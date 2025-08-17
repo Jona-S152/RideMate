@@ -7,7 +7,7 @@ export default function HomeScreen() {
         <ThemedView
             lightColor={DefaultTheme.colors.background}
             darkColor={DarkTheme.colors.background}
-            style={{ padding: 10 }}>
+            style={{ padding: 20 }}>
                 <ThemedText>
                     HOME SCREEN
                 </ThemedText>

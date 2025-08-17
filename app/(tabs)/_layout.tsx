@@ -14,6 +14,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
+        tabBarShowLabel: false,
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
         tabBarButton: HapticTab,
@@ -22,8 +23,15 @@ export default function TabLayout() {
           ios: {
             // Use a transparent background on iOS to show the blur effect
             position: 'absolute',
+            // backgroundColor: 'transparent',
+            // borderTopWidth: 0, 
           },
-          default: {},
+          default: {
+            // position: 'absolute',
+            // backgroundColor: 'transparent',
+            // borderTopWidth: 0,
+            // elevation: 0, 
+          },
         }),
       }}>
       <Tabs.Screen
@@ -36,6 +44,12 @@ export default function TabLayout() {
         name="available-routes"
         options={{
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="p.square" color={color} />,
         }}
       />
     </Tabs>

@@ -1,7 +1,7 @@
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { DarkTheme, DefaultTheme } from "@react-navigation/native";
-import { Link } from "expo-router";
+import { Link, router } from "expo-router";
 import { Pressable } from "react-native";
 
 export default function LoginScreen () {
@@ -17,9 +17,10 @@ export default function LoginScreen () {
             >
             Login Screen
         </ThemedText>
-        <Link href="/(tabs)/home" asChild>
+        <Link href="/(tabs)/home/index" asChild>
             <Pressable 
-                style={{ margin: 10, padding: 10, borderRadius: 15, backgroundColor: DefaultTheme.colors.primary}}>
+                style={{ margin: 10, padding: 10, borderRadius: 15, backgroundColor: DefaultTheme.colors.primary}}
+                onPress={() => router.replace("/(tabs)/home/index")}>
                 <ThemedText
                     style={{ color: 'white'}}
                     >
