@@ -4,7 +4,7 @@ import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 
-export default function AvailableRoutesScreen() {
+export default function MyActivityScreen() {
     const [ text, setText ] = useState<string>('');
     return (
         <Screen>
@@ -12,7 +12,7 @@ export default function AvailableRoutesScreen() {
                 <ThemedTextInput placeholder="Buscar..." onChangeText={setText} value={text}>
 
                 </ThemedTextInput>
-                <Pressable style={{ backgroundColor: '#F2DD6C' }} className="rounded-full w-10 h-10">
+                <Pressable style={{backgroundColor: '#F2DD6C'}} className="rounded-full w-10 h-10">
                     
                 </Pressable>
             </View>

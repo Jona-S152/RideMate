@@ -14,8 +14,8 @@ export default function HistoryRouteCard({ title }: HistoryRouteProps) {
             darkColor={Colors.dark.tint}
             className="rounded-2xl my-1 p-5 h-44">
                 <ThemedText
-                    lightColor={DefaultTheme.colors.background} 
-                    darkColor={DarkTheme.colors.background}
+                    lightColor={DefaultTheme.colors.text} 
+                    darkColor={DarkTheme.colors.text}
                     className="text-2xl">
                         {title}
                 </ThemedText>

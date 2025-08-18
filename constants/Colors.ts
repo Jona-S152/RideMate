@@ -4,7 +4,7 @@
  */
 
 
-const tintColorLight = '#794519';
+const tintColorLight = '#F2DD6C';
 const tintColorDark = '#fff';
 
 export const Colors = {
@@ -16,7 +16,7 @@ export const Colors = {
     tabIconDefault: '#687076',
     tabIconSelected: tintColorLight,
     historyCard: {
-      background: '#F1DF79'
+      background: '#EAE9E7'
     }
   },
   dark: {

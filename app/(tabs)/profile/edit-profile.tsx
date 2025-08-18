@@ -1,10 +1,10 @@
 import { Screen } from "@/components/screen";
 import { ThemedText } from "@/components/ThemedText";
+import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { DarkTheme, DefaultTheme } from "@react-navigation/native";
-import { Link } from "expo-router";
 import { Pressable, ScrollView, View } from "react-native";
 
-export default function ProfileScreen() {
+export default function EditProfileScreen() {
     return (
         <Screen>
             <ScrollView>
@@ -17,6 +17,12 @@ export default function ProfileScreen() {
                     </ThemedText>
                     <View className="relative w-60 h-60 my-3">
                         <View className="bg-stone-300 rounded-full w-60 h-60 my-3"/>
+                        <ThemedText
+                            lightColor={DefaultTheme.colors.text}
+                            darkColor={DarkTheme.colors.text}
+                            className="absolute top-1/3 left-1/2 -translate-x-1/3 -translate-y-1/2 text-xl">
+                                Cambiar foto
+                        </ThemedText>
                     </View>
                     <ThemedText
                         lightColor={DefaultTheme.colors.text}
@@ -28,54 +34,40 @@ export default function ProfileScreen() {
                 {/* Divider */}
                 <View className="my-2 h-px bg-gray-300" />
                 <View className="flex-1">
-                    <Link href="/(tabs)/profile/edit-profile" className="active:bg-slate-300">
-                        <Pressable >
-                            <ThemedText
-                                lightColor={DefaultTheme.colors.text}
-                                darkColor={DarkTheme.colors.text}
-                                className="py-6 px-4">
-                                    Editar perfil
-                            </ThemedText>
-                        </Pressable>
-                    </Link>
+
                         <Pressable className="active:bg-slate-300">
-                            <ThemedText
+                            <ThemedTextInput
                                 lightColor={DefaultTheme.colors.text}
                                 darkColor={DarkTheme.colors.text}
-                                className="py-6 px-4">
-                                    Mi actividad
-                            </ThemedText>
+                                className="py-6 px-4"
+                                placeholder="Nombres">
+                                    
+                            </ThemedTextInput>
                         </Pressable>
                         <Pressable className="active:bg-slate-300">
-                            <ThemedText
+                            <ThemedTextInput
                                 lightColor={DefaultTheme.colors.text}
                                 darkColor={DarkTheme.colors.text}
-                                className="py-6 px-4">
-                                    Stonks
-                            </ThemedText>
+                                className="py-6 px-4"
+                                placeholder="Apellidos">
+                                    
+                            </ThemedTextInput>
                         </Pressable>
                         <Pressable className="active:bg-slate-300">
-                            <ThemedText
+                            <ThemedTextInput
                                 lightColor={DefaultTheme.colors.text}
                                 darkColor={DarkTheme.colors.text}
-                                className="py-6 px-4">
-                                    Convertirme en conductor
-                            </ThemedText>
+                                className="py-6 px-4"
+                                placeholder="Correo electrónico">
+                                    
+                            </ThemedTextInput>
                         </Pressable>
                         <Pressable className="active:bg-slate-300">
                             <ThemedText
                                 lightColor={DefaultTheme.colors.text}
                                 darkColor={DarkTheme.colors.text}
                                 className="py-6 px-4">
-                                    Editar vehículo
-                            </ThemedText>
-                        </Pressable>
-                        <Pressable className="active:bg-red-300">
-                            <ThemedText
-                                lightColor={DefaultTheme.colors.text}
-                                darkColor={DarkTheme.colors.text}
-                                className="py-6 px-4 text-red-600">
-                                    Cerrar sesion
+                                    Cambiar contraseña
                             </ThemedText>
                         </Pressable>
                 </View>
