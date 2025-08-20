@@ -28,8 +28,8 @@ export default function ProfileScreen() {
                 {/* Divider */}
                 <View className="my-2 h-px bg-gray-300" />
                 <View className="flex-1">
-                    <Link href="/(tabs)/profile/edit-profile" className="active:bg-slate-300">
-                        <Pressable >
+                    <Link href="/(tabs)/profile/edit-profile">
+                        <Pressable className="rounded-full active:bg-slate-300">
                             <ThemedText
                                 lightColor={DefaultTheme.colors.text}
                                 darkColor={DarkTheme.colors.text}

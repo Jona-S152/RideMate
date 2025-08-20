@@ -18,6 +18,7 @@ export function ThemedTextInput({
 
   return (
     <TextInput
+      className='rounded-full border border-orange-950 p-3'
       style={[
         { color },
         type === 'default' ? styles.default : undefined,

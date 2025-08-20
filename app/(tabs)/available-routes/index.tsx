@@ -8,8 +8,12 @@ export default function AvailableRoutesScreen() {
     const [ text, setText ] = useState<string>('');
     return (
         <Screen>
-            <View className="flex-row justify-between items-center p-1">
-                <ThemedTextInput placeholder="Buscar..." onChangeText={setText} value={text}>
+            <View className="flex-row items-center w-full">
+                <ThemedTextInput 
+                    placeholder="Buscar..." 
+                    onChangeText={setText} value={text} 
+                    className="flex-1 mr-2"
+                    >
 
                 </ThemedTextInput>
                 <Pressable style={{ backgroundColor: '#F2DD6C' }} className="rounded-full w-10 h-10">

@@ -11,7 +11,7 @@ export function Screen({ children }: ScreenProps) {
         <ThemedView
             lightColor={DefaultTheme.colors.background}
             darkColor={DarkTheme.colors.background}
-            className="flex-1 pt-4 px-2"
+            className="flex-1 pt-4 px-3"
             >
                 {children}
         </ThemedView>
