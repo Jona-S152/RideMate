@@ -13,7 +13,9 @@ export default function HomeStackLayout() {
         headerTransparent: true,
         headerLeft: () => <Text style={{ color: Colors.light.text, fontSize: 40, paddingBottom: 10, fontWeight: 'bold' }}>Rutas disponibles</Text>,
       }}>
-      <Stack.Screen name="index" />
+      <Stack.Screen name="index" options={{
+        headerShown: false,
+      }} />
     </Stack>
   );
 }

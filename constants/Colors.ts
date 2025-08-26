@@ -9,7 +9,10 @@ const tintColorDark = '#fff';
 
 export const Colors = {
   light: {
-    text: '#794515',
+    primary: '#000D3A',
+    secondary: '#FCA311',
+    tird: '#E5E5E5',
+    text: '#E5E5E5',
     background: '#fff',
     tint: tintColorLight,
     icon: '#687076',

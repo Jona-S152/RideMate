@@ -40,18 +40,21 @@ export default function TabLayout() {
       <Tabs.Screen
         name="home"
         options={{
+          headerShown: false,
           tabBarIcon: ({ color }) => <Entypo size={28} name="home" color={color} />,
         }}
       />
       <Tabs.Screen
         name="available-routes"
         options={{
+          headerShown: false,
           tabBarIcon: ({ color }) => <FontAwesome5 size={28} name="route" color={color}/>,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
+          headerShown: false,
           tabBarIcon: ({ color }) => <MaterialCommunityIcons size={28} name="account" color={color}/>
         }}
       />

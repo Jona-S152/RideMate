@@ -11,9 +11,11 @@ export default function ProfileStackLayout() {
         
       }}>
       <Stack.Screen name="index" options={{
+        headerShown: false,
         headerLeft: () => <Text style={{ color: Colors.light.text, fontSize: 40, paddingBottom: 10, fontWeight: 'bold' }}>Perfil</Text>,
       }} />
       <Stack.Screen name="edit-profile" options={{
+        headerShown: false,
         headerLeft: () => <Text style={{ color: Colors.light.text, fontSize: 40, paddingBottom: 10, fontWeight: 'bold' }}>Editar perfil</Text>,
       }} />
     </Stack>
