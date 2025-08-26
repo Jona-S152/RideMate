@@ -1,16 +1,17 @@
-import HistoryRouteCard from "@/components/history-route-card";
+import RouteCard from "@/components/history-route-card";
 import { ThemedText } from "@/components/ThemedText";
+import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { useState } from "react";
-import { ScrollView, Switch, View } from "react-native";
+import { Image, ScrollView, Switch, View } from "react-native";
 
 export default function HomeScreen() {
     const [isEnabled, setIsEnabled] = useState(false);
     const toggleSwitch = () => setIsEnabled(previousState => !previousState);
     return (
             <ScrollView >
-                <View className={`bg-[${Colors.light.primary}] h-[393px] w-full rounded-bl-[40px]`}>
-                    <View className="flex-row justify-between mx-8 my-16">
+                <ThemedView lightColor={Colors.light.primary} className="w-full rounded-bl-[40px]">
+                    <View className="flex-row justify-between px-8 pt-16">
                         <View>
                             <ThemedText
                                 lightColor={Colors.light.text}
@@ -33,7 +34,7 @@ export default function HomeScreen() {
                         </Switch>
                     </View>
                     <View className="flex-row justify-between mx-8">
-                        <View className="flex-col gap-4">
+                        <View className="flex-col gap-4  my-14">
                             <ThemedText
                                 lightColor={Colors.light.text}
                                 className="font-light text-base">
@@ -50,13 +51,18 @@ export default function HomeScreen() {
                                     Conociste +1 estudiante
                             </ThemedText>
                         </View>
+                        <View className="">
+                            <Image
+                                source={require('@/assets/images/studentWalk.png')}
+                                resizeMode="contain"
+                                className="h-64"/>
+                        </View>
                     </View>
-                </View>
+                </ThemedView>
                 
-                <View className="flex-1 mx-1 rounded-xl">
-                        <HistoryRouteCard title="Ruta 1"/>
-                        <HistoryRouteCard title="Ruta 2"/>
-                        <HistoryRouteCard title="Ruta 2"/>
+                <View className="flex-col gap-4 m-4">
+                    <RouteCard title="Sur - Norte" isActive={true}/>
+                    <RouteCard title="Sur - Norte" isActive={false}/>
                 </View>
             </ScrollView>
     );

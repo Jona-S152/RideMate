@@ -13,13 +13,14 @@ export const Colors = {
     secondary: '#FCA311',
     tird: '#E5E5E5',
     text: '#E5E5E5',
-    background: '#fff',
+    background: '#E5E5E5',
     tint: tintColorLight,
     icon: '#687076',
     tabIconDefault: '#687076',
     tabIconSelected: tintColorLight,
     historyCard: {
-      background: '#EAE9E7'
+      background: '#D9D9D9',
+      activeBackground: '#FCA311'
     }
   },
   dark: {

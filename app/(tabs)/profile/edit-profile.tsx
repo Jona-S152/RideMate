@@ -1,7 +1,8 @@
 import ChangePasswordModal from "@/components/Modals/change-password";
-import { Screen } from "@/components/screen";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedTextInput } from "@/components/ThemedTextInput";
+import { ThemedView } from "@/components/ThemedView";
+import { Colors } from "@/constants/Colors";
 import { DarkTheme, DefaultTheme } from "@react-navigation/native";
 import { useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
@@ -9,38 +10,30 @@ import { Pressable, ScrollView, View } from "react-native";
 export default function EditProfileScreen() {
     const [ changePassVisibleModal, setChangePassVisibleModal ] = useState<boolean>(false);
     return (
-        <Screen>
             <ScrollView>
-                <View className="flex-1 items-center">
-                    <ThemedText
-                        lightColor={DefaultTheme.colors.text}
-                        darkColor={DarkTheme.colors.text}
-                        className="text-3xl">
-                            Jhon Doe
-                    </ThemedText>
-                    <View className="relative w-60 h-60 my-3">
-                        <View className="bg-stone-300 rounded-full w-60 h-60 my-3"/>
+                <ThemedView lightColor={Colors.light.primary} className="w-full px-4 py-6 rounded-bl-[40px]">
+                    <View className="items-center">
                         <ThemedText
-                            lightColor={DefaultTheme.colors.text}
-                            darkColor={DarkTheme.colors.text}
-                            className="absolute top-1/3 left-1/2 -translate-x-1/3 -translate-y-1/2 text-xl">
-                                Cambiar foto
+                            lightColor={Colors.light.text}
+                            className="text-3xl mt-6">
+                                Jhon Doe
                         </ThemedText>
-                    </View>
-                    <ThemedText
-                        lightColor={DefaultTheme.colors.text}
-                        darkColor={DarkTheme.colors.text}
-                        className="text-2xl">
-                            4.8
-                    </ThemedText>
-                </View> 
+                        <View className="w-60 h-60 my-3">
+                            <View className="bg-stone-300 rounded-full w-60 h-60 my-3"/>
+                        </View>
+                        <ThemedText
+                            lightColor={Colors.light.text}
+                            className="text-2xl mt-4">
+                                4.8
+                        </ThemedText>
+                    </View> 
+                </ThemedView>
                 {/* Divider */}
                 <View className="my-2 h-px bg-gray-300" />
                 <View className="flex-1">
                         <Pressable className="active:bg-slate-300">
                             <ThemedTextInput
-                                lightColor={DefaultTheme.colors.text}
-                                darkColor={DarkTheme.colors.text}
+                                lightColor={Colors.light.background}
                                 className="py-6 px-4 mb-2"
                                 placeholder="Nombres">
                                     
@@ -48,8 +41,7 @@ export default function EditProfileScreen() {
                         </Pressable>
                         <Pressable className="active:bg-slate-300">
                             <ThemedTextInput
-                                lightColor={DefaultTheme.colors.text}
-                                darkColor={DarkTheme.colors.text}
+                                lightColor={Colors.light.background}
                                 className="py-6 px-4 mb-2"
                                 placeholder="Apellidos">
                                     
@@ -57,8 +49,7 @@ export default function EditProfileScreen() {
                         </Pressable>
                         <Pressable className="active:bg-slate-300">
                             <ThemedTextInput
-                                lightColor={DefaultTheme.colors.text}
-                                darkColor={DarkTheme.colors.text}
+                                lightColor={Colors.light.background}
                                 className="py-6 px-4 mb-2"
                                 placeholder="Correo electrónico">
                                     
@@ -85,6 +76,5 @@ export default function EditProfileScreen() {
                         </View>
                 </View>
             </ScrollView>
-        </Screen>
     );
 }

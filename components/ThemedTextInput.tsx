@@ -14,13 +14,13 @@ export function ThemedTextInput({
   type = 'default',
   ...rest
 }: ThemedTextProps) {
-  const color = useThemeColor({ light: lightColor, dark: darkColor }, 'text');
+  const backgroundColor = useThemeColor({ light: lightColor, dark: darkColor }, 'text');
 
   return (
     <TextInput
-      className='rounded-full border border-orange-950 p-3'
+      className='rounded-full p-3'
       style={[
-        { color },
+        { backgroundColor },
         type === 'default' ? styles.default : undefined,
         type === 'title' ? styles.title : undefined,
         type === 'defaultSemiBold' ? styles.defaultSemiBold : undefined,

@@ -1,5 +1,5 @@
 import { Colors } from "@/constants/Colors";
-import { DarkTheme, DefaultTheme } from "@react-navigation/native";
+import { DefaultTheme } from "@react-navigation/native";
 import { useState } from "react";
 import { Modal, Pressable, View } from "react-native";
 import { ThemedText } from "../ThemedText";
@@ -57,8 +57,7 @@ export default function ChangePasswordModal({ animationType, transparent, visibl
                                 </View>
                                 <View className="mt-2">
                                     <ThemedTextInput
-                                        lightColor={DefaultTheme.colors.text}
-                                        darkColor={DarkTheme.colors.text}
+                                        lightColor={Colors.light.background}
                                         placeholder=""
                                         className="text-xl mx-4 mb-2">
 
@@ -82,7 +81,7 @@ export default function ChangePasswordModal({ animationType, transparent, visibl
                             </View>
                             :
                             <View>
-                                <View style={{ backgroundColor: Colors.light.tint }} className="p-4">
+                                <View style={{ backgroundColor: Colors.light.primary }} className="p-4">
                                     <ThemedText
                                         lightColor={Colors.light.text}
                                         darkColor={Colors.dark.text}
@@ -92,15 +91,13 @@ export default function ChangePasswordModal({ animationType, transparent, visibl
                                 </View>
                                 <View className="mt-2">
                                     <ThemedTextInput
-                                        lightColor={DefaultTheme.colors.text}
-                                        darkColor={DarkTheme.colors.text}
+                                        lightColor={Colors.light.background}
                                         placeholder="Contraseña nueva"
                                         className="text-xl mx-4 mb-2">
 
                                     </ThemedTextInput>
                                     <ThemedTextInput
-                                        lightColor={DefaultTheme.colors.text}
-                                        darkColor={DarkTheme.colors.text}
+                                        lightColor={Colors.light.background}
                                         placeholder="Confirmar contraseña"
                                         className="text-xl mx-4">
 
