@@ -16,6 +16,9 @@ export default function HomeStackLayout() {
       <Stack.Screen name="index" options={{
         headerShown: false,
       }} />
+      <Stack.Screen name="route-detail" options={{ 
+        headerShown: false 
+      }} />
     </Stack>
   );
 }

@@ -1,5 +1,6 @@
 import { Colors } from "@/constants/Colors";
 import { DarkTheme, DefaultTheme } from "@react-navigation/native";
+import { Link } from "expo-router";
 import { Image, Pressable, View } from "react-native";
 import { ThemedText } from "./ThemedText";
 import { ThemedView } from "./ThemedView";
@@ -14,7 +15,17 @@ export default function RouteCard({ title, isActive }: HistoryRouteProps) {
         <ThemedView
             lightColor={isActive ? Colors.light.historyCard.activeBackground : Colors.light.historyCard.background}
             darkColor={Colors.light.historyCard.activeBackground}
-            className="flex-row justify-between rounded-[28px] my-1 p-5">
+            className="flex-row justify-between rounded-[28px] my-1 p-5 overflow-hidden">
+                {isActive && (
+                    <View
+                    className="
+                        absolute -top-12 -left-12 
+                        w-[150%] h-40 
+                        bg-[#FFD369]/40 
+                        -rotate-[70deg]
+                    "
+                    />
+                )}
                 <View>
                     <ThemedText
                         lightColor={DefaultTheme.colors.text} 
@@ -67,14 +78,17 @@ export default function RouteCard({ title, isActive }: HistoryRouteProps) {
                             </ThemedView>
                         </View>
                         : 
-                        <Pressable className="bg-[#FCA311] rounded-full p-1 items-center">
-                            <ThemedText
-                                lightColor={DefaultTheme.colors.text} 
-                                darkColor={DarkTheme.colors.text}
-                                className="text-lg font-normal">
-                                    Ver detalles
-                            </ThemedText>
-                        </Pressable>}
+                        <Link href="/(tabs)/available-routes/route-detail" asChild>
+                            <Pressable className="bg-[#FCA311] rounded-full p-1 items-center">
+                                <ThemedText
+                                    lightColor={DefaultTheme.colors.text} 
+                                    darkColor={DarkTheme.colors.text}
+                                    className="text-lg font-normal">
+                                        Ver detalles
+                                </ThemedText>
+                            </Pressable>
+                        </Link>
+                        }
                     </View> 
                 </View>
                 <View className="justify-center">

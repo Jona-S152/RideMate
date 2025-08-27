@@ -9,7 +9,7 @@ export default function HomeScreen() {
     const [isEnabled, setIsEnabled] = useState(false);
     const toggleSwitch = () => setIsEnabled(previousState => !previousState);
     return (
-            <ScrollView >
+            <ScrollView>
                 <ThemedView lightColor={Colors.light.primary} className="w-full rounded-bl-[40px]">
                     <View className="flex-row justify-between px-8 pt-16">
                         <View>
