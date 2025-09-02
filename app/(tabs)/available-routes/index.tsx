@@ -63,8 +63,15 @@ export default function AvailableRoutesScreen() {
                     }}>
                     <View className="flex-row items-center">
                         <FilterCard title="Punto de partida" value="puntoPartida" isSelected={true}/>
-                        <FilterCard title="Punto Final" value="puntoFinal" />
-                        <FilterCard title="Ruta" value="nombreRuta"/>
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            >
+                            <FilterCard title="Punto Final" value="puntoFinal" />
+                            <FilterCard title="Ruta" value="nombreRuta"/>
+                            <FilterCard title="Conductor" value="nombreRuta"/>
+                            <FilterCard title="2 pasajeros" value="nombreRuta"/>
+                        </ScrollView>
                     </View>
                 </Animated.View>
                 :
@@ -73,16 +80,16 @@ export default function AvailableRoutesScreen() {
             </ThemedView>
             <View className="m-4">
                 <ScrollView>
-                    <HistoryRouteCard title="Sur - Norte"/>
-                    <HistoryRouteCard title="Sur - Norte"/>
-                    <HistoryRouteCard title="Sur - Norte"/>
-                    <HistoryRouteCard title="Sur - Norte"/>
-                    <HistoryRouteCard title="Sur - Norte"/>
-                    <HistoryRouteCard title="Sur - Norte"/>
-                    <HistoryRouteCard title="Sur - Norte"/>
-                    <HistoryRouteCard title="Sur - Norte"/>
-                    <HistoryRouteCard title="Sur - Norte"/>
-                    <HistoryRouteCard title="Sur - Norte"/>
+                    <HistoryRouteCard title="Sur - Norte" routeScreen="/(tabs)/available-routes/route-detail"/>
+                    <HistoryRouteCard title="Sur - Norte" routeScreen="/(tabs)/available-routes/route-detail"/>
+                    <HistoryRouteCard title="Sur - Norte" routeScreen="/(tabs)/available-routes/route-detail"/>
+                    <HistoryRouteCard title="Sur - Norte" routeScreen="/(tabs)/available-routes/route-detail"/>
+                    <HistoryRouteCard title="Sur - Norte" routeScreen="/(tabs)/available-routes/route-detail"/>
+                    <HistoryRouteCard title="Sur - Norte" routeScreen="/(tabs)/available-routes/route-detail"/>
+                    <HistoryRouteCard title="Sur - Norte" routeScreen="/(tabs)/available-routes/route-detail"/>
+                    <HistoryRouteCard title="Sur - Norte" routeScreen="/(tabs)/available-routes/route-detail"/>
+                    <HistoryRouteCard title="Sur - Norte" routeScreen="/(tabs)/available-routes/route-detail"/>
+                    <HistoryRouteCard title="Sur - Norte" routeScreen="/(tabs)/available-routes/route-detail"/>
                 </ScrollView>
             </View>
         </View>

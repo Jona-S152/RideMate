@@ -12,6 +12,19 @@
       "supportsTablet": true
     },
     "android": {
+      "newArchEnabled": true,
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyD7QUc9cGMHwVNILiyJjJc0yvM5KVBZsEA"
+        }
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "INTERNET"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -34,7 +47,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "expo-maps"
     ],
     "experiments": {
       "typedRoutes": true
