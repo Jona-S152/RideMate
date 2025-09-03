@@ -1,17 +1,31 @@
 import { Colors } from "@/constants/Colors";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
-import { useCallback, useMemo, useRef } from "react";
-import { Text } from "react-native";
-import Animated, { useSharedValue } from "react-native-reanimated";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { View } from "react-native";
+import Animated, { interpolate, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { ThemedText } from "./ThemedText";
 import { ThemedView } from "./ThemedView";
 
 export default function BottomSheetRouteDetail() {
   const bottomSheetRef = useRef<BottomSheet>(null);
-  const snapPoints = useMemo(() => ["30%", "40%"], []);
+  const [ currentSnapPoint, setCurrentSnapPoint ] = useState<number>(0);
+  const snapPoints = useMemo(() => ["45%"], []);
   const animatedIndex = useSharedValue(0);
 
+  const animatedContentStyle = useAnimatedStyle(() => {
+  const opacity = interpolate(animatedIndex.value, [0, 1], [0, 1]);
+  const translateY = interpolate(animatedIndex.value, [0, 1], [20, 0]);
+  const maxHeight = interpolate(animatedIndex.value, [0, 1], [0, 500]); 
+  return {
+    opacity,
+    transform: [{ translateY }],
+    maxHeight, // esto evita que deje hueco cuando está colapsado
+    overflow: "hidden",
+  };
+});
+
   const handleSheetChanges = useCallback((index: number) => {
+    setCurrentSnapPoint(index);
     animatedIndex.value = index; // actualiza el índice animado
     console.log("handleSheetChanges", index);
   }, []);
@@ -19,11 +33,11 @@ export default function BottomSheetRouteDetail() {
   const HandleDragToResize = () => (
     <ThemedView
         lightColor={Colors.light.secondary}
-        className="self-center rounded-full px-3 py-2 my-6 min-w-[60px] items-center justify-center absolute -top-6 z-10">
+        className="px-4 py-2 rounded-b-full self-center min-w-[100px] min-h-[50px] items-center justify-center">
             <ThemedText
                 lightColor={Colors.light.text}
-                className="text-base font-bold">
-                    23
+                className="text-2xl font-bold">
+                    23Km
             </ThemedText>
     </ThemedView>
   )
@@ -37,20 +51,43 @@ export default function BottomSheetRouteDetail() {
         enablePanDownToClose={false}
         backgroundStyle={{
             backgroundColor: Colors.light.primary,
-            borderTopLeftRadius: 80,
-            borderTopRightRadius: 80,
+            borderTopLeftRadius: 100,
+            borderTopRightRadius: 100,
         }}
         handleComponent={HandleDragToResize}
       >
-        <Animated.View className="pt-16 px-4">
-          <BottomSheetView>
-            <Text className="text-lg font-bold mb-2">
-              Información del BottomSheet
-            </Text>
-            <Text>Arrastra el BottomSheet para cambiar su altura.</Text>
-            <Text>Este contenido se adapta dinámicamente.</Text>
-          </BottomSheetView>
-        </Animated.View>
+        <BottomSheetView>
+          <View className="my-6 px-6">
+            {/* Siempre visible */}
+            <ThemedText
+              lightColor={Colors.light.text}
+              className="font-bold text-3xl"
+            >
+              Ruta Sur - Norte
+            </ThemedText>
+
+            {/* Visible solo cuando el bottomsheet se expande */}
+            {/* { currentSnapPoint > 0 && ( */}
+              <Animated.View style={animatedContentStyle}>
+              <View className="mt-6">
+                <ThemedText lightColor={Colors.light.text}>
+                  Arrastra el BottomSheet para cambiar su altura.
+                </ThemedText>
+                <ThemedText lightColor={Colors.light.text}>
+                  Este contenido se adapta dinámicamente.
+                </ThemedText>
+                <ThemedText lightColor={Colors.light.text}>
+                  Otro contenido adicional.
+                </ThemedText>
+                <ThemedText lightColor={Colors.light.text}>
+                  Y más información aquí.
+                </ThemedText>
+              </View>
+            </Animated.View>
+            {/* )
+            } */}
+          </View>
+        </BottomSheetView>  
       </BottomSheet>
   );
 }
