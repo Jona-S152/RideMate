@@ -13,6 +13,7 @@ export const Colors = {
     secondary: '#FCA311',
     tird: '#E5E5E5',
     text: '#E5E5E5',
+    textBlack: '#000000',
     background: '#E5E5E5',
     tint: tintColorLight,
     icon: '#687076',

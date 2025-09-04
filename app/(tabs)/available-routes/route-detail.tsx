@@ -1,8 +1,11 @@
 import BottomSheetRouteDetail from "@/components/BottomSheetRouteDetail";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 export default function RouteDetail() {
     return (
-        <BottomSheetRouteDetail/>
+        <GestureHandlerRootView className="flex-1">
+            <BottomSheetRouteDetail/>
+        </GestureHandlerRootView>
         // <ImageBackground
         //     source={{ uri: "https://media.wired.com/photos/59269cd37034dc5f91bec0f1/master/pass/GoogleMapTA.jpg" }} // URL o require local
         //     resizeMode="cover"
