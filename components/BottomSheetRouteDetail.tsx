@@ -1,12 +1,24 @@
 import { Colors } from "@/constants/Colors";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Image, ScrollView, View } from "react-native";
+import { Image, View } from "react-native";
+import { FlatList } from "react-native-gesture-handler";
 import Animated, { interpolate, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { ThemedText } from "./ThemedText";
 import { ThemedView } from "./ThemedView";
 
 export default function BottomSheetRouteDetail() {
+  const imagenes = [
+    {url : 'https://www.az.cl/wp-content/uploads/2021/07/ariela-agosin-480x385.jpg'},
+    {url : 'https://i.pinimg.com/originals/02/35/66/023566c2bbfcf49a65b014382f522af3.jpg'},
+    {url : 'https://tse4.mm.bing.net/th/id/OIP.LPLdkS9c-vB5LMKZygVhIAHaLF?cb=thfvnext&rs=1&pid=ImgDetMain&o=7&rm=3'},
+    {url : 'https://www.az.cl/wp-content/uploads/2021/07/ariela-agosin-480x385.jpg'},
+    {url : 'https://www.az.cl/wp-content/uploads/2021/07/ariela-agosin-480x385.jpg'},
+    {url : 'https://www.az.cl/wp-content/uploads/2021/07/ariela-agosin-480x385.jpg'},
+    {url : 'https://www.az.cl/wp-content/uploads/2021/07/ariela-agosin-480x385.jpg'},
+    {url : 'https://www.az.cl/wp-content/uploads/2021/07/ariela-agosin-480x385.jpg'},
+  ]
+
   const bottomSheetRef = useRef<BottomSheet>(null);
   const [ currentSnapPoint, setCurrentSnapPoint ] = useState<number>(0);
   const snapPoints = useMemo(() => ["45%"], []);
@@ -36,7 +48,7 @@ export default function BottomSheetRouteDetail() {
         <ThemedText
           lightColor={Colors.light.text}
           className="font-bold text-3xl pt-8"
-        >
+          >
           Ruta Sur - Norte
         </ThemedText>
       </View>
@@ -224,13 +236,15 @@ export default function BottomSheetRouteDetail() {
                     </View>
                   </View>
                   <View className="h-full bg-slate-300 w-[1px] mr-4 opacity-40"/>
-                  <ScrollView
+                  <FlatList
                     horizontal
-                    showsHorizontalScrollIndicator={false}>
+                    data={imagenes}
+                    keyExtractor={(item, index) => index.toString()}
+                    renderItem={({item}) => (
                       <View className=" mr-4">
                         <View className="items-center">
                           <View className="w-16 h-24 rounded-full border-2 border-[#E5E5E5] overflow-hidden">
-                            <Image source={{ uri: "https://www.az.cl/wp-content/uploads/2021/07/ariela-agosin-480x385.jpg" }} 
+                            <Image source={{ uri: item.url }} 
                               resizeMode="cover" 
                               className="w-full h-full"
                             />
@@ -242,37 +256,10 @@ export default function BottomSheetRouteDetail() {
                           </ThemedView>
                         </View>
                       </View>
-                      <View className=" mr-4">
-                        <View className="items-center">
-                          <View className="w-16 h-24 rounded-full border-2 border-[#E5E5E5] overflow-hidden">
-                            <Image source={{ uri: "https://i.pinimg.com/originals/02/35/66/023566c2bbfcf49a65b014382f522af3.jpg" }} 
-                              resizeMode="cover" 
-                              className="w-full h-full"
-                            />
-                          </View>
-                          <ThemedView lightColor={Colors.light.tird} className="rounded-full justify-center items-center max-w-[40px] px-2 -translate-y-3">
-                            <ThemedText lightColor={Colors.light.textBlack}>
-                              4.8
-                            </ThemedText>
-                          </ThemedView>
-                        </View>
-                      </View>
-                      <View className=" mr-4">
-                        <View className="items-center">
-                          <View className="w-16 h-24 rounded-full border-2 border-[#E5E5E5] overflow-hidden">
-                            <Image source={{ uri: "https://tse4.mm.bing.net/th/id/OIP.LPLdkS9c-vB5LMKZygVhIAHaLF?cb=thfvnext&rs=1&pid=ImgDetMain&o=7&rm=3" }} 
-                              resizeMode="cover" 
-                              className="w-full h-full"
-                            />
-                          </View>
-                          <ThemedView lightColor={Colors.light.tird} className="rounded-full justify-center items-center max-w-[40px] px-2 -translate-y-3">
-                            <ThemedText lightColor={Colors.light.textBlack}>
-                              4.8
-                            </ThemedText>
-                          </ThemedView>
-                        </View>
-                      </View>
-                  </ScrollView>
+                    )}
+                    showsHorizontalScrollIndicator={false}
+                    nestedScrollEnabled
+                  />
                 </View>
               </View>
             </Animated.View>

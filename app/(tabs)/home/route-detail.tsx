@@ -3,16 +3,21 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import AntDesign from '@expo/vector-icons/AntDesign';
+import Feather from '@expo/vector-icons/Feather';
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
+import { useNavigation } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Dimensions, Pressable, Text, View } from "react-native";
 import { GestureHandlerRootView, ScrollView } from "react-native-gesture-handler";
 import MapView, { Marker, Region } from "react-native-maps";
+import MapViewDirections from "react-native-maps-directions";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 export default function RouteDetail() {
+  const navigation = useNavigation();
+  
   const [region, setRegion] = useState<Region | null>(null);
   const mapRef = useRef<MapView>(null);
   const [showStops, setShowStops] = useState(false); 
@@ -79,14 +84,14 @@ export default function RouteDetail() {
   };
 
   const toggleStops = () => {
-    console.log('Presionado');
     if (showStops) {
+      setShowStops(false)
       // Ocultar → desliza hacia la izquierda
       Animated.timing(slideAnim, {
         toValue: -SCREEN_WIDTH,
         duration: 300,
         useNativeDriver: true,
-      }).start(() => setShowStops(false));
+      }).start();
     } else {
       setShowStops(true);
       // Mostrar → desliza hacia dentro
@@ -111,7 +116,6 @@ export default function RouteDetail() {
             ref={mapRef}
             mapType="standard"
             loadingEnabled
-            showsUserLocation
             className="flex-1"
             initialRegion={region}
             onPress={(e) =>
@@ -129,11 +133,30 @@ export default function RouteDetail() {
               title="Tu ubicación"
               description="Este es tu marcador"
             />
+
+            <MapViewDirections
+              origin={{ latitude: -2.208754, longitude: -79.891686 }}
+              destination={{ latitude: -2.180671, longitude: -79.878057 }}
+              apikey="AIzaSyD7QUc9cGMHwVNILiyJjJc0yvM5KVBZsEA"
+              strokeWidth={6}
+              waypoints={[
+                { latitude: -2.160998, longitude: -79.915359 }, // Parada 1
+                { latitude: -2.140998, longitude: -79.910359 }, // Parada 2
+              ]}
+              strokeColor={Colors.light.secondary}
+            />
+
           </MapView>
+
+          <View pointerEvents="box-none" className="absolute top-8 right-[14px] z-50">
+            <Pressable onPress={() => navigation.goBack()} className="p-2 rounded-full shadow-lg">
+              <Feather name="x-square" size={36} color={Colors.light.primary} />
+            </Pressable>
+          </View>
 
           <View pointerEvents="box-none" className="absolute top-8 left-[14px] z-50">
             <Pressable onPress={toggleStops} className="p-2 rounded-full shadow-lg">
-              {showStops ? <AntDesign name="left" size={36} color="black" /> : <AntDesign name="right" size={36} color="black" />}
+              {showStops ? <AntDesign name="doubleleft" size={36} color={Colors.light.primary} /> : <AntDesign name="doubleright" size={36} color="black" />}
             </Pressable>
           </View>
 
