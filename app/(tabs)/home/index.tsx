@@ -2,12 +2,31 @@ import RouteCard from "@/components/history-route-card";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
-import { useState } from "react";
-import { Image, ScrollView, Switch, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Animated, ScrollView, Switch, View } from "react-native";
 
 export default function HomeScreen() {
     const [isEnabled, setIsEnabled] = useState(false);
     const toggleSwitch = () => setIsEnabled(previousState => !previousState);
+
+    const slideAnim = useRef(new Animated.Value(300)).current;
+    const opacityAnim = useRef(new Animated.Value(0)).current;
+    
+    useEffect(() => {
+        Animated.timing(slideAnim, {
+            toValue: isEnabled ? 300 : 0, // 0 es visible, 300 fuera de pantalla
+            duration: 500, // tiempo de animación en ms
+            useNativeDriver: true,
+        }).start();
+    }, [isEnabled]);
+    
+    useEffect(() => {
+        Animated.timing(opacityAnim, {
+            toValue: isEnabled ? 0 : 1,
+            duration: 500,
+            useNativeDriver: true,
+        }).start();
+    }, [isEnabled]);
 
     return (
         <ScrollView>
@@ -53,10 +72,11 @@ export default function HomeScreen() {
                         </ThemedText>
                     </View>
                     <View>
-                        <Image
+                        <Animated.Image
                             source={require('@/assets/images/studentWalk.png')}
                             resizeMode="contain"
-                            className="h-64"/>
+                            className="h-64"
+                            style={{ transform : [{ translateX: slideAnim }], opacity: opacityAnim, }}/>
                     </View>
                 </View>
             </ThemedView>
