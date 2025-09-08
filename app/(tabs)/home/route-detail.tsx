@@ -25,17 +25,17 @@ export default function RouteDetail() {
   const slideAnim = useRef(new Animated.Value(-SCREEN_WIDTH)).current;
 
   const stops = [
-    { title: 'Punto de partida', lugar: 'Mall del sur', recent: false },
-    { title: 'Parada reciente', lugar: 'E7th St', recent: true },
-    { title: 'Próxima parada', lugar: 'Vine St', recent: false },
-    { title: 'Próxima parada', lugar: 'Vine St', recent: false },
-    { title: 'Próxima parada', lugar: 'Vine St', recent: false },
-    { title: 'Próxima parada', lugar: 'Vine St', recent: false },
-    { title: 'Próxima parada', lugar: 'Vine St', recent: false },
-    { title: 'Próxima parada', lugar: 'Vine St', recent: false },
-    { title: 'Próxima parada', lugar: 'Vine St', recent: false },
-    { title: 'Próxima parada', lugar: 'Vine St', recent: false },
-    { title: 'Próxima parada', lugar: 'Vine St', recent: false },
+    { title: 'Punto de partida', lugar: 'Mall del sur', recent: false, lng: -79.891686, lat: -2.208754 },
+    { title: 'Parada reciente', lugar: 'E7th St', recent: true, lng: -79.915359, lat: -2.160998 },
+    { title: 'Próxima parada', lugar: 'Vine St', recent: false, lng: -79.910359, lat: -2.140998 },
+    { title: 'Próxima parada', lugar: 'Vine St', recent: false, lng: -79.910359, lat: -2.140998 },
+    { title: 'Próxima parada', lugar: 'Vine St', recent: false, lng: -79.915359, lat: -2.160998 },
+    { title: 'Próxima parada', lugar: 'Vine St', recent: false, lng: -79.910359, lat: -2.140998 },
+    { title: 'Próxima parada', lugar: 'Vine St', recent: false, lng: -79.915359, lat: -2.160998 },
+    { title: 'Próxima parada', lugar: 'Vine St', recent: false, lng: -79.910359, lat: -2.140998 },
+    { title: 'Próxima parada', lugar: 'Vine St', recent: false, lng: -79.915359, lat: -2.160998 },
+    { title: 'Próxima parada', lugar: 'Vine St', recent: false, lng: -79.910359, lat: -2.140998 },
+    { title: 'Próxima parada', lugar: 'Vine St', recent: false, lng: -79.878057, lat: -2.180671 },
   ]
 
   useEffect(() => {
@@ -184,8 +184,10 @@ export default function RouteDetail() {
                           </View>
 
                           <View className="flex-start mb-6">
-                            <ThemedText lightColor={ stop.recent ? Colors.light.textBlack : "#94a3b8"} className="font-bold">{stop.title}</ThemedText>
-                            <ThemedText lightColor={ stop.recent ? Colors.light.textBlack : "#94a3b8"} className="text-sm">{stop.lugar}</ThemedText>
+                            <Pressable onPress={() => changeLocation(stop.lat, stop.lng)}>
+                              <ThemedText lightColor={ stop.recent ? Colors.light.textBlack : "#94a3b8"} className="font-bold">{stop.title}</ThemedText>
+                              <ThemedText lightColor={ stop.recent ? Colors.light.textBlack : "#94a3b8"} className="text-sm">{stop.lugar}</ThemedText>
+                            </Pressable>
                           </View>
                         </View>
                       ))}               

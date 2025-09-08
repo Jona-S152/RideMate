@@ -47,7 +47,7 @@ export default function ChangePasswordModal({ animationType, transparent, visibl
                                 >
                             {visibleVerificationCode ? 
                             <View>
-                                <View style={{ backgroundColor: Colors.light.tint }} className="p-4">
+                                <View style={{ backgroundColor: Colors.light.primary }} className="p-4">
                                     <ThemedText
                                         lightColor={Colors.light.text}
                                         darkColor={Colors.dark.text}
@@ -58,14 +58,15 @@ export default function ChangePasswordModal({ animationType, transparent, visibl
                                 <View className="mt-2">
                                     <ThemedTextInput
                                         lightColor={Colors.light.background}
-                                        placeholder=""
-                                        className="text-xl mx-4 mb-2">
+                                        placeholder="..."
+                                        className="text-xl mx-4 mb-2 text-center">
 
                                     </ThemedTextInput>
                                 </View>
                                 <View className="m-2">
                                     <Pressable 
-                                        className={`rounded-2xl p-3 bg-[${Colors.light.tint}] active:bg-yellow-200 items-center`}
+                                        style={{ backgroundColor: Colors.light.secondary }}
+                                        className="rounded-2xl p-3 active:bg-yellow-200 items-center"
                                         onPress={() => {
                                             setVisibleVerificationCode(false)
                                             setVisible(false)
@@ -105,7 +106,8 @@ export default function ChangePasswordModal({ animationType, transparent, visibl
                                 </View>
                                 <View className="m-2">
                                     <Pressable 
-                                        className={`rounded-2xl p-3 bg-[${Colors.light.tint}] active:bg-yellow-200 items-center`}
+                                        style={{ backgroundColor: Colors.light.secondary }}
+                                        className={`rounded-2xl p-3 active:bg-yellow-200 items-center`}
                                         onPress={() => {setVisibleVerificationCode(true)}}>
                                         <ThemedText 
                                             lightColor={Colors.light.text}

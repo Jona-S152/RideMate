@@ -56,7 +56,7 @@ export default function EditProfileScreen() {
                             </ThemedTextInput>
                         </Pressable>
                         <Pressable 
-                            className="active:bg-slate-300 rounded-full" 
+                            className="active:bg-slate-300" 
                             onPress={() => setChangePassVisibleModal(true)}>
                             <ThemedText
                                 lightColor={DefaultTheme.colors.text}
