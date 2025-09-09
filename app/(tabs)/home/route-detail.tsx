@@ -3,7 +3,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import AntDesign from '@expo/vector-icons/AntDesign';
-import Feather from '@expo/vector-icons/Feather';
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import { useNavigation } from "expo-router";
@@ -23,6 +23,7 @@ export default function RouteDetail() {
   const [showStops, setShowStops] = useState(false); 
 
   const slideAnim = useRef(new Animated.Value(-SCREEN_WIDTH)).current;
+  const buttonAnim = useRef(new Animated.Value(0)).current;
 
   const stops = [
     { title: 'Punto de partida', lugar: 'Mall del sur', recent: false, lng: -79.891686, lat: -2.208754 },
@@ -87,19 +88,37 @@ export default function RouteDetail() {
     if (showStops) {
       setShowStops(false)
       // Ocultar → desliza hacia la izquierda
-      Animated.timing(slideAnim, {
-        toValue: -SCREEN_WIDTH,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
+      Animated.parallel([
+        // Ocultar panel
+        Animated.timing(slideAnim, {
+          toValue: SCREEN_WIDTH, // se va fuera de pantalla
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        // Botón vuelve a la derecha
+        Animated.timing(buttonAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
     } else {
       setShowStops(true);
       // Mostrar → desliza hacia dentro
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
+      Animated.parallel([
+        // Mostrar panel
+        Animated.timing(slideAnim, {
+          toValue: SCREEN_WIDTH / 2, // ocupa la mitad derecha
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        // Botón se corre hacia la izquierda, justo al borde del panel
+        Animated.timing(buttonAnim, {
+          toValue: SCREEN_WIDTH / 2, // mismo ancho del panel
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
     }
   };
 
@@ -118,12 +137,12 @@ export default function RouteDetail() {
             loadingEnabled
             className="flex-1"
             initialRegion={region}
-            onPress={(e) =>
-              changeLocation(
-                e.nativeEvent.coordinate.latitude,
-                e.nativeEvent.coordinate.longitude
-              )
-            }
+            // onPress={(e) =>
+            //   changeLocation(
+            //     e.nativeEvent.coordinate.latitude,
+            //     e.nativeEvent.coordinate.longitude
+            //   )
+            // }
           >
             <Marker
               coordinate={{
@@ -148,23 +167,42 @@ export default function RouteDetail() {
 
           </MapView>
 
-          <View pointerEvents="box-none" className="absolute top-8 right-[14px] z-50">
+          <View pointerEvents="box-none" className="absolute top-8 left-[14px] z-50">
             <Pressable onPress={() => navigation.goBack()} className="p-2 rounded-full shadow-lg">
-              <Feather name="x-square" size={36} color={Colors.light.primary} />
+              <Ionicons name="arrow-back" size={34} color={Colors.light.primary} />
             </Pressable>
           </View>
 
-          <View pointerEvents="box-none" className="absolute top-8 left-[14px] z-50">
-            <Pressable onPress={toggleStops} className="p-2 rounded-full shadow-lg">
-              {showStops ? <AntDesign name="doubleleft" size={36} color={Colors.light.primary} /> : <AntDesign name="doubleright" size={36} color="black" />}
+          <Animated.View style={{ transform: [{ translateX: Animated.multiply(buttonAnim, -1) }] }} pointerEvents="box-none" className="absolute top-8 right-[14px] z-50">
+            {/* Contenedor del degradado */}
+            <View className="absolute inset-0 flex-row w-40 h-12 rounded-full overflow-hidden">
+              {/* Degradado principal de izquierda → derecha */}
+              <LinearGradient
+                colors={[Colors.light.secondary, "transparent", "transparent"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{ flex: 1 }}
+              />
+            </View>
+
+            {/* Botón */}
+            <Pressable
+              onPress={toggleStops}
+              className="p-2 rounded-full shadow-lg"
+            >
+              {showStops ? (
+                <AntDesign name="doubleright" size={30} color="white" />
+              ) : (
+                <AntDesign name="doubleleft" size={30} color="white" />
+              )}
             </Pressable>
-          </View>
+          </Animated.View>
 
           {
             showStops && (
-              <Animated.View style={{ transform: [{ translateX: slideAnim }], }} className="absolute top-0 left-0 w-1/2 h-1/2">
+              <Animated.View style={{ transform: [{ translateX: slideAnim }], }} className="absolute top-0 right-0 w-1/2 h-1/2">
                 <LinearGradient
-                  colors={["rgba(255,255,255,0.95)", "rgba(255,255,255,0.7)", "transparent"]}
+                  colors={["transparent", "rgba(255,255,255,0.7)","rgba(255,255,255,0.95)" ]}
                   style={{ flex: 1, padding: 20 }}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}

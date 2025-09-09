@@ -1,3 +1,4 @@
+import { useAuth } from "@/app/context/AuthContext";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
@@ -6,6 +7,8 @@ import { Link } from "expo-router";
 import { Pressable, ScrollView, View } from "react-native";
 
 export default function ProfileScreen() {
+    const { logout } = useAuth();
+
     return (
             <ScrollView>
                 <ThemedView lightColor={Colors.light.primary} className="w-full px-4 py-6 rounded-bl-[40px]">
@@ -70,7 +73,7 @@ export default function ProfileScreen() {
                                     Editar vehículo
                             </ThemedText>
                         </Pressable>
-                        <Pressable className="active:bg-red-300">
+                        <Pressable className="active:bg-red-300" onPress={() => {logout()}}>
                             <ThemedText
                                 lightColor={DefaultTheme.colors.text}
                                 darkColor={DarkTheme.colors.text}

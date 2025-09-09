@@ -1,19 +1,25 @@
+import { Redirect, Slot } from 'expo-router';
 import 'react-native-reanimated';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
-import { useColorScheme } from '@/hooks/useColorScheme';
-import { Slot } from 'expo-router';
+function RootLayoutNav() {
+  const { token } = useAuth();
+
+  // Mientras carga el token desde AsyncStorage
+  if (token === undefined) return null; // o ActivityIndicator
+
+  if (!token) {
+    return <Redirect href="/(auth)/login" />;
+  }
+
+  return <Redirect href="/(tabs)/home" />;
+}
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  // const { user } = useAuth();
-
-  //  if (!user) {
-  //   return <Slot initialRouteName="(auth)" />; // no autenticado
-  // }
-
-  // return <Slot initialRouteName="(tabs)" />; // autenticado
-
   return (
-      <Slot initialRouteName="(tabs)"/>
+    <AuthProvider>
+      <RootLayoutNav /> {/* Este componente decide qué Slot mostrar */}
+      <Slot />
+    </AuthProvider>
   );
 }

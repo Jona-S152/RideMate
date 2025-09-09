@@ -9,20 +9,55 @@ export default function HomeScreen() {
     const [isEnabled, setIsEnabled] = useState(false);
     const toggleSwitch = () => setIsEnabled(previousState => !previousState);
 
+    const slideStudent = useRef(new Animated.Value(0)).current; // 0 visible, 300 fuera
+    const opacityAnimStudent = useRef(new Animated.Value(0)).current;
+    const slideCar = useRef(new Animated.Value(300)).current; // 300 fuera, 0 visible
+    const opacityAnimCar = useRef(new Animated.Value(0)).current;
+
     const slideAnim = useRef(new Animated.Value(300)).current;
     const opacityAnim = useRef(new Animated.Value(0)).current;
     
     useEffect(() => {
-        Animated.timing(slideAnim, {
-            toValue: isEnabled ? 300 : 0, // 0 es visible, 300 fuera de pantalla
-            duration: 500, // tiempo de animación en ms
+        if (isEnabled) {
+            // Student se mueve a la derecha y Car entra desde la izquierda
+            Animated.timing(slideStudent, {
+            toValue: 300, // fuera
+            duration: 500,
             useNativeDriver: true,
-        }).start();
+            }).start();
+
+            Animated.timing(slideCar, {
+            toValue: 0, // visible
+            duration: 500,
+            useNativeDriver: true,
+            }).start();
+        } else {
+            // Student entra y Car sale
+            Animated.timing(slideStudent, {
+            toValue: 0,
+            duration: 500,
+            useNativeDriver: true,
+            }).start();
+
+            Animated.timing(slideCar, {
+            toValue: 300,
+            duration: 500,
+            useNativeDriver: true,
+            }).start();
+        }
     }, [isEnabled]);
     
     useEffect(() => {
-        Animated.timing(opacityAnim, {
+        Animated.timing(opacityAnimStudent, {
             toValue: isEnabled ? 0 : 1,
+            duration: 500,
+            useNativeDriver: true,
+        }).start();
+    }, [isEnabled]);
+
+    useEffect(() => {
+        Animated.timing(opacityAnimCar, {
+            toValue: isEnabled ? 1 : 0,
             duration: 500,
             useNativeDriver: true,
         }).start();
@@ -54,7 +89,7 @@ export default function HomeScreen() {
                     </Switch>
                 </View>
                 <View className="flex-row justify-between mx-8">
-                    <View className="flex-col gap-4  my-14">
+                    <View className="flex-col gap-4 mt-4">
                         <ThemedText
                             lightColor={Colors.light.text}
                             className="font-light text-base">
@@ -71,12 +106,18 @@ export default function HomeScreen() {
                                 Conociste +1 estudiante
                         </ThemedText>
                     </View>
-                    <View>
+                    <View className="relative">
+                        <View className="w-full h-[270px]"/>
                         <Animated.Image
                             source={require('@/assets/images/studentWalk.png')}
                             resizeMode="contain"
-                            className="h-64"
-                            style={{ transform : [{ translateX: slideAnim }], opacity: opacityAnim, }}/>
+                            className="h-64 absolute right-1"
+                            style={{ transform : [{ translateX: slideStudent }], opacity: opacityAnimStudent, }}/>
+                        <Animated.Image
+                            source={require('@/assets/images/CarHome.png')}
+                            resizeMode="contain"
+                            className="mt-32 absolute -right-14"
+                            style={{ transform : [{ translateX: slideCar }], opacity: opacityAnimCar, }}/>
                     </View>
                 </View>
             </ThemedView>
