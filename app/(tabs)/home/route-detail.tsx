@@ -22,7 +22,7 @@ export default function RouteDetail() {
   const mapRef = useRef<MapView>(null);
   const [showStops, setShowStops] = useState(false); 
 
-  const slideAnim = useRef(new Animated.Value(-SCREEN_WIDTH)).current;
+  const slideAnim = useRef(new Animated.Value(SCREEN_WIDTH)).current;
   const buttonAnim = useRef(new Animated.Value(0)).current;
 
   const stops = [
@@ -88,37 +88,19 @@ export default function RouteDetail() {
     if (showStops) {
       setShowStops(false)
       // Ocultar → desliza hacia la izquierda
-      Animated.parallel([
-        // Ocultar panel
-        Animated.timing(slideAnim, {
-          toValue: SCREEN_WIDTH, // se va fuera de pantalla
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        // Botón vuelve a la derecha
-        Animated.timing(buttonAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      Animated.timing(slideAnim, {
+        toValue: SCREEN_WIDTH, // se va fuera de pantalla
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     } else {
       setShowStops(true);
       // Mostrar → desliza hacia dentro
-      Animated.parallel([
-        // Mostrar panel
-        Animated.timing(slideAnim, {
-          toValue: SCREEN_WIDTH / 2, // ocupa la mitad derecha
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        // Botón se corre hacia la izquierda, justo al borde del panel
-        Animated.timing(buttonAnim, {
-          toValue: SCREEN_WIDTH / 2, // mismo ancho del panel
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      Animated.timing(slideAnim, {
+        toValue: 0, // ocupa la mitad derecha
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     }
   };
 
@@ -173,7 +155,7 @@ export default function RouteDetail() {
             </Pressable>
           </View>
 
-          <Animated.View style={{ transform: [{ translateX: Animated.multiply(buttonAnim, -1) }] }} pointerEvents="box-none" className="absolute top-8 right-[14px] z-50">
+          <View pointerEvents="box-none" className="absolute top-8 right-[14px] z-50">
             {/* Contenedor del degradado */}
             <View className="absolute inset-0 flex-row w-40 h-12 rounded-full overflow-hidden">
               {/* Degradado principal de izquierda → derecha */}
@@ -196,56 +178,56 @@ export default function RouteDetail() {
                 <AntDesign name="doubleleft" size={30} color="white" />
               )}
             </Pressable>
-          </Animated.View>
+          </View>
 
           {
-            showStops && (
-              <Animated.View style={{ transform: [{ translateX: slideAnim }], }} className="absolute top-0 right-0 w-1/2 h-1/2">
-                <LinearGradient
-                  colors={["transparent", "rgba(255,255,255,0.7)","rgba(255,255,255,0.95)" ]}
-                  style={{ flex: 1, padding: 20 }}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                >
-                  <View className="relative flex-1 overflow-hidden rounded-2xl pt-20">
-                    <ScrollView
-                      showsVerticalScrollIndicator={false}
-                    >
-                      {stops.map((stop, index) => (
-                        <View key={index} className="flex-row mb-6">
-                          <View className="items-center w-10">
-                            <ThemedView lightColor={ stop.recent ? Colors.light.textBlack : "#94a3b8"} className="w-3 h-3 rounded-full"/>
+            
+            <Animated.View style={{ transform: [{ translateX: slideAnim }], }} className="absolute top-0 right-0 w-1/2 h-1/2">
+              <LinearGradient
+                colors={["transparent", "rgba(255,255,255,0.7)","rgba(255,255,255,0.95)" ]}
+                style={{ flex: 1, padding: 20 }}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <View className="relative flex-1 overflow-hidden rounded-2xl pt-20">
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                  >
+                    {stops.map((stop, index) => (
+                      <View key={index} className="flex-row mb-6">
+                        <View className="items-center w-10">
+                          <ThemedView lightColor={ stop.recent ? Colors.light.textBlack : "#94a3b8"} className="w-3 h-3 rounded-full"/>
 
-                            {index < stops.length - 1 && (
-                              <View className="w-1 flex-1 bg-slate-300 mt-1"/>
-                            )}
-                          </View>
-
-                          <View className="flex-start mb-6">
-                            <Pressable onPress={() => changeLocation(stop.lat, stop.lng)}>
-                              <ThemedText lightColor={ stop.recent ? Colors.light.textBlack : "#94a3b8"} className="font-bold">{stop.title}</ThemedText>
-                              <ThemedText lightColor={ stop.recent ? Colors.light.textBlack : "#94a3b8"} className="text-sm">{stop.lugar}</ThemedText>
-                            </Pressable>
-                          </View>
+                          {index < stops.length - 1 && (
+                            <View className="w-1 flex-1 bg-slate-300 mt-1"/>
+                          )}
                         </View>
-                      ))}               
-                    </ScrollView>
 
-                    {/* <LinearGradient
-                      colors={["rgba(255,255,255,1)", "transparent"]}
-                      style={{ position: "absolute", top: 0, left: 0, right: 0, height: 40 }}
-                    /> */}
+                        <View className="flex-start mb-6">
+                          <Pressable onPress={() => changeLocation(stop.lat, stop.lng)}>
+                            <ThemedText lightColor={ stop.recent ? Colors.light.textBlack : "#94a3b8"} className="font-bold">{stop.title}</ThemedText>
+                            <ThemedText lightColor={ stop.recent ? Colors.light.textBlack : "#94a3b8"} className="text-sm">{stop.lugar}</ThemedText>
+                          </Pressable>
+                        </View>
+                      </View>
+                    ))}               
+                  </ScrollView>
 
-                    {/* Gradiente abajo */}
-                    {/* <LinearGradient
-                      colors={["rgba(255,255,255,1)", "transparent"]}
-                      style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 100 }}
-                    /> */}
-                  </View>
-                </LinearGradient>
+                  {/* <LinearGradient
+                    colors={["rgba(255,255,255,1)", "transparent"]}
+                    style={{ position: "absolute", top: 0, left: 0, right: 0, height: 40 }}
+                  /> */}
 
-              </Animated.View>
-            )
+                  {/* Gradiente abajo */}
+                  {/* <LinearGradient
+                    colors={["rgba(255,255,255,1)", "transparent"]}
+                    style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 100 }}
+                  /> */}
+                </View>
+              </LinearGradient>
+
+            </Animated.View>
+            
           }
           <BottomSheetRouteDetail />
         </>
