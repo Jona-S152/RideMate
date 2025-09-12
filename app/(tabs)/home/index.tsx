@@ -16,7 +16,7 @@ export default function HomeScreen() {
 
     const slideAnim = useRef(new Animated.Value(300)).current;
     const opacityAnim = useRef(new Animated.Value(0)).current;
-    
+
     useEffect(() => {
         if (isEnabled) {
             // Student se mueve a la derecha y Car entra desde la izquierda
@@ -46,7 +46,7 @@ export default function HomeScreen() {
             }).start();
         }
     }, [isEnabled]);
-    
+
     useEffect(() => {
         Animated.timing(opacityAnimStudent, {
             toValue: isEnabled ? 0 : 1,
@@ -64,7 +64,7 @@ export default function HomeScreen() {
     }, [isEnabled]);
 
     return (
-        <ScrollView>
+        <View className="flex-1">
             <ThemedView lightColor={Colors.light.primary} className="w-full rounded-bl-[40px]">
                 <View className="flex-row justify-between px-8 pt-16">
                     <View>
@@ -121,11 +121,15 @@ export default function HomeScreen() {
                     </View>
                 </View>
             </ThemedView>
-            
-            <View className="flex-col gap-4 m-4">
-                <RouteCard title="Sur - Norte" isActive={true} routeScreen="/(tabs)/home/route-detail"/>
-                <RouteCard title="Sur - Norte" isActive={false} routeScreen="/(tabs)/home/route-detail"/>
+
+            <View className="flex-1 mx-4 mt-4">
+                <ScrollView showsVerticalScrollIndicator={false}>
+                    <RouteCard title="Sur - Norte" isActive={true} routeScreen="/(tabs)/home/route-detail"/>
+                    <RouteCard title="Sur - Norte" isActive={false} routeScreen="/(tabs)/home/route-detail"/>
+                    <RouteCard title="Sur - Norte" isActive={false} routeScreen="/(tabs)/home/route-detail"/>
+                </ScrollView>
             </View>
-        </ScrollView>
+            {/* <View className="h-48 bg-fuchsia-500"/> */}
+        </View>
     );
 }

@@ -5,12 +5,12 @@ import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { DarkTheme, DefaultTheme } from "@react-navigation/native";
 import { useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { Pressable, View } from "react-native";
 
 export default function EditProfileScreen() {
     const [ changePassVisibleModal, setChangePassVisibleModal ] = useState<boolean>(false);
     return (
-            <ScrollView>
+            <View>
                 <ThemedView lightColor={Colors.light.primary} className="w-full px-4 py-6 rounded-bl-[40px]">
                     <View className="items-center">
                         <ThemedText
@@ -30,7 +30,7 @@ export default function EditProfileScreen() {
                 </ThemedView>
                 {/* Divider */}
                 <View className="my-2 h-px bg-gray-300" />
-                <View className="flex-1">
+                <View className="mx-4">
                         <Pressable className="active:bg-slate-300">
                             <ThemedTextInput
                                 lightColor={Colors.light.background}
@@ -75,6 +75,6 @@ export default function EditProfileScreen() {
                             </ChangePasswordModal>
                         </View>
                 </View>
-            </ScrollView>
+            </View>
     );
 }

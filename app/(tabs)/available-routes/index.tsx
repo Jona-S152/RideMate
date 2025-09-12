@@ -92,6 +92,7 @@ export default function AvailableRoutesScreen() {
                     <HistoryRouteCard title="Sur - Norte" routeScreen="/(tabs)/available-routes/route-detail"/>
                 </ScrollView>
             </View>
+            <View className="h-10 bg-fuchsia-800"/>
         </View>
     );
 }

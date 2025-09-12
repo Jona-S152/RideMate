@@ -1,6 +1,6 @@
 import { Redirect, Slot } from 'expo-router';
 import 'react-native-reanimated';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import AuthProvider, { useAuth } from './context/AuthContext';
 
 function RootLayoutNav() {
   const { token } = useAuth();

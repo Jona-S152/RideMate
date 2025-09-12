@@ -10,13 +10,19 @@ export default function ProfileScreen() {
     const { logout } = useAuth();
 
     return (
-            <ScrollView>
+            <View className="flex-1">
                 <ThemedView lightColor={Colors.light.primary} className="w-full px-4 py-6 rounded-bl-[40px]">
+                    <ThemedText
+                        lightColor={Colors.light.text}
+                        darkColor={DarkTheme.colors.text}
+                        className="text-3xl mt-6">
+                            Perfil
+                    </ThemedText>
                     <View className="items-center">
                         <ThemedText
                             lightColor={Colors.light.text}
                             darkColor={DarkTheme.colors.text}
-                            className="text-3xl mt-6">
+                            className="text-2xl mt-6">
                                 Jhon Doe
                         </ThemedText>
                         <View className="relative w-60 h-60 my-3">
@@ -30,7 +36,7 @@ export default function ProfileScreen() {
                         </ThemedText>
                     </View> 
                 </ThemedView>
-                <View className="flex-1">
+                <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
                     <Link href="/(tabs)/profile/edit-profile" asChild>
                         <Pressable className="active:bg-slate-300 w-full">
                             <ThemedText
@@ -81,7 +87,8 @@ export default function ProfileScreen() {
                                     Cerrar sesion
                             </ThemedText>
                         </Pressable>
-                </View>
-            </ScrollView>
+                </ScrollView>
+                <View className="h-28 w-full"/>
+            </View>
     );
 }
