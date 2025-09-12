@@ -32,6 +32,7 @@ export default function TabLayout() {
                 backgroundColor: '#001147',
                 borderRadius: 35,          // hace que se vea ovalado
                 borderTopWidth: 0,         // elimina borde feo default
+                overflow: 'hidden',
                 elevation: 5,              // sombra Android
                 shadowColor: '#000',       // sombra iOS
                 shadowOpacity: 0.1,
