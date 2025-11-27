@@ -70,12 +70,12 @@ export default function LoginScreen () {
             <ThemedView lightColor={Colors.light.primary} className="w-full px-4 pt-6 rounded-bl-[40px]">
                 <View className="items-center">
                     <Image
-                        className="mt-32 mb-20"
+                        className="mt-32 mb-32"
                         source={require('../../assets/images/TitleApp.png')}/>
                 </View> 
-                <Image
+                {/* <Image
                     className="mb-1"
-                    source={require('../../assets/images/CarLogin.png')}/>
+                    source={require('../../assets/images/CarLogin.png')}/> */}
             </ThemedView>
             <View className="mx-6 my-8 items-center justify-center">
                 <ThemedTextInput
