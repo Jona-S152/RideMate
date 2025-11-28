@@ -2,11 +2,15 @@ import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { supabase } from "@/lib/supabase";
+import { useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Image, Pressable, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Pressable, Text, View } from "react-native";
+import { useAuth } from "../context/AuthContext";
 
 export default function RegisterScreen() {
-  const [step, setStep] = useState(1);
+  const router = useRouter();
+  const { login } = useAuth();
+
   const [loading, setLoading] = useState(false);
 
   // Datos obligatorios
@@ -24,96 +28,105 @@ export default function RegisterScreen() {
     address: "",
   });
 
+  /** Helper: obtain an active session (tries getSession, then signInWithPassword) */
+  const ensureSession = async (email: string, password: string) => {
+    // try current session first
+    let { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData?.session?.user) return sessionData.session;
+
+    // if not, try to sign in immediately (works if email confirmation is off)
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (signInError) {
+      // return null to allow caller to handle
+      return null;
+    }
+    // try getSession again
+    ({ data: sessionData } = await supabase.auth.getSession());
+    return sessionData.session ?? signInData.session ?? null;
+  };
+
   const handleRegister = async () => {
     setLoading(true);
 
-    // 1) Registrar en auth
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: form.email.trim(),
-      password: form.password,
-    });
+    try {
+      // 1) Crear user en auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: form.email.trim(),
+        password: form.password,
+        // options: { emailRedirectTo: 'exp://..' } // opcional según config
+      });
 
-    if (authError) {
-      alert(authError.message);
-      return setLoading(false);
-    }
+      if (authError) throw authError;
 
-    const userId = authData.user?.id;
-    if (!userId) {
-      alert("Error creando el usuario");
+      // 2) Obtener sesión activa (puede que signUp no haya creado sesión inmediatamente)
+      // intentamos garantizar que haya sesión y token
+      const session = await ensureSession(form.email.trim(), form.password);
+
+      if (!session?.user) {
+        // Si NO hay sesión, podemos aún intentar insertar usando authData.user.id
+        // pero si RLS requiere session (auth.uid()) el insert fallará.
+        // Mejor informar al usuario.
+        Alert.alert(
+          "Atención",
+          "No se pudo iniciar sesión automáticamente. Intenta iniciar sesión manualmente."
+        );
+        setLoading(false);
+        return;
+      }
+
+      const userId = session.user.id;
+
+      // 3) Insertar fila en public.users (asegúrate de que created_at tenga default y password no exista)
+      const { error: insertError } = await supabase.from("users").insert({
+        id: userId,
+        name: form.name || null,
+        last_name: form.lastname || null,
+        email: form.email,
+        is_driver: false,
+        role_id: 2,
+      });
+
+      if (insertError) throw insertError;
+
+      // 4) Construir objeto user para el context (puedes ajustar campos que necesites)
+      const userForContext = {
+        id: userId,
+        email: form.email,
+        is_driver: false,
+      };
+
+      // 5) Guardar token + user en el contexto inmediatamente
+      await login(session.access_token ?? "", userForContext);
+
+      // 6) Avanzar al step opcional (pero ya está guardado en contexto)
       setLoading(false);
-      return;
+
+    } catch (err: any) {
+      console.log("Register error:", err);
+      Alert.alert("Error al registrarse", err?.message ?? String(err));
+      setLoading(false);
     }
-
-    // 2) Insertar en tabla users
-    const { error: dbError } = await supabase.from("users").insert({
-      id: userId,
-      name: form.name,
-      last_name: form.lastname,
-      email: form.email,
-      is_driver: false,
-      role_id: 2,
-    });
-
-    if (dbError) {
-      alert(dbError.message);
-      return setLoading(false);
-    }
-
-    // Pasar al Step 2
-    setLoading(false);
-    setStep(2);
-  };
-
-  const handleOptionalSave = async () => {
-    setLoading(true);
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      alert("Usuario no encontrado");
-      return setLoading(false);
-    }
-
-    const { error } = await supabase
-      .from("users")
-      .update(optional)
-      .eq("id", user.id);
-
-    if (error) alert(error.message);
-
-    setLoading(false);
-
-    // Final: redirigir a Home, Dashboard o donde quieras
-    console.log("Perfil actualizado");
   };
 
   return (
     <View>
+      <ThemedView lightColor={Colors.light.primary} className="w-full px-4 pt-6 rounded-bl-[40px]">
+        <View className="items-center">
+          <Image className="mt-32 mb-32" source={require('../../assets/images/TitleApp.png')} />
+        </View>
+      </ThemedView>
 
-        <ThemedView lightColor={Colors.light.primary} className="w-full px-4 pt-6 rounded-bl-[40px]">
-            <View className="items-center">
-                <Image
-                    className="mt-32 mb-32"
-                    source={require('../../assets/images/TitleApp.png')}/>
-            </View> 
-            {/* <Image
-                className="mb-1"
-                source={require('../../assets/images/CarLogin.png')}/> */}
-        </ThemedView>
-
-      {/* ---------- HEADER ---------- */}
       <View className="mx-5 mt-4 mb-2">
         <Text className="text-3xl font-bold mb-6 text-primary">
-            {step === 1 ? "Crear cuenta" : "Completar perfil"}
+          Crear cuenta
         </Text>
       </View>
 
-      {/* ---------- STEP 1 ---------- */}
-      {step === 1 && (
-        <View className="mx-5 mt-2 mb-4">
+        <View className="mx-5 mt-2">
           <ThemedTextInput
             lightColor={Colors.light.background}
             className="py-6 px-4 mb-4 w-full"
@@ -152,70 +165,13 @@ export default function RegisterScreen() {
           <Pressable
             onPress={handleRegister}
             disabled={loading}
-            className="bg-primary py-4 rounded-full mt-4"
+            className="bg-yellow-500 py-4 rounded-full mt-4"
           >
-            {loading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text className="text-center text-white font-semibold">
-                Continuar
-              </Text>
-            )}
+            {loading ? <ActivityIndicator color="white" /> : <Text className="text-center font-semibold">Continuar</Text>}
           </Pressable>
         </View>
-      )}
 
-      {/* ---------- STEP 2 ---------- */}
-      {step === 2 && (
-        <View>
-          <Text className="text-gray-500 mb-4">
-            Estos datos son opcionales. Puedes completarlos ahora o más tarde.
-          </Text>
-
-          <TextInput
-            placeholder="Teléfono"
-            className="w-full p-4 rounded-lg bg-gray-100 mb-3"
-            value={optional.phone}
-            onChangeText={(t) => setOptional({ ...optional, phone: t })}
-          />
-
-          <TextInput
-            placeholder="Avatar URL"
-            className="w-full p-4 rounded-lg bg-gray-100 mb-3"
-            autoCapitalize="none"
-            value={optional.avatar}
-            onChangeText={(t) => setOptional({ ...optional, avatar: t })}
-          />
-
-          <TextInput
-            placeholder="Dirección"
-            className="w-full p-4 rounded-lg bg-gray-100 mb-3"
-            value={optional.address}
-            onChangeText={(t) => setOptional({ ...optional, address: t })}
-          />
-
-          <View className="flex-row justify-between mt-4">
-            <Pressable
-              className="bg-gray-200 py-3 px-6 rounded-full"
-              onPress={() => console.log("Omitido")}
-            >
-              <Text className="text-gray-800">Omitir</Text>
-            </Pressable>
-
-            <Pressable
-              onPress={handleOptionalSave}
-              disabled={loading}
-              className="bg-primary py-3 px-6 rounded-full"
-            >
-              {loading ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <Text className="text-white font-semibold">Guardar</Text>
-              )}
-            </Pressable>
-          </View>
-        </View>
-      )}
+      
     </View>
   );
 }
