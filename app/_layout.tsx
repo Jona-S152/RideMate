@@ -18,7 +18,6 @@ function RootLayoutNav() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootLayoutNav /> {/* Este componente decide qué Slot mostrar */}
       <Slot />
     </AuthProvider>
   );

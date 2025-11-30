@@ -18,6 +18,10 @@ export default function ProfileStackLayout() {
         headerShown: false,
         headerLeft: () => <Text style={{ color: Colors.light.text, fontSize: 40, paddingBottom: 10, fontWeight: 'bold' }}>Editar perfil</Text>,
       }} />
+      <Stack.Screen name="become-driver" options={{
+        headerShown: false,
+        headerLeft: () => <Text style={{ color: Colors.light.text, fontSize: 40, paddingBottom: 10, fontWeight: 'bold'}}>Convertime en contuctor</Text> 
+      }}/>
     </Stack>
   );
 }

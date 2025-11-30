@@ -6,20 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { Link } from "expo-router";
 import { useState } from "react";
 import { Image, Pressable, Text, View } from "react-native";
-import { useAuth } from "../context/AuthContext";
-
-type User = {
-  id: string;
-  email: string;
-  is_driver: boolean;
-};
-
-type AuthContextType = {
-  token: string | null;
-  user: User | null;
-  login: (token: string, user: User) => Promise<void>; // espera 2 argumentos
-  logout: () => Promise<void>;
-};
+import { useAuth, User } from "../context/AuthContext";
 
 export default function LoginScreen () {
     const { login } = useAuth()
@@ -43,7 +30,7 @@ export default function LoginScreen () {
 
         const { data: userDataRaw, error: userError } = await supabase
             .from('users')
-            .select('id, email, is_driver, role_id')
+            .select('id, email, is_driver, role_id, name, last_name')
             .eq('id', data.user?.id);
 
             if (!userDataRaw || userDataRaw.length === 0) throw new Error("Usuario no encontrado");
@@ -52,6 +39,8 @@ export default function LoginScreen () {
             id: userDataRaw[0].id,
             email: userDataRaw[0].email,
             is_driver: userDataRaw[0].is_driver ?? false,
+            driver_mode: userDataRaw[0].is_driver ?? false,
+            name: userDataRaw[0].name ?? 'Usuario'
         };
 
 

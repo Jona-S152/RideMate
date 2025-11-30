@@ -1,10 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, useContext, useEffect, useState } from "react";
 
-type User = {
+export type User = {
   id: string;
   email: string;
   is_driver: boolean;
+  driver_mode: boolean;
+  name: string;
 };
 
 type AuthContextType = {
@@ -12,6 +14,7 @@ type AuthContextType = {
   user: User | null;
   login: (token: string, user: User) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (user: Partial<User>) => Promise<void>; 
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -50,8 +53,23 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     }
   };
 
+    const updateUser = async (newData: Partial<User>) => {
+        setUser(prev => {
+            if (!prev) return prev;
+            const updated: User = {
+                id: newData.id ?? prev.id,
+                email: newData.email ?? prev.email,
+                is_driver: newData.is_driver ?? prev.is_driver,
+                driver_mode: newData.driver_mode ?? prev.driver_mode,
+                name: newData.name ?? prev.name
+            };
+            AsyncStorage.setItem("userInfo", JSON.stringify(updated));
+            return updated;
+        });
+    };
+
   return (
-    <AuthContext.Provider value={{ token, user, login, logout }}>
+    <AuthContext.Provider value={{ token, user, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

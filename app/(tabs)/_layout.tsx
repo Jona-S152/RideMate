@@ -1,4 +1,4 @@
-import { Tabs, usePathname } from 'expo-router';
+import { Redirect, Tabs, usePathname } from 'expo-router';
 import React from 'react';
 
 import { HapticTab } from '@/components/HapticTab';
@@ -9,11 +9,24 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import Entypo from '@expo/vector-icons/Entypo';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useAuth } from '../context/AuthContext';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const pathName = usePathname();
   const hideTabBar = ['edit-profile', 'route-detail'].some(route => pathName.includes(route)); // Colocar rutas secundarias
+
+  const { token } = useAuth();
+  const pathname = usePathname();
+
+  if (token === undefined) return null;
+
+  if (!token) return <Redirect href="/(auth)/login" />;
+
+  // 🔥 solo redirige a home cuando el usuario entra a /tabs por primera vez
+  if (pathname === "/(tabs)") {
+    return <Redirect href="/(tabs)/home" />;
+  }
 
   return (
     <Tabs

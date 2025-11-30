@@ -63,6 +63,7 @@ export default function ProfileScreen() {
                                     Stonks
                             </ThemedText>
                         </Pressable>
+                    <Link href="/(tabs)/profile/become-driver" asChild>
                         <Pressable className="active:bg-slate-300">
                             <ThemedText
                                 lightColor={DefaultTheme.colors.text}
@@ -71,6 +72,7 @@ export default function ProfileScreen() {
                                     Convertirme en conductor
                             </ThemedText>
                         </Pressable>
+                    </Link>
                         <Pressable className="active:bg-slate-300">
                             <ThemedText
                                 lightColor={DefaultTheme.colors.text}

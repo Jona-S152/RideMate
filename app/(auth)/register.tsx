@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Alert, Image, Pressable, Text, View } from "react-native";
-import { useAuth } from "../context/AuthContext";
+import { useAuth, User } from "../context/AuthContext";
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -93,10 +93,11 @@ export default function RegisterScreen() {
       if (insertError) throw insertError;
 
       // 4) Construir objeto user para el context (puedes ajustar campos que necesites)
-      const userForContext = {
+      const userForContext : User = {
         id: userId,
         email: form.email,
         is_driver: false,
+        driver_mode: false
       };
 
       // 5) Guardar token + user en el contexto inmediatamente

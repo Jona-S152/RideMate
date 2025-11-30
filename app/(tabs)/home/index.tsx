@@ -1,3 +1,4 @@
+import { useAuth } from "@/app/context/AuthContext";
 import RouteCard from "@/components/history-route-card";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -6,8 +7,9 @@ import { useEffect, useRef, useState } from "react";
 import { Animated, ScrollView, Switch, View } from "react-native";
 
 export default function HomeScreen() {
+    const { user, updateUser } = useAuth();
     const [isEnabled, setIsEnabled] = useState(false);
-    const toggleSwitch = () => setIsEnabled(previousState => !previousState);
+    const toggleSwitch = () => {setIsEnabled(previousState => !previousState);}
 
     const slideStudent = useRef(new Animated.Value(0)).current; // 0 visible, 300 fuera
     const opacityAnimStudent = useRef(new Animated.Value(0)).current;
@@ -18,6 +20,9 @@ export default function HomeScreen() {
     const opacityAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
+        if (user?.driver_mode !== isEnabled) {
+            updateUser({ driver_mode: isEnabled });
+        }
         if (isEnabled) {
             // Student se mueve a la derecha y Car entra desde la izquierda
             Animated.timing(slideStudent, {
@@ -71,7 +76,7 @@ export default function HomeScreen() {
                         <ThemedText
                             lightColor={Colors.light.text}
                             className="font-semibold text-4xl">
-                                Hola, Usuario
+                                Hola, {user?.name}
                         </ThemedText>
                         <ThemedText
                             lightColor={Colors.light.text}
@@ -79,14 +84,16 @@ export default function HomeScreen() {
                                 ¿Que ruta quieres tomar?
                         </ThemedText>
                     </View>
-                    <Switch
-                        trackColor={{ false: Colors.light.tird, true: Colors.light.tird }}
-                        thumbColor={isEnabled ? Colors.light.secondary : Colors.light.primary}
-                        ios_backgroundColor={Colors.light.text}
-                        value={isEnabled}
-                        onValueChange={toggleSwitch}>
+                    {user?.is_driver &&
+                        <Switch
+                            trackColor={{ false: Colors.light.tird, true: Colors.light.tird }}
+                            thumbColor={isEnabled ? Colors.light.secondary : Colors.light.primary}
+                            ios_backgroundColor={Colors.light.text}
+                            value={isEnabled}
+                            onValueChange={toggleSwitch}>
 
-                    </Switch>
+                        </Switch>
+                    }                
                 </View>
                 <View className="flex-row justify-between mx-8">
                     <View className="flex-col gap-4 mt-4">
