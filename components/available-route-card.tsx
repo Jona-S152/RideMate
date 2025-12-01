@@ -95,11 +95,11 @@ export default function AvailableRouteCard({
     return (
             <ThemedView
                 lightColor={Colors.light.historyCard.background}
-                darkColor={Colors.light.historyCard.activeBackground}
+                darkColor={Colors.light.historyCard.background}
                 className="flex-1 justify-center rounded-[28px] m-2 p-5"
             >
                 <ThemedText
-                    lightColor={DefaultTheme.colors.text}
+                    lightColor={Colors.light.textBlack}
                     className="text-sm font-bold"
                 >
                     {start} - {end}

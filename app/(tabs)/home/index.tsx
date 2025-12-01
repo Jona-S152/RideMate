@@ -3,6 +3,8 @@ import RouteCard from "@/components/history-route-card";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
+import { RouteHistory } from "@/interfaces/available-routes";
+import { supabase } from "@/lib/supabase";
 import { useEffect, useRef, useState } from "react";
 import { Animated, ScrollView, Switch, View } from "react-native";
 
@@ -10,6 +12,8 @@ export default function HomeScreen() {
     const { user, updateUser } = useAuth();
     const [isEnabled, setIsEnabled] = useState(false);
     const toggleSwitch = () => {setIsEnabled(previousState => !previousState);}
+
+    const [history, setHistory] = useState<RouteHistory[]>([]);
 
     const slideStudent = useRef(new Animated.Value(0)).current; // 0 visible, 300 fuera
     const opacityAnimStudent = useRef(new Animated.Value(0)).current;
@@ -68,6 +72,31 @@ export default function HomeScreen() {
         }).start();
     }, [isEnabled]);
 
+    useEffect(() => {
+        fetchHistory();
+    }, [user?.id])
+
+    const fetchHistory = async () => {
+        if (!user?.id) return;
+
+        console.log(`Fetching history for user ${user.name}`);
+
+        const { data, error } = await supabase
+            .from("passenger_route_history")
+            .select('*')
+            .eq('user_id', user.id)
+            .order('end_time', { ascending: false });
+
+        if (error) {
+            console.error("Error fetching route history: ", error);
+        } else {
+            setHistory(data as RouteHistory[]);
+            console.log(history);
+        }
+
+
+    }
+
     return (
         <View className="flex-1">
             <ThemedView lightColor={Colors.light.primary} className="w-full rounded-bl-[40px]">
@@ -100,7 +129,7 @@ export default function HomeScreen() {
                         <ThemedText
                             lightColor={Colors.light.text}
                             className="font-light text-base">
-                                Te has unido a 10 rutas
+                                {`Te has unido a ${history.length} ruta${history.length > 1 ? 's' : ''}`}
                         </ThemedText>
                         <ThemedText
                             lightColor={Colors.light.text}
@@ -131,9 +160,26 @@ export default function HomeScreen() {
 
             <View className="flex-1 mx-4 mt-4">
                 <ScrollView showsVerticalScrollIndicator={false}>
-                    <RouteCard title="Sur - Norte" isActive={true} routeScreen="/(tabs)/home/route-detail"/>
-                    <RouteCard title="Sur - Norte" isActive={false} routeScreen="/(tabs)/home/route-detail"/>
-                    <RouteCard title="Sur - Norte" isActive={false} routeScreen="/(tabs)/home/route-detail"/>
+                    {history.length > 0 ? (
+                        history.map((item) => (
+                            <RouteCard
+                                key={item.id}
+                                title={`${item.start_location} - ${item.end_location}`}
+                                isActive={item.end_time === null}
+                                routeScreen={`/(tabs)/home/route-detail?id=${item.trip_session_id}`}
+                                // 🚀 Pasando datos dinámicos
+                                startLocation={item.start_location.split(',')[0].trim()} 
+                                endLocation={item.end_location.split(',')[0].trim()}
+                                
+                                // 🚧 Valor Temporal: DEBES reemplazar '3' con el resultado de una consulta
+                                passengerCount={3 }
+                            />
+                        ))
+                    ) : (
+                        <ThemedText className="text-center mt-10 text-gray-500">
+                            No tienes rutas en tu historial.
+                        </ThemedText>
+                    )}
                 </ScrollView>
             </View>
             {/* <View className="h-48 bg-fuchsia-500"/> */}

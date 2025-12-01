@@ -6,19 +6,34 @@ import { ThemedText } from "./ThemedText";
 import { ThemedView } from "./ThemedView";
 
 interface HistoryRouteProps{
-    title: string,
-    isActive?: boolean,
-    routeScreen: Href
+    title: string;
+    startLocation: string; // Nueva prop para el punto de partida
+    endLocation: string;   // Nueva prop para el punto final
+    passengerCount: number; // Nueva prop para el número de círculos
+    isActive?: boolean;
+    routeScreen: Href;
 }
 
-export default function RouteCard({ title, isActive, routeScreen }: HistoryRouteProps) {
+export default function RouteCard({ 
+    title, 
+    isActive, 
+    routeScreen, 
+    startLocation, 
+    endLocation, 
+    passengerCount = 0 
+}: HistoryRouteProps) {
+    
+    // Limitamos el número máximo de círculos visibles
+    const maxCircles = 3;
+    const circlesToRender = Math.min(passengerCount, maxCircles);
+
     return (
         <Link href={routeScreen} asChild>
             <Pressable>
                 <ThemedView
                     lightColor={isActive ? Colors.light.historyCard.activeBackground : Colors.light.historyCard.background}
                     darkColor={Colors.light.historyCard.activeBackground}
-                    className="flex-row justify-between rounded-[28px] my-1 p-5 overflow-hidden">
+                    className=" rounded-[28px] my-1 p-5 overflow-hidden">
                         {isActive && (
                             <View
                             className="
@@ -29,66 +44,78 @@ export default function RouteCard({ title, isActive, routeScreen }: HistoryRoute
                             "
                             />
                         )}
-                        <View>
+                        <View className="">
                             <ThemedText
                                 lightColor={DefaultTheme.colors.text} 
                                 darkColor={DarkTheme.colors.text}
-                                className="text-3xl font-bold">
+                                className="text-sm font-bold text-center">
                                     {title}
                             </ThemedText>
-                            <ThemedText
-                                lightColor={DefaultTheme.colors.text} 
-                                darkColor={DarkTheme.colors.text}
-                                className="text-lg font-normal mb-[-8px]">
-                                    Punto de partida
-                            </ThemedText>
-                            <ThemedText
-                                lightColor={DefaultTheme.colors.text} 
-                                darkColor={DarkTheme.colors.text}
-                                className="text-base font-extralight">
-                                    Mall del sur
-                            </ThemedText>
+                        </View>
+                        <View className="flex-row justify-between">
+                            <View>
                                 
-                            <ThemedText
-                                lightColor={DefaultTheme.colors.text} 
-                                darkColor={DarkTheme.colors.text}
-                                className="text-lg font-normal mb-[-8px]">
-                                    Punto final
-                            </ThemedText>
-                            <ThemedText
-                                lightColor={DefaultTheme.colors.text} 
-                                darkColor={DarkTheme.colors.text}
-                                className="text-base font-extralight">
-                                    Riocentro norte
-                            </ThemedText>
-                            <View className="my-2">
-                                <View className="flex-row items-center">
-                                    <ThemedView
-                                        lightColor={Colors.light.primary}
-                                        className="w-8 h-8 rounded-full z-30">
+                                <ThemedText
+                                    lightColor={DefaultTheme.colors.text} 
+                                    darkColor={DarkTheme.colors.text}
+                                    className="text-base font-normal mb-[-8px]">
+                                        Punto de partida
+                                </ThemedText>
+                                <ThemedText
+                                    lightColor={DefaultTheme.colors.text} 
+                                    darkColor={DarkTheme.colors.text}
+                                    className="text-sm font-extralight">
+                                        {startLocation} {/* 👈 Dinámico */}
+                                </ThemedText>
                                         
-                                    </ThemedView>
-                                    <ThemedView
-                                        lightColor={Colors.light.primary}
-                                        className="w-8 h-8 rounded-full -ml-3 z-20 opacity-80">
-                                        
-                                    </ThemedView>
-                                    <ThemedView
-                                        lightColor={Colors.light.primary}
-                                        className="w-8 h-8 rounded-full -ml-3 z-10 opacity-60">
-                                        
-                                    </ThemedView>
-                                </View>
-                            </View> 
-                        </View>
-                        <View className="justify-center">
-                            <View className="w-44 h-28">
-                                <Image
-                                    source={require('@/assets/images/mapExample.png')}
-                                    resizeMode="cover"
-                                    className="w-full h-full rounded-2xl"/>
+                                <ThemedText
+                                    lightColor={DefaultTheme.colors.text} 
+                                    darkColor={DarkTheme.colors.text}
+                                    className="text-base font-normal mb-[-8px]">
+                                        Punto final
+                                </ThemedText>
+                                <ThemedText
+                                    lightColor={DefaultTheme.colors.text} 
+                                    darkColor={DarkTheme.colors.text}
+                                    className="text-sm font-extralight">
+                                        {endLocation} {/* 👈 Dinámico */}
+                                </ThemedText>
+                                <View className="my-2">
+                                    <View className="flex-row items-center">
+                                        {/* 👈 Círculos Dinámicos */}
+                                        {[...Array(circlesToRender)].map((_, i) => (
+                                            <ThemedView
+                                                key={i}
+                                                lightColor={Colors.light.primary}
+                                                // Usamos un estilo dinámico simple para el solapamiento y la opacidad
+                                                style={{ 
+                                                    width: 32, 
+                                                    height: 32, 
+                                                    borderRadius: 16, 
+                                                    marginLeft: i === 0 ? 0 : -12, 
+                                                    zIndex: 30 - i, // Para el orden de solapamiento
+                                                    opacity: 1 - (i * 0.2), // Efecto de atenuación
+                                                }}
+                                                className="z-30" 
+                                            />
+                                        ))}
+                                        {passengerCount > maxCircles && (
+                                            <ThemedText className="ml-2 text-sm">
+                                                +{passengerCount - maxCircles}
+                                            </ThemedText>
+                                        )}
+                                    </View>
+                                </View> 
                             </View>
-                        </View>
+                            <View className="justify-center">
+                                <View className="w-44 h-28">
+                                    <Image
+                                        source={require('@/assets/images/mapExample.png')}
+                                        resizeMode="cover"
+                                        className="w-full h-full rounded-2xl"/>
+                                </View>
+                            </View>
+                        </View>  
                 </ThemedView>
             </Pressable>
         </Link>
