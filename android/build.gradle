@@ -26,6 +26,13 @@ allprojects {
       // All of React Native (JS, Obj-C sources, Android binaries) is installed from npm
       url(reactNativeAndroidDir)
     }
+    maven {
+      url 'https://api.mapbox.com/downloads/v2/releases/maven'
+      credentials {
+          username = 'mapbox'
+          password = System.getenv("MAPBOX_DOWNLOADS_TOKEN") ?: project.properties["MAPBOX_DOWNLOADS_TOKEN"]
+      }
+    }
 
     google()
     mavenCentral()

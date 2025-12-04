@@ -69,7 +69,7 @@ export default function AvailableRoutesScreen() {
                         visit_time
                     )
                 `)
-                .eq('status', 'active')
+                .eq('status', 'pending')
         }
 
         const { data, error } = await query;
