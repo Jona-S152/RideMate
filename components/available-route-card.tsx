@@ -23,6 +23,7 @@ startLatitude: number;
 endLongitude: number;
 endLatitude: number;
 stops: StopData[]; // Lista de stops con su ID y estado inicial
+trip_session_id: number;
 }
 
 export default function AvailableRouteCard({
@@ -36,9 +37,59 @@ export default function AvailableRouteCard({
         endLongitude,
         endLatitude,
         stops,
+        trip_session_id
     }: DriverRouteCardProps) {
 
     const { user } = useAuth();
+
+    const handleJoinTrip = async () => {
+        if (!user || user.driver_mode === true) return;
+
+        try {
+            const { data: sessionTrip, error } = await supabase
+                .from('passenger_trip_sessions')
+                .select("*")
+                .eq("passenger_id", user.id)
+                .in("status", ["joined"])
+                .maybeSingle();
+
+            console.log(sessionTrip);
+
+            if (error) {
+                console.error(error);
+                Alert.alert("Error verificando viaje");
+                return;
+            }
+
+            if (sessionTrip) {
+                Alert.alert("No se pudo solicitar el viaje.", "Ya tiene un viaje en curso");
+                return;
+            }
+            // Insertar participación del pasajero
+            const { error: insertError } = await supabase
+                .from('passenger_trip_sessions')
+                .insert([
+                    {
+                        trip_session_id: trip_session_id,
+                        passenger_id: user.id,
+                        status: 'joined',      // el conductor debe aceptar
+                        rejected: false,
+                        rejection_reason: null
+                    }
+                ]);
+
+            if (insertError) throw insertError;
+
+            Alert.alert("Solicitud enviada", "Has solicitado unirte al viaje.");
+            
+            // Si quieres redirigir:
+            // router.push(routeScreen);
+
+        } catch (error: any) {
+            console.error("Error al unirse al viaje:", error.message);
+            Alert.alert("Error", "No se pudo solicitar unirse al viaje.");
+        }
+    };
 
     const handleStartTrip = async () => {
         if (!user || user.driver_mode !== true) {
@@ -46,6 +97,25 @@ export default function AvailableRouteCard({
         }
 
         try {
+
+            const { data: session, error: sError } = await supabase
+                .from("trip_sessions")
+                .select("*")
+                .eq("driver_id", user.id)
+                .in("status", ["pending", "active"])
+                .maybeSingle();
+
+            if (sError) {
+                console.error(sError);
+                Alert.alert("Error verificando viaje");
+                return;
+            }
+
+            if (session) {
+                Alert.alert("No se pudo iniciar el viaje.", "Ya tiene un viaje en curso");
+                return;
+            }
+
             const { data: sessionData, error: sessionError } = await supabase
                 .from('trip_sessions')
                 .insert([
@@ -146,7 +216,7 @@ export default function AvailableRouteCard({
                         <Pressable 
                             style={{ backgroundColor: Colors.light.secondary }} 
                             className="rounded-full p-2 mt-4"
-                            onPress={user?.driver_mode ? handleStartTrip : () => router.push(routeScreen)}
+                            onPress={user?.driver_mode ? handleStartTrip : handleJoinTrip}
                         >
                             <Text className="text-lg text-center">
                                 {user?.driver_mode ? "Iniciar" : "Entrar"}

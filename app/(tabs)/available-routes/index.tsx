@@ -174,6 +174,7 @@ export default function AvailableRoutesScreen() {
                         return (
                             <AvailableRouteCard
                                 key={item.id}
+                                trip_session_id={item.id}
                                 routeScreen={`/(tabs)/available-routes/route-detail?id=${item.id}`} 
                                 start={item.start_location}
                                 end={item.end_location}
