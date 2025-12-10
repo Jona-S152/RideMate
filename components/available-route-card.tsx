@@ -1,4 +1,5 @@
 import { useAuth } from "@/app/context/AuthContext";
+import { useSession } from "@/app/context/SessionContext";
 import { Colors } from "@/constants/Colors";
 import { supabase } from "@/lib/supabase";
 import { DefaultTheme } from "@react-navigation/native";
@@ -41,6 +42,7 @@ export default function AvailableRouteCard({
     }: DriverRouteCardProps) {
 
     const { user } = useAuth();
+    const { setSessionChanged } = useSession();
 
     const handleJoinTrip = async () => {
         if (!user || user.driver_mode === true) return;
@@ -80,7 +82,8 @@ export default function AvailableRouteCard({
 
             if (insertError) throw insertError;
 
-            Alert.alert("Solicitud enviada", "Has solicitado unirte al viaje.");
+            setSessionChanged(true);
+            router.replace("/(tabs)/home");
             
             // Si quieres redirigir:
             // router.push(routeScreen);
@@ -122,7 +125,7 @@ export default function AvailableRouteCard({
                     {
                         route_id: routeId,
                         driver_id: user.id,
-                        status: 'active',
+                        status: 'pending',
                         start_location: start,
                         end_location: end,
                         start_time: new Date().toISOString(),
@@ -154,7 +157,8 @@ export default function AvailableRouteCard({
 
             if (stopsError) throw stopsError;
 
-            Alert.alert("Éxito", "Viaje iniciado y paradas registradas.");
+            setSessionChanged(true);
+            router.replace("/(tabs)/home");
 
         } catch (error: any) {   
             console.error("Error al iniciar el viaje:", error.message);
