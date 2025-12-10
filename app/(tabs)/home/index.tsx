@@ -35,7 +35,7 @@ export default function HomeScreen() {
 
             setSessionChanged(false); // reset bandera
         }
-    }, [sessionChanged, user?.driver_mode]);
+    }, [sessionChanged]);
 
     useEffect(() => {
         if (user?.driver_mode !== isEnabled) {
@@ -89,7 +89,7 @@ export default function HomeScreen() {
     useEffect(() => {
         loadActiveSession();
         fetchHistory();
-    }, [user?.id])
+    }, [user?.id, user?.driver_mode])
 
     const loadActiveSession = async () => {
         const session = await fetchActiveSession();
@@ -132,7 +132,6 @@ export default function HomeScreen() {
 
                 return data as SessionData ?? null;
             } else {
-                console.log("USER ID: ", user.id);
                 const { data: passengerSession } = await supabase
                     .from('passenger_trip_sessions')
                     .select('trip_session_id')
@@ -151,8 +150,6 @@ export default function HomeScreen() {
                     .in('status', ['pending', 'active']) // ← corregido
                     .is('end_time', null)
                     .single();
-
-                console.log("TRIP DATA: ", tripData);
 
                 return tripData as SessionData ?? null;
             }
