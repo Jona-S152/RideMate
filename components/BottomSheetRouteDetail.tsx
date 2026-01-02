@@ -1,13 +1,20 @@
 import { Colors } from "@/constants/Colors";
+import { PassengerTripSession, SessionData, UserData } from "@/interfaces/available-routes";
+import { supabase } from "@/lib/supabase";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Image, View } from "react-native";
 import { FlatList } from "react-native-gesture-handler";
 import Animated, { interpolate, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { ThemedText } from "./ThemedText";
 import { ThemedView } from "./ThemedView";
 
-export default function BottomSheetRouteDetail() {
+interface BottomSheetRouteDetailProps {
+  passengers?: PassengerTripSession[];
+  session?: SessionData | null;
+}
+
+export default function BottomSheetRouteDetail({passengers, session}: BottomSheetRouteDetailProps) {
   const imagenes = [
     {url : 'https://www.az.cl/wp-content/uploads/2021/07/ariela-agosin-480x385.jpg'},
     {url : 'https://i.pinimg.com/originals/02/35/66/023566c2bbfcf49a65b014382f522af3.jpg'},
@@ -21,6 +28,7 @@ export default function BottomSheetRouteDetail() {
 
   const bottomSheetRef = useRef<BottomSheet>(null);
   const [ currentSnapPoint, setCurrentSnapPoint ] = useState<number>(0);
+  const [ users, setUsers] = useState<UserData[]>([]);
   const snapPoints = useMemo(() => ["45%"], []);
   const animatedIndex = useSharedValue(0);
 
@@ -47,9 +55,9 @@ export default function BottomSheetRouteDetail() {
       <View className="">
         <ThemedText
           lightColor={Colors.light.text}
-          className="font-bold text-3xl pt-8"
+          className="font-bold text-3xl pt-4"
           >
-          Ruta Sur - Norte
+          {session?.status === "active"? "En curso" : session?.status === "pending" ? "pendiente" : "Completada" }
         </ThemedText>
       </View>
       <ThemedView
@@ -58,7 +66,7 @@ export default function BottomSheetRouteDetail() {
               <ThemedText
                   lightColor={Colors.light.text}
                   className="text-sm font-light px-4">
-                      Distancia {/* { false ? "Distancia" : "Prueba" } */}
+                      Distancia
               </ThemedText>
               <ThemedText
                   lightColor={Colors.light.text}
@@ -68,6 +76,19 @@ export default function BottomSheetRouteDetail() {
       </ThemedView>
     </View>
   )
+
+  const fetchUsers = async () => {
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .in('id', passengers?.map(p => p.passenger_id) ?? []);
+
+    setUsers(data as UserData[]);
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, [passengers]);
 
   return (
       <BottomSheet
@@ -84,11 +105,11 @@ export default function BottomSheetRouteDetail() {
         handleComponent={HandleDragToResize}
       >
         <BottomSheetView>
-          <View className="my-6 px-6">
+          <View className="px-6">
             {/* Visible solo cuando el bottomsheet se expande */}
               <Animated.View style={animatedContentStyle}>
               <View>
-                <View className="flex-row justify-between my-2">
+                <View className="flex-row justify-between">
                   <View className="items-start">
                     <ThemedText
                       lightColor={Colors.light.text}
@@ -100,7 +121,7 @@ export default function BottomSheetRouteDetail() {
                       lightColor={Colors.light.text}
                       className="text-sm font-extralight"
                     >
-                      Mall del sur
+                      {session?.start_location.split(',')[0]}
                     </ThemedText>
                   </View>
                   <View className="items-end">
@@ -114,7 +135,7 @@ export default function BottomSheetRouteDetail() {
                       lightColor={Colors.light.text}
                       className="text-sm font-extralight"
                     >
-                      Riocentro norte
+                      {session?.end_location.split(',')[0]}
                     </ThemedText>
                   </View>
                 </View>
@@ -238,13 +259,13 @@ export default function BottomSheetRouteDetail() {
                   <View className="h-full bg-slate-300 w-[1px] mr-4 opacity-40"/>
                   <FlatList
                     horizontal
-                    data={imagenes}
+                    data={users}
                     keyExtractor={(item, index) => index.toString()}
                     renderItem={({item}) => (
                       <View className=" mr-4">
                         <View className="items-center">
                           <View className="w-16 h-24 rounded-full border-2 border-[#E5E5E5] overflow-hidden">
-                            <Image source={{ uri: item.url }} 
+                            <Image source={{ uri: item.avatar_profile }} 
                               resizeMode="cover" 
                               className="w-full h-full"
                             />

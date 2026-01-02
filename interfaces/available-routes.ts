@@ -63,6 +63,56 @@ export interface RouteHistory {
     stops: any; // jsonb, mejor tiparlo como un array si es necesario
 }
 
+export interface PassengerTripSession {
+  id: number;
+  trip_session_id: number;
+  passenger_id: string;
+  status: string;
+  rejected: boolean;
+  rejection_reason?: string | null;
+  created_at: string;
+}
+
+export interface UserData {
+    id: string;
+    name: string;
+    email: string;
+    role_id: number; 
+    phone_number: string;
+    created_at: Date;
+    last_name: string;
+    is_driver: boolean;
+    display_name: string;
+    avatar_profile: string;
+}
+
+export interface TripSessionStops {
+    id: number;
+    trip_session_id: number;
+    stop_id: number;
+    status: string;
+    visit_time: Date;
+    create_at: Date;
+}
+
+export interface StopData {
+    id: number;
+    route_id: number;
+    location: string;
+    latitude: number;
+    longitude: number;
+    stop_order: number;
+    created_at: Date;
+}
+
+export interface DriverLocation {
+    trip_session_id: number;
+    driver_id: string;
+    latitude: number;
+    longitude: number;
+    recorded_at: Date;
+}
+
 // 3. INTERFAZ UNIFICADA para el estado 'routes'
 // Permite que el estado sea cualquiera de los dos tipos
 export type AvailableRoute = RouteData | SessionData;

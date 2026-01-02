@@ -6,12 +6,15 @@ import AntDesign from '@expo/vector-icons/AntDesign';
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
-import { useNavigation } from "expo-router";
+import { useLocalSearchParams, useNavigation } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView, ScrollView } from "react-native-gesture-handler";
 
 // Mapbox Imports
+import { useDriverLocation, useTripRealtimeById, useTripStops } from "@/hooks/useRealTime";
+import { PassengerTripSession, StopData } from "@/interfaces/available-routes";
+import { supabase } from "@/lib/supabase";
 import Mapbox, { Camera, LineLayer, MarkerView, ShapeSource, UserLocation } from "@rnmapbox/maps";
 
 // REEMPLAZA ESTO CON TU CLAVE REAL DE MAPBOX
@@ -19,14 +22,6 @@ import Mapbox, { Camera, LineLayer, MarkerView, ShapeSource, UserLocation } from
 Mapbox.setAccessToken("pk.eyJ1Ijoiam9uYS1zMTUyIiwiYSI6ImNtaWc0NWw1MDAzMWgzY3E4MzJ6dTVyZngifQ.4LJzkPbbZQufPVGpwk41qA"); 
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-
-interface Stop {
-  title: string;
-  lugar: string;
-  recent: boolean;
-  lng: number;
-  lat: number;
-}
 
 // Interfaz para el estado de la región (aunque Mapbox usa Camera, mantenemos esto para la ubicación del usuario)
 interface MapRegion {
@@ -38,8 +33,12 @@ interface MapRegion {
 
 export default function RouteDetail() {
   const navigation = useNavigation();
+  const { id } = useLocalSearchParams();
 
   const [region, setRegion] = useState<MapRegion | null>(null);
+  const [ passengers, setPassengers ] = useState<PassengerTripSession[]>([]);
+  const [ stopsData, setStopsData ] = useState<StopData[]>([]);
+
   // Mapbox usa Mapbox.MapView. Aunque la referencia de tipo es diferente, useRef puede manejarlo.
   const mapRef = useRef<Mapbox.MapView>(null); 
   const cameraRef = useRef<Mapbox.Camera>(null);
@@ -49,21 +48,38 @@ export default function RouteDetail() {
   const slideAnim = useRef(new Animated.Value(SCREEN_WIDTH)).current;
   const buttonAnim = useRef(new Animated.Value(0)).current;
 
-  const stops: Stop[] = [
-    { title: 'Punto de partida', lugar: 'Mall del sur', recent: true, lng: -79.891686, lat: -2.208754 }, // Origen
-    { title: 'Parada reciente', lugar: 'E7th St', recent: true, lng: -79.915359, lat: -2.160998 }, // Waypoint 1
-    { title: 'Próxima parada', lugar: 'Vine St', recent: false, lng: -79.910359, lat: -2.140998 }, // Waypoint 2
-    { title: 'Parada final', lugar: 'Otro destino', recent: false, lng: -79.878057, lat: -2.180671 }, // Destino
-  ];
+  const { stops } = useTripStops(Number(id));
+  const { session } = useTripRealtimeById(Number(id));
+  const { driverLocation } = useDriverLocation(Number(id));
+    
+  const fetchStops = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("stops")
+        .select("*")
+        .in("id", stops.map(s => s.stop_id))
+        .order("stop_order", { ascending: true });
 
-  // Coordenadas para la ruta
-  const origin: [number, number] = [stops[0].lng, stops[0].lat];
-  const destination: [number, number] = [stops[stops.length - 1].lng, stops[stops.length - 1].lat];
-  const waypoints: [number, number][] = stops.slice(1, stops.length - 1).map(stop => [stop.lng, stop.lat]);
-  const allCoordinates: [number, number][] = [origin, ...waypoints, destination];
+      console.log("DATA STOPS: ", data);
+
+      setStopsData(data as StopData[]);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  useEffect(() => {
+    fetchStops();
+  }, [stops]);
   
   // Función para obtener la ruta de Mapbox Directions
-  const fetchRoute = async () => {
+  const fetchRouteMap = async () => {
+    // Coordenadas para la ruta
+    const origin: [number, number] = session !== null ? [session.start_longitude, session.start_latitude] : [stopsData[0].longitude, stopsData[0].latitude];
+    const destination: [number, number] = session !== null ? [session.end_longitude, session.end_latitude] : [stopsData[stopsData.length - 1].longitude, stopsData[stopsData.length - 1].latitude];
+    const waypoints: [number, number][] = session !== null ? stopsData.map(stop => [stop.longitude, stop.latitude]) : stopsData.slice(1, stopsData.length - 1).map(stop => [stop.longitude, stop.latitude]);
+    const allCoordinates: [number, number][] = [origin, ...waypoints, destination];
+
     // Une las coordenadas en el formato requerido por la API: lng,lat;lng,lat...
     const coordsString = allCoordinates.map(c => c.join(',')).join(';');
     const accessToken = "pk.eyJ1Ijoiam9uYS1zMTUyIiwiYSI6ImNtaWc0NWw1MDAzMWgzY3E4MzJ6dTVyZngifQ.4LJzkPbbZQufPVGpwk41qA"; // Usar el token aquí también
@@ -83,13 +99,13 @@ export default function RouteDetail() {
           type: 'FeatureCollection',
           features: [{ type: 'Feature', geometry: route, properties: {} }]
         };
+
         setRouteGeoJSON(routeFeatureCollection as any);
       }
     } catch (error) {
       console.error("Error al obtener la ruta de Mapbox:", error);
     }
   };
-
 
   useEffect(() => {
     let subscriber: Location.LocationSubscription | null = null;
@@ -126,11 +142,67 @@ export default function RouteDetail() {
       );
     })();
 
-    // Llama a la función para dibujar la ruta
-    fetchRoute();
-
     return () => subscriber?.remove();
   }, []);
+
+  useEffect(() => {
+    // Solo intentamos trazar la ruta si tenemos al menos 2 paradas
+    if (stopsData && stopsData.length >= 2) {
+      fetchRouteMap();
+    }
+  }, [stopsData]);
+
+  const fetchPassengers = async () => {
+    const { data, error } = await supabase
+      .from('passenger_trip_sessions')
+      .select('*')
+      .eq('trip_session_id', id)
+      .eq('status', 'joined')
+      .is('rejected', false);
+
+    if (error) {
+      console.error("Error al obtener pasajeros:", error);
+      return null;
+    }
+    return data as PassengerTripSession[];
+  };
+
+  useEffect(() => {
+    // 1. Carga inicial
+    const loadInitialPassengers = async () => {
+      const data = await fetchPassengers();
+      if (data) setPassengers(data);
+    };
+
+    loadInitialPassengers();
+
+    // 2. Suscripción en tiempo real
+    const channel = supabase
+      .channel(`passengers-in-session-${id}`) // Canal único por viaje
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Escuchamos INSERT y UPDATE (por si cambian de estado)
+          schema: 'public',
+          table: 'passenger_trip_sessions',
+          filter: `trip_session_id=eq.${id}`, // Filtramos solo para este viaje
+        },
+        (payload) => {
+          console.log("Cambio detectado en pasajeros:", payload);
+          
+          // Opción recomendada: Refrescar la lista completa para asegurar filtros
+          fetchPassengers().then(data => {
+            if (data) setPassengers(data);
+          });
+        }
+      )
+      .subscribe();
+
+    // 3. Limpieza al desmontar el componente
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id]);
 
   // Función para cambiar la ubicación y centrar la cámara de Mapbox
   const changeLocation = (lat: number, lng: number) => {
@@ -189,6 +261,23 @@ export default function RouteDetail() {
               animationDuration={500}
             />
 
+            {driverLocation && (
+              <MarkerView
+                id="driver"
+                coordinate={[
+                  driverLocation.longitude,
+                  driverLocation.latitude,
+                ]}
+                anchor={{ x: 0.5, y: 0.5 }}
+              >
+                <Ionicons
+                  name="car-sport"
+                  size={30}
+                  color="#2563eb"
+                />
+              </MarkerView>
+            )}
+
             {/* Ubicación del usuario */}
             <UserLocation 
                 visible={true}
@@ -211,20 +300,48 @@ export default function RouteDetail() {
               </ShapeSource>
             )}
 
+            {session && (
+              <MarkerView 
+                id="start-point"
+                coordinate={[session.start_longitude, session.start_latitude]}
+                anchor={{ x: 0.5, y: 1 }}
+              >
+                <View className="items-center">
+                  <View className="bg-white p-1 rounded-full shadow-md">
+                    <Ionicons name="flag" size={30} color="#22c55e" /> {/* Verde para inicio */}
+                  </View>
+                  <Text className="bg-white/80 px-1 text-[10px] font-bold">Inicio</Text>
+                </View>
+              </MarkerView>
+            )}
+
             {/* Marcadores para las Paradas (usando MarkerView para más control) */}
-            {stops.map((stop, index) => (
+            {stopsData.map((stop, index) => (
               <MarkerView 
                 key={`stop-${index}`}
-                coordinate={[stop.lng, stop.lat]} // [lng, lat]
-                anchor={{ x: 0.5, y: 1 }} // Anclaje en el centro inferior
+                coordinate={[stop.longitude, stop.latitude]}
+                anchor={{ x: 0.5, y: 1 }}
               >
-                <View style={{ alignItems: 'center' }}>
-                  <Ionicons name="location-sharp" size={30} color={stop.recent ? Colors.light.secondary : "#94a3b8"} />
-                  {/* Puedes añadir una etiqueta si quieres */}
-                  {/* <Text style={{ color: 'black', fontSize: 10 }}>{stop.lugar}</Text> */}
+                <View className="items-center">
+                  <Ionicons name="location-sharp" size={24} color={Colors.light.primary} />
                 </View>
               </MarkerView>
             ))}
+
+            {session && (
+              <MarkerView 
+                id="end-point"
+                coordinate={[session.end_longitude, session.end_latitude]}
+                anchor={{ x: 0.5, y: 1 }}
+              >
+                <View className="items-center">
+                  <View className="bg-white p-1 rounded-full shadow-md">
+                    <Ionicons name="location" size={30} color="#ef4444" /> {/* Rojo para fin */}
+                  </View>
+                  <Text className="bg-white/80 px-1 text-[10px] font-bold">Destino</Text>
+                </View>
+              </MarkerView>
+            )}
 
           </Mapbox.MapView>
 
@@ -277,11 +394,11 @@ export default function RouteDetail() {
                 <ScrollView
                   showsVerticalScrollIndicator={false}
                 >
-                  {stops.map((stop, index) => (
+                  {stopsData.map((stop, index) => (
                     <View key={index} className="flex-row mb-6">
                       <View className="items-center w-10">
                         <ThemedView 
-                          lightColor={ stop.recent ? Colors.light.textBlack : "#94a3b8"} 
+                          lightColor={ stop.stop_order ? Colors.light.textBlack : "#94a3b8"} 
                           className="w-3 h-3 rounded-full"
                         />
 
@@ -291,18 +408,18 @@ export default function RouteDetail() {
                       </View>
 
                       <View className="flex-start mb-6">
-                        <Pressable onPress={() => changeLocation(stop.lat, stop.lng)}>
+                        <Pressable onPress={() => changeLocation(stop.latitude, stop.longitude)}>
                           <ThemedText 
-                            lightColor={ stop.recent ? Colors.light.textBlack : "#94a3b8"} 
+                            lightColor={ stop.stop_order ? Colors.light.textBlack : "#94a3b8"} 
                             className="font-bold"
                           >
-                            {stop.title}
+                            {stop.location.split(',')[0]}
                           </ThemedText>
                           <ThemedText 
-                            lightColor={ stop.recent ? Colors.light.textBlack : "#94a3b8"} 
+                            lightColor={ stop.stop_order ? Colors.light.textBlack : "#94a3b8"} 
                             className="text-sm"
                           >
-                            {stop.lugar}
+                            {stop.location.split(',')[0]}
                           </ThemedText>
                         </Pressable>
                       </View>
@@ -314,7 +431,7 @@ export default function RouteDetail() {
           </Animated.View>
           
           {/* Bottom Sheet */}
-          <BottomSheetRouteDetail />
+          <BottomSheetRouteDetail session={session} passengers={passengers} />
         </>
       )}
     </GestureHandlerRootView>

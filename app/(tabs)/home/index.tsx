@@ -4,7 +4,8 @@ import RouteCard from "@/components/history-route-card";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
-import { RouteHistory, SessionData } from "@/interfaces/available-routes";
+import { useActiveSession } from "@/hooks/useRealTime";
+import { RouteHistory } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useRef, useState } from "react";
 import { Animated, ScrollView, Switch, View } from "react-native";
@@ -12,12 +13,13 @@ import { Animated, ScrollView, Switch, View } from "react-native";
 export default function HomeScreen() {
     const { user, updateUser } = useAuth();
     const { sessionChanged, setSessionChanged } = useSession();
+    const { activeSession, loading } = useActiveSession(user);
 
     const [isEnabled, setIsEnabled] = useState(false);
     const toggleSwitch = () => {setIsEnabled(previousState => !previousState);}
 
     const [history, setHistory] = useState<RouteHistory[]>([]);
-    const [activeSessionData, setActiveSessionData] = useState<SessionData | null>(null);
+    
 
     const slideStudent = useRef(new Animated.Value(0)).current; // 0 visible, 300 fuera
     const opacityAnimStudent = useRef(new Animated.Value(0)).current;
@@ -30,8 +32,6 @@ export default function HomeScreen() {
     useEffect(() => {
         if (sessionChanged) {
             console.log("Detectado cambio de sesión → recargando datos");
-
-            loadActiveSession(); // refresca datos
 
             setSessionChanged(false); // reset bandera
         }
@@ -87,14 +87,9 @@ export default function HomeScreen() {
     }, [isEnabled]);
 
     useEffect(() => {
-        loadActiveSession();
         fetchHistory();
     }, [user?.id, user?.driver_mode])
 
-    const loadActiveSession = async () => {
-        const session = await fetchActiveSession();
-        setActiveSessionData(session);
-    };
 
     const fetchHistory = async () => {
         if (!user?.id) return;
@@ -105,7 +100,8 @@ export default function HomeScreen() {
             .from("passenger_route_history")
             .select('*')
             .eq('user_id', user.id)
-            .order('end_time', { ascending: false });
+            .order('end_time', { ascending: false })
+            .limit(3);
 
         if (error) {
             console.error("Error fetching route history: ", error);
@@ -114,52 +110,6 @@ export default function HomeScreen() {
             console.log(history);
         }
     }
-
-    const fetchActiveSession = async (): Promise<SessionData | null> => {
-        if (!user?.id) return null;
-
-        try {
-            if (user.driver_mode) {
-                const { data } = await supabase
-                    .from('trip_sessions')
-                    .select("*")
-                    .eq('driver_id', user.id)
-                    .in('status', ["pending", "active"])
-                    .is('end_time', null)
-                    .order('start_time', { ascending: false })
-                    .limit(1)
-                    .single();
-
-                return data as SessionData ?? null;
-            } else {
-                const { data: passengerSession } = await supabase
-                    .from('passenger_trip_sessions')
-                    .select('trip_session_id')
-                    .eq('passenger_id', user.id)
-                    .in('status', ['joined'])
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .single();
-
-                if (!passengerSession) return null;
-
-                const { data: tripData } = await supabase
-                    .from('trip_sessions')
-                    .select('*')
-                    .eq('id', passengerSession.trip_session_id)
-                    .in('status', ['pending', 'active']) // ← corregido
-                    .is('end_time', null)
-                    .single();
-
-                return tripData as SessionData ?? null;
-            }
-        } catch (error) {
-            console.error(error);
-            return null;
-        }
-    };
-
-
 
     return (
         <View className="flex-1">
@@ -224,15 +174,16 @@ export default function HomeScreen() {
 
             <View className="flex-1 mx-4 mt-4">
                 <ScrollView showsVerticalScrollIndicator={false}>
-                    {activeSessionData && (
+                    {activeSession && (
                         <RouteCard
-                            key={activeSessionData.id}
-                            title={`${activeSessionData.start_location} - ${activeSessionData.end_location}`}
-                            isActive={activeSessionData.status === "active" || activeSessionData.status === "pending"}
-                            routeScreen={`/(tabs)/home/route-detail?id=${activeSessionData.id}`}
+                            key={activeSession.id}
+                            sessionId={activeSession.id}
+                            title={`${activeSession.start_location} - ${activeSession.end_location}`}
+                            isActive={activeSession.status}
+                            routeScreen={`/(tabs)/home/route-detail?id=${activeSession.id}`}
                             // 🚀 Pasando datos dinámicos
-                            startLocation={activeSessionData.start_location.split(',')[0].trim()} 
-                            endLocation={activeSessionData.end_location.split(',')[0].trim()}
+                            startLocation={activeSession.start_location.split(',')[0].trim()} 
+                            endLocation={activeSession.end_location.split(',')[0].trim()}
                             
                             // 🚧 Valor Temporal: DEBES reemplazar '3' con el resultado de una consulta
                             passengerCount={3 }
@@ -243,8 +194,9 @@ export default function HomeScreen() {
                         history.map((item) => (
                             <RouteCard
                                 key={item.id}
+                                sessionId={item.id}
                                 title={`${item.start_location} - ${item.end_location}`}
-                                isActive={item.end_time === null}
+                                isActive={"completed"}
                                 routeScreen={`/(tabs)/home/route-detail?id=${item.trip_session_id}`}
                                 // 🚀 Pasando datos dinámicos
                                 startLocation={item.start_location.split(',')[0].trim()} 
