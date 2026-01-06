@@ -1,0 +1,10 @@
+node_modules
+.git
+.expo
+.expo-shared
+android/.gradle
+android/app/build
+ios
+coverage
+dist
+*.log

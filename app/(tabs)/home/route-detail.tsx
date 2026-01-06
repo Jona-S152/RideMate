@@ -6,7 +6,7 @@ import AntDesign from '@expo/vector-icons/AntDesign';
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
-import { useLocalSearchParams, useNavigation } from "expo-router";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView, ScrollView } from "react-native-gesture-handler";
@@ -51,6 +51,13 @@ export default function RouteDetail() {
   const { stops } = useTripStops(Number(id));
   const { session } = useTripRealtimeById(Number(id));
   const { driverLocation } = useDriverLocation(Number(id));
+
+  useEffect(() => {
+    if (session === null) return;
+
+    if (session.status === "completed")
+      router.navigate("/(tabs)/home");
+  }, [session]);
     
   const fetchStops = async () => {
     try {

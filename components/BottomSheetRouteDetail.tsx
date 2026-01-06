@@ -1,9 +1,11 @@
+import { useAuth } from "@/app/context/AuthContext";
 import { Colors } from "@/constants/Colors";
 import { PassengerTripSession, SessionData, UserData } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Image, View } from "react-native";
+import { Alert, Image, Pressable, ScrollView, View } from "react-native";
 import { FlatList } from "react-native-gesture-handler";
 import Animated, { interpolate, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { ThemedText } from "./ThemedText";
@@ -25,6 +27,51 @@ export default function BottomSheetRouteDetail({passengers, session}: BottomShee
     {url : 'https://www.az.cl/wp-content/uploads/2021/07/ariela-agosin-480x385.jpg'},
     {url : 'https://www.az.cl/wp-content/uploads/2021/07/ariela-agosin-480x385.jpg'},
   ]
+  
+  const { user } = useAuth();
+
+  const isActive = session?.status === "active";
+ 
+  const actions = [
+    {
+      label: "Salir",
+      icon: "log-out-outline",
+      color: "#ef4444",
+      onPress: () => {
+        console.log("Salir del viaje");
+      },
+      hidden: user?.driver_mode || !isActive
+    },
+    {
+      label: "Cancelar",
+      icon: "close-circle-outline",
+      color: "#f97316",
+      onPress: () => {
+        console.log("Cancelar viaje");
+      },
+      hidden: isActive, // solo antes de iniciar
+    },
+    {
+      label: "Finalizar",
+      icon: "flag-outline",
+      color: "#22c55e",
+      onPress: () => {
+        console.log("Finalizar viaje");
+        onFinishTrip();
+      },
+      hidden: !(user?.driver_mode && user?.is_driver) || !isActive,
+    },
+  ].filter(a => !a.hidden);
+
+  const onFinishTrip = async () => {
+    const { error } = await supabase
+      .from("trip_sessions")
+      .update({ status : "completed"})
+      .eq("id", session?.id)
+
+    if (error)
+      Alert.alert("Error: ", error.message)
+  }
 
   const bottomSheetRef = useRef<BottomSheet>(null);
   const [ currentSnapPoint, setCurrentSnapPoint ] = useState<number>(0);
@@ -240,7 +287,7 @@ export default function BottomSheetRouteDetail({passengers, session}: BottomShee
                   // </View>
                 }
                 
-                <View className="flex-row my-6">
+                <View className="flex-row mt-6">
                   <View className=" mr-4">
                     <View className="items-center">
                       <View className="w-16 h-24 rounded-full border-2 border-[#E5E5E5] overflow-hidden">
@@ -282,6 +329,36 @@ export default function BottomSheetRouteDetail({passengers, session}: BottomShee
                     nestedScrollEnabled
                   />
                 </View>
+                {/* Acciones del viaje */}
+                <View className="my-6">
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ paddingHorizontal: 4 }}
+                  >
+                    {actions.map((action, index) => (
+                      <Pressable
+                        key={index}
+                        onPress={action.onPress}
+                        className="flex-row items-center mr-3 px-4 py-2 rounded-full"
+                        style={{ backgroundColor: action.color }}
+                      >
+                        <Ionicons
+                          name={action.icon as any}
+                          size={18}
+                          color="white"
+                        />
+                        <ThemedText
+                          lightColor="#fff"
+                          className="ml-2 text-sm font-semibold"
+                        >
+                          {action.label}
+                        </ThemedText>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+
               </View>
             </Animated.View>
           </View>

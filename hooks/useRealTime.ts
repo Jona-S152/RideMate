@@ -1,7 +1,8 @@
 import { User } from '@/app/context/AuthContext';
 import { DriverLocation, SessionData, TripSessionStops } from '@/interfaces/available-routes';
 import { supabase } from '@/lib/supabase';
-import { useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 
 export const useTripRealtimeById = (sessionId : number) => {
     const [session, setSession] = useState<SessionData | null>(null);
@@ -129,7 +130,15 @@ export const useActiveSession = (user: User | null) => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [user?.id, user?.driver_mode]);
+    }, [user?.id]);
+
+    useFocusEffect(
+        useCallback(() => {
+            if (user?.id) {
+            refreshSession();
+            }
+        }, [user?.id, user?.driver_mode])
+    );
 
     return { activeSession, loading, refreshSession };
 };
