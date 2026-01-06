@@ -2,6 +2,7 @@ import { useAuth } from "@/app/context/AuthContext";
 import { Colors } from "@/constants/Colors";
 import { PassengerTripSession, SessionData, UserData } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
+import { useTripTrackingStore } from "@/store/tripTrackinStore";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -29,6 +30,7 @@ export default function BottomSheetRouteDetail({passengers, session}: BottomShee
   ]
   
   const { user } = useAuth();
+  const { stopTracking } = useTripTrackingStore();
 
   const isActive = session?.status === "active";
  
@@ -64,6 +66,9 @@ export default function BottomSheetRouteDetail({passengers, session}: BottomShee
   ].filter(a => !a.hidden);
 
   const onFinishTrip = async () => {
+    if (!session) return;
+    
+    stopTracking(session?.id);
     const { error } = await supabase
       .from("trip_sessions")
       .update({ status : "completed"})

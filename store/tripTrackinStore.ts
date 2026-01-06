@@ -41,7 +41,7 @@ export const useTripTrackingStore = create<TripTrackingState>((set) => ({
         console.log("FECHA DE ACTUALIZACIÓN: ", new Date().toISOString());
 
         // 2️⃣ UPDATE continuo
-        await supabase
+        const {error } = await supabase
           .from("driver_locations")
           .update({
             latitude,
@@ -49,6 +49,8 @@ export const useTripTrackingStore = create<TripTrackingState>((set) => ({
             recorded_at: new Date().toISOString(),
           })
           .eq("trip_session_id", tripId);
+
+        console.error("ERROR EN UPDATE: ", error);
       }
     );
 
