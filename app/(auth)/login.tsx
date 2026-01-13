@@ -4,17 +4,48 @@ import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { supabase } from "@/lib/supabase";
 import { Link } from "expo-router";
-import { useState } from "react";
-import { Image, Pressable, Text, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { Animated, Image, Keyboard, Pressable, Text, View } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { useAuth, User } from "../context/AuthContext";
 
 export default function LoginScreen () {
     const { login } = useAuth()
-
+    
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-
     
+    const HEADER_EXPANDED = 400;
+    const HEADER_COLLAPSED = 185;
+    const AnimatedThemedView = Animated.createAnimatedComponent(ThemedView);
+
+    const headerHeight = useRef(
+        new Animated.Value(HEADER_EXPANDED)
+    ).current;
+    
+    useEffect(() => {
+        const showSub = Keyboard.addListener("keyboardDidShow", () => {
+            Animated.timing(headerHeight, {
+            toValue: HEADER_COLLAPSED,
+            duration: 250,
+            useNativeDriver: false,
+            }).start();
+        });
+
+        const hideSub = Keyboard.addListener("keyboardDidHide", () => {
+            Animated.timing(headerHeight, {
+            toValue: HEADER_EXPANDED,
+            duration: 250,
+            useNativeDriver: false,
+            }).start();
+        });
+
+        return () => {
+            showSub.remove();
+            hideSub.remove();
+        };
+    }, []);
+
     const handleLogin = async (email: string, password: string) => {
         try {
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -33,7 +64,7 @@ export default function LoginScreen () {
             .select('id, email, is_driver, role_id, name, last_name')
             .eq('id', data.user?.id);
 
-            if (!userDataRaw || userDataRaw.length === 0) throw new Error("Usuario no encontrado");
+        if (!userDataRaw || userDataRaw.length === 0) throw new Error("Usuario no encontrado");
 
         const userData: User = {
             id: userDataRaw[0].id,
@@ -55,17 +86,22 @@ export default function LoginScreen () {
     };
     
     return (
-        <View>
-            <ThemedView lightColor={Colors.light.primary} className="w-full px-4 pt-6 rounded-bl-[40px]">
-                <View className="items-center">
+        <KeyboardAwareScrollView>
+            <AnimatedThemedView
+                style={{ height: headerHeight }} 
+                lightColor={Colors.light.primary} 
+                className="w-full px-4 pt-6 rounded-bl-[40px]"
+            >
+                <View className="items-center justify-center flex-1">
                     <Image
-                        className="mt-32 mb-32"
+                        className="h-36"
+                        style={{ resizeMode: "contain"}}
                         source={require('../../assets/images/TitleApp.png')}/>
                 </View> 
                 {/* <Image
                     className="mb-1"
                     source={require('../../assets/images/CarLogin.png')}/> */}
-            </ThemedView>
+            </AnimatedThemedView>
             <View className="mx-6 my-8 items-center justify-center">
                 <ThemedTextInput
                     lightColor={Colors.light.background}
@@ -101,6 +137,6 @@ export default function LoginScreen () {
                     </Link>
                 </View>
             </View>
-        </View>
+        </KeyboardAwareScrollView>
     );
 }

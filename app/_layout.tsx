@@ -1,4 +1,5 @@
 import { Redirect, Slot } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import AuthProvider, { useAuth } from './context/AuthContext';
 import SessionProvider from './context/SessionContext';
@@ -18,10 +19,12 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <SessionProvider>
-        <Slot />
-      </SessionProvider>
-    </AuthProvider>
+    <GestureHandlerRootView className='flex-1'>
+      <AuthProvider>
+        <SessionProvider>
+          <Slot />
+        </SessionProvider>
+      </AuthProvider>
+    </GestureHandlerRootView>
   );
 }

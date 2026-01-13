@@ -1,17 +1,32 @@
 import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
+import { useCollapsingHeader } from "@/hooks/useCollapsingHeader";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { ActivityIndicator, Alert, Image, Pressable, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Alert, Animated, Dimensions, Image, Keyboard, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useAuth, User } from "../context/AuthContext";
 
 export default function RegisterScreen() {
   const router = useRouter();
   const { login } = useAuth();
 
+  const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+  const HEADER_EXPANDED = SCREEN_HEIGHT * 0.50; // 45%
+  const HEADER_COLLAPSED = SCREEN_HEIGHT * 0.30; // 22%
+
+  const AnimatedThemedView = Animated.createAnimatedComponent(ThemedView);
+
+  const [ keyboardHeight, setKeyboardHeight ] = useState(0);
   const [loading, setLoading] = useState(false);
+
+  const headerHeight = useCollapsingHeader({
+    expanded: HEADER_EXPANDED,
+    collapsed: HEADER_COLLAPSED,
+    keyboardHeight,
+  });
+  console.log("headerHeight:", headerHeight);
 
   // Datos obligatorios
   const [form, setForm] = useState({
@@ -28,6 +43,27 @@ export default function RegisterScreen() {
     address: "",
   });
 
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+
+    const hideSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+  
   /** Helper: obtain an active session (tries getSession, then signInWithPassword) */
   const ensureSession = async (email: string, password: string) => {
     // try current session first
@@ -97,7 +133,8 @@ export default function RegisterScreen() {
         id: userId,
         email: form.email,
         is_driver: false,
-        driver_mode: false
+        driver_mode: false,
+        name: form.name
       };
 
       // 5) Guardar token + user en el contexto inmediatamente
@@ -114,18 +151,29 @@ export default function RegisterScreen() {
   };
 
   return (
-    <View>
-      <ThemedView lightColor={Colors.light.primary} className="w-full px-4 pt-6 rounded-bl-[40px]">
-        <View className="items-center">
-          <Image className="mt-32 mb-32" source={require('../../assets/images/TitleApp.png')} />
+    <View className="flex-1">
+      <AnimatedThemedView 
+        lightColor={Colors.light.primary} 
+        style={{ height: headerHeight }}
+        className="w-full px-4 pt-6 rounded-bl-[40px]"
+      >
+        <View className="items-center justify-center flex-1">
+          <Image className="h-36" style={{ resizeMode: "contain" }} source={require('../../assets/images/TitleApp.png')} />
         </View>
-      </ThemedView>
+      </AnimatedThemedView>
 
-      <View className="mx-5 mt-4 mb-2">
-        <Text className="text-3xl font-bold mb-6 text-primary">
-          Crear cuenta
-        </Text>
-      </View>
+      <ScrollView
+        className="flex-1"
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{
+          paddingBottom: keyboardHeight + 40,
+        }}
+      >
+        <View className="mx-5 mt-4 mb-2">
+          <Text className="text-3xl font-bold mb-6 text-primary">
+            Crear cuenta
+          </Text>
+        </View>
 
         <View className="mx-5 mt-2">
           <ThemedTextInput
@@ -171,8 +219,7 @@ export default function RegisterScreen() {
             {loading ? <ActivityIndicator color="white" /> : <Text className="text-center font-semibold">Continuar</Text>}
           </Pressable>
         </View>
-
-      
+      </ScrollView>
     </View>
   );
 }

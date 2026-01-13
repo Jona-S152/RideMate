@@ -2,12 +2,31 @@ import { useAuth } from "@/app/context/AuthContext";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
+import { UserData } from "@/interfaces/available-routes";
+import { supabase } from "@/lib/supabase";
 import { DarkTheme, DefaultTheme } from "@react-navigation/native";
 import { Link } from "expo-router";
-import { Pressable, ScrollView, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Image, Pressable, ScrollView, View } from "react-native";
 
 export default function ProfileScreen() {
-    const { logout } = useAuth();
+    const { user, logout } = useAuth();
+
+    const [ userData, setUserData ] = useState<UserData | null>(null);
+
+    const fetchUser = async () => {
+        const { data, error } = await supabase
+            .from("users")
+            .select("*")
+            .eq('id', user?.id)
+            .maybeSingle();
+        
+        setUserData(data as UserData)
+    }
+    
+    useEffect(() => {
+    fetchUser();
+    }, []);
 
     return (
             <View className="flex-1">
@@ -23,10 +42,21 @@ export default function ProfileScreen() {
                             lightColor={Colors.light.text}
                             darkColor={DarkTheme.colors.text}
                             className="text-2xl mt-6">
-                                Jhon Doe
+                                {userData?.name}
                         </ThemedText>
                         <View className="relative w-60 h-60 my-3">
-                            <View className="bg-stone-300 rounded-full w-60 h-60 my-3"/>
+                            {userData?.avatar_profile ? 
+                                (
+                                    <Image
+                                        className="rounded-full w-60 h-60 my-3"
+                                        source={{uri: userData?.avatar_profile}}
+                                    />
+                                )
+                                :
+                                (
+                                    <View className="bg-stone-300 rounded-full w-60 h-60 my-3"/>
+                                )
+                            }
                         </View>
                         <ThemedText
                             lightColor={Colors.light.text}
