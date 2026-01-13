@@ -81,8 +81,23 @@ export default function BottomSheetRouteDetail({passengers, session}: BottomShee
   const bottomSheetRef = useRef<BottomSheet>(null);
   const [ currentSnapPoint, setCurrentSnapPoint ] = useState<number>(0);
   const [ users, setUsers] = useState<UserData[]>([]);
+  const [ userData, setUserData ] = useState<UserData | null>(null);
   const snapPoints = useMemo(() => ["45%"], []);
   const animatedIndex = useSharedValue(0);
+
+  const fetchUser = async () => {
+    const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq('id', user?.id)
+        .maybeSingle();
+    
+    setUserData(data as UserData)
+  }
+    
+  useEffect(() => {
+    fetchUser();
+  }, []);
 
   const animatedContentStyle = useAnimatedStyle(() => {
     const opacity = interpolate(animatedIndex.value, [0, 1], [0, 1]);
@@ -296,7 +311,7 @@ export default function BottomSheetRouteDetail({passengers, session}: BottomShee
                   <View className=" mr-4">
                     <View className="items-center">
                       <View className="w-16 h-24 rounded-full border-2 border-[#E5E5E5] overflow-hidden">
-                        <Image source={{ uri: "https://static.vecteezy.com/system/resources/thumbnails/040/861/048/small_2x/people-lifestyle-business-style-fashion-and-menswear-concept-positive-successful-young-man-sitting-in-a-chair-in-a-room-smiling-at-the-camera-wearing-elegant-shoes-trousers-and-a-white-shirt-photo.JPG" }} 
+                        <Image source={{ uri: userData?.avatar_profile }} 
                           resizeMode="cover" 
                           className="w-full h-full"
                         />
