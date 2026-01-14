@@ -68,7 +68,7 @@ export default function BottomSheetRouteDetail({passengers, session}: BottomShee
   const onFinishTrip = async () => {
     if (!session) return;
     
-    stopTracking(session?.id);
+    stopTracking();
     const { error } = await supabase
       .from("trip_sessions")
       .update({ status : "completed"})

@@ -168,7 +168,7 @@ export const useTripStops = (tripSessionId: number) => {
             .channel(`session-stops-${tripSessionId}`)
             .on(
                 'postgres_changes',
-                { event: '*', schema: 'public', table: 'trip_sessions_stops' },
+                { event: '*', schema: 'public', table: 'trip_session_stops' },
                 () => refreshStops() // Re-ejecuta la lógica ante cualquier cambio relevante
             )
             .subscribe();

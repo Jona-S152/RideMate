@@ -9,9 +9,18 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Necesitamos tu ubicación para el viaje",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Necesitamos tu ubicación incluso con la app cerrada",
+        "UIBackgroundModes": ["location"]
+      }
     },
     "android": {
+      "foregroundService": {
+        "notificationTitle": "Viaje activo",
+        "notificationBody": "Compartiendo ubicación en tiempo real"
+      },
       "newArchEnabled": true,
       "config": {
         "googleMaps": {
@@ -38,6 +47,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "expo-location",
       "@rnmapbox/maps",
       "expo-router",
       [

@@ -12,6 +12,7 @@ import { Animated, Dimensions, Pressable, StyleSheet, Text, View } from "react-n
 import { GestureHandlerRootView, ScrollView } from "react-native-gesture-handler";
 
 // Mapbox Imports
+import { useAuth } from "@/app/context/AuthContext";
 import { useDriverLocation, useTripRealtimeById, useTripStops } from "@/hooks/useRealTime";
 import { PassengerTripSession, StopData } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
@@ -34,6 +35,7 @@ interface MapRegion {
 export default function RouteDetail() {
   const navigation = useNavigation();
   const { id } = useLocalSearchParams();
+  const { user } = useAuth();
 
   const [region, setRegion] = useState<MapRegion | null>(null);
   const [ passengers, setPassengers ] = useState<PassengerTripSession[]>([]);
@@ -141,7 +143,7 @@ export default function RouteDetail() {
           
           // Mapbox: mover la cámara
           cameraRef.current?.setCamera({
-            centerCoordinate: [loc.coords.longitude, loc.coords.latitude],
+            centerCoordinate: [ session?.status === "active" ? driverLocation!.longitude : loc.coords.longitude, session?.status === "active" ? driverLocation!.latitude : loc.coords.latitude ],
             zoomLevel: 15,
             animationDuration: 500
           });
