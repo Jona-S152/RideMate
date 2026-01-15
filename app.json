@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "ridemate",
+    "platforms": ["ios", "android"],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -28,10 +29,12 @@
         }
       },
       "permissions": [
+        "WAKE_LOCK",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
         "INTERNET"
       ],
       "adaptiveIcon": {
@@ -47,7 +50,15 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-location",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Permitir que RideMate acceda a tu ubicación siempre.",
+          "isAndroidForegroundServiceEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidLevelAndAboveForegroundServiceEnabled": true
+        }
+      ],
       "@rnmapbox/maps",
       "expo-router",
       [
@@ -69,6 +80,11 @@
       "eas": {
         "projectId": "b4cab86f-ce79-4ee9-90ab-eaef88ce61a8"
       }
+    },
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
     }
   }
 }

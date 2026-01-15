@@ -8,7 +8,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Animated, Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, AppState, AppStateStatus, Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView, ScrollView } from "react-native-gesture-handler";
 
 // Mapbox Imports
@@ -53,6 +53,30 @@ export default function RouteDetail() {
   const { stops } = useTripStops(Number(id));
   const { session } = useTripRealtimeById(Number(id));
   const { driverLocation } = useDriverLocation(Number(id));
+
+  useEffect(() => {
+    const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        // El usuario volvió a la app. Forzamos una consulta a Supabase
+        // para ver si el viaje ya se completó mientras estábamos fuera.
+        const { data } = await supabase
+          .from('trip_sessions')
+          .select('status')
+          .eq('id', id)
+          .single();
+
+        if (data?.status === 'completed') {
+          router.replace("/(tabs)/home");
+        }
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription.remove();
+    };
+  }, [id]);
 
   useEffect(() => {
     if (session === null) return;

@@ -1,6 +1,7 @@
 import { Redirect, Slot } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
+import '../services/backgroundLocation.task';
 import AuthProvider, { useAuth } from './context/AuthContext';
 import SessionProvider from './context/SessionContext';
 

@@ -16,6 +16,7 @@ export const useTripTrackingStore = create<TripTrackingState>((set, get) => ({
   tripSessionId: null,
 
   startTracking: async (tripId, driverId) => {
+    console.log("START TRACKING: ", { tripId, driverId, is_tracking: get().isTracking });
     if (get().isTracking) return;
 
     await startBackgroundTracking(tripId, driverId);
