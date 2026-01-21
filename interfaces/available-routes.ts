@@ -113,6 +113,16 @@ export interface DriverLocation {
     recorded_at: Date;
 }
 
+export interface MeetingPoint {
+    id: number;
+    trip_session_id: number;
+    passenger_id: string;
+    location: string;
+    latitude: number;
+    longitude: number;
+    created_at: string;
+}
+
 // 3. INTERFAZ UNIFICADA para el estado 'routes'
 // Permite que el estado sea cualquiera de los dos tipos
 export type AvailableRoute = RouteData | SessionData;

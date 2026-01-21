@@ -6,8 +6,8 @@ import { Text } from "react-native";
 export default function HomeStackLayout() {
   const colorScheme = useColorScheme();
   return (
-    <Stack 
-      screenOptions={{ 
+    <Stack
+      screenOptions={{
         headerStyle: { backgroundColor: Colors.light.tint },
         headerTitle: "",
         headerTransparent: true,
@@ -16,8 +16,11 @@ export default function HomeStackLayout() {
       <Stack.Screen name="index" options={{
         headerShown: false,
       }} />
-      <Stack.Screen name="route-detail" options={{ 
-        headerShown: false 
+      <Stack.Screen name="route-detail" options={{
+        headerShown: false
+      }} />
+      <Stack.Screen name="selection-map-screen" options={{
+        headerShown: false
       }} />
     </Stack>
   );

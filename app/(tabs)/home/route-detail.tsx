@@ -1,26 +1,33 @@
 import BottomSheetRouteDetail from "@/components/BottomSheetRouteDetail";
-import { ThemedText } from "@/components/ThemedText";
-import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
-import AntDesign from '@expo/vector-icons/AntDesign';
+import AntDesign from "@expo/vector-icons/AntDesign";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
-import { useEffect, useRef, useState } from "react";
-import { Animated, AppState, AppStateStatus, Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
-import { GestureHandlerRootView, ScrollView } from "react-native-gesture-handler";
+import React, { useEffect, useRef, useState } from "react";
+import { Alert, Animated, AppState, AppStateStatus, Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  GestureHandlerRootView
+} from "react-native-gesture-handler";
 
 // Mapbox Imports
 import { useAuth } from "@/app/context/AuthContext";
-import { useDriverLocation, useTripRealtimeById, useTripStops } from "@/hooks/useRealTime";
-import { PassengerTripSession, StopData } from "@/interfaces/available-routes";
+import { MeetingPoint, PassengerTripSession, StopData } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
-import Mapbox, { Camera, LineLayer, MarkerView, ShapeSource, UserLocation } from "@rnmapbox/maps";
+import Mapbox, {
+  Camera,
+  LineLayer,
+  MarkerView,
+  ShapeSource,
+  UserLocation,
+} from "@rnmapbox/maps";
 
 // REEMPLAZA ESTO CON TU CLAVE REAL DE MAPBOX
 // Se recomienda manejar esto en un archivo de configuración o variables de entorno.
-Mapbox.setAccessToken("pk.eyJ1Ijoiam9uYS1zMTUyIiwiYSI6ImNtaWc0NWw1MDAzMWgzY3E4MzJ6dTVyZngifQ.4LJzkPbbZQufPVGpwk41qA"); 
+Mapbox.setAccessToken(
+  "pk.eyJ1Ijoiam9uYS1zMTUyIiwiYSI6ImNtaWc0NWw1MDAzMWgzY3E4MzJ6dTVyZngifQ.4LJzkPbbZQufPVGpwk41qA",
+);
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -32,46 +39,100 @@ interface MapRegion {
   longitudeDelta: number;
 }
 
+interface Waypoint {
+  id: string;
+  type: 'stop' | 'meeting_point' | 'origin' | 'destination';
+  location: string;
+  latitude: number;
+  longitude: number;
+  order: number;
+  passengerId?: string;
+  stopId?: number;
+}
+
+import PassengerActionModal from "@/components/PassengerActionModal";
+import WaypointCheckInModal from "@/components/WaypointCheckInModal";
+import { useDriverLocation, useTripRealtimeById, useTripStops } from "@/hooks/useRealTime";
+
+
+
 export default function RouteDetail() {
   const navigation = useNavigation();
-  const { id } = useLocalSearchParams();
+  const params = useLocalSearchParams<{
+    trip_session_id: string;
+    passenger_id: string;
+    autoOpenModal: string;
+    id?: string;
+  }>();
+
+  // Unify the ID: prefer 'id' from params or fallback to 'trip_session_id'
+  const idParam = params.id || params.trip_session_id;
+  const id = idParam;
+
   const { user } = useAuth();
 
-  const [region, setRegion] = useState<MapRegion | null>(null);
-  const [ passengers, setPassengers ] = useState<PassengerTripSession[]>([]);
-  const [ stopsData, setStopsData ] = useState<StopData[]>([]);
-
-  // Mapbox usa Mapbox.MapView. Aunque la referencia de tipo es diferente, useRef puede manejarlo.
-  const mapRef = useRef<Mapbox.MapView>(null); 
+  // Mapbox refs & State
+  const mapRef = useRef<Mapbox.MapView>(null);
   const cameraRef = useRef<Mapbox.Camera>(null);
   const [showStops, setShowStops] = useState(false);
   const [routeGeoJSON, setRouteGeoJSON] = useState(null);
 
+  // Animations
   const slideAnim = useRef(new Animated.Value(SCREEN_WIDTH)).current;
   const buttonAnim = useRef(new Animated.Value(0)).current;
 
+  // Custom Hooks
   const { stops } = useTripStops(Number(id));
   const { session } = useTripRealtimeById(Number(id));
   const { driverLocation } = useDriverLocation(Number(id));
 
+  const [region, setRegion] = useState<MapRegion | null>(null);
+  const [passengers, setPassengers] = useState<PassengerTripSession[]>([]);
+  const [stopsData, setStopsData] = useState<StopData[]>([]);
+  const [meetingPoints, setMeetingPoints] = useState<MeetingPoint[]>([]);
+  const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
+  const [currentWaypointIndex, setCurrentWaypointIndex] = useState<number>(-1);
+
+  // Modal State
+  const [modalVisible, setModalVisible] = useState(false);
+  const [passengerIdToProcess, setPassengerIdToProcess] = useState<string | null>(null);
+
+  // Check-in Modal State
+  const [checkInModalVisible, setCheckInModalVisible] = useState(false);
+  const [waypointToCheckIn, setWaypointToCheckIn] = useState<Waypoint | null>(null);
+  const [checkedInWaypoints, setCheckedInWaypoints] = useState<Set<string>>(new Set());
+
+  // ... existing code
+
+  useEffect(() => {
+    if (params.autoOpenModal === "true" && params.passenger_id) {
+      // Abrir modal automáticamente
+      setPassengerIdToProcess(params.passenger_id);
+      setModalVisible(true);
+    }
+  }, [params.autoOpenModal, params.passenger_id]);
+
   useEffect(() => {
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
-      if (nextAppState === 'active') {
+      if (nextAppState === "active") {
         // El usuario volvió a la app. Forzamos una consulta a Supabase
         // para ver si el viaje ya se completó mientras estábamos fuera.
         const { data } = await supabase
-          .from('trip_sessions')
-          .select('status')
-          .eq('id', id)
+          .from("trip_sessions")
+          .select("status")
+          .eq("id", id)
           .single();
 
-        if (data?.status === 'completed') {
+        if (data?.status === "completed") {
           router.replace("/(tabs)/home");
         }
       }
     };
 
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    const subscription = AppState.addEventListener(
+      "change",
+      handleAppStateChange,
+    );
 
     return () => {
       subscription.remove();
@@ -81,16 +142,18 @@ export default function RouteDetail() {
   useEffect(() => {
     if (session === null) return;
 
-    if (session.status === "completed")
-      router.navigate("/(tabs)/home");
+    if (session.status === "completed") router.navigate("/(tabs)/home");
   }, [session]);
-    
+
   const fetchStops = async () => {
     try {
       const { data, error } = await supabase
         .from("stops")
         .select("*")
-        .in("id", stops.map(s => s.stop_id))
+        .in(
+          "id",
+          stops.map((s) => s.stop_id),
+        )
         .order("stop_order", { ascending: true });
 
       console.log("DATA STOPS: ", data);
@@ -99,23 +162,234 @@ export default function RouteDetail() {
     } catch (error) {
       console.error(error);
     }
-  }
+  };
 
   useEffect(() => {
     fetchStops();
   }, [stops]);
-  
+
+  const buildWaypoints = () => {
+    if (!session) return;
+
+    const allWaypoints: Waypoint[] = [];
+
+    // Add origin
+    allWaypoints.push({
+      id: 'origin',
+      type: 'origin',
+      location: session.start_location,
+      latitude: session.start_latitude,
+      longitude: session.start_longitude,
+      order: 0,
+    });
+
+    // Combine stops and meeting points
+    const combined = [
+      ...stopsData.map((stop) => ({
+        ...stop,
+        type: 'stop' as const,
+        stopId: stop.id,
+      })),
+      ...meetingPoints.map((mp) => ({
+        ...mp,
+        type: 'meeting_point' as const,
+        passengerId: mp.passenger_id,
+      })),
+    ];
+
+    // Sort by distance from origin (same logic as route calculation)
+    const sorted = combined.sort((a, b) => {
+      const distA = Math.sqrt(
+        Math.pow(a.longitude - session.start_longitude, 2) +
+        Math.pow(a.latitude - session.start_latitude, 2),
+      );
+      const distB = Math.sqrt(
+        Math.pow(b.longitude - session.start_longitude, 2) +
+        Math.pow(b.latitude - session.start_latitude, 2),
+      );
+      return distA - distB;
+    });
+
+    // Add to waypoints with order
+    sorted.forEach((item, index) => {
+      allWaypoints.push({
+        id:
+          item.type === 'stop'
+            ? `stop-${item.id}`
+            : `meeting-${item.passenger_id}`,
+        type: item.type,
+        location: item.location,
+        latitude: item.latitude,
+        longitude: item.longitude,
+        order: index + 1,
+        stopId: item.type === 'stop' ? item.stopId : undefined,
+        passengerId:
+          item.type === 'meeting_point' ? item.passengerId : undefined,
+      });
+    });
+
+    // Add destination
+    allWaypoints.push({
+      id: 'destination',
+      type: 'destination',
+      location: session.end_location,
+      latitude: session.end_latitude,
+      longitude: session.end_longitude,
+      order: allWaypoints.length,
+    });
+
+    setWaypoints(allWaypoints);
+  };
+
+  const PROXIMITY_THRESHOLD = 50; // meters
+
+  const detectCurrentWaypoint = () => {
+    if (!driverLocation || waypoints.length === 0) return;
+
+    // Calculate distance to each waypoint using Haversine formula
+    const distances = waypoints.map((wp, index) => {
+      const R = 6371e3; // Earth radius in meters
+      const φ1 = (driverLocation.latitude * Math.PI) / 180;
+      const φ2 = (wp.latitude * Math.PI) / 180;
+      const Δφ = ((wp.latitude - driverLocation.latitude) * Math.PI) / 180;
+      const Δλ = ((wp.longitude - driverLocation.longitude) * Math.PI) / 180;
+
+      const a =
+        Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+        Math.cos(φ1) *
+        Math.cos(φ2) *
+        Math.sin(Δλ / 2) *
+        Math.sin(Δλ / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distance = R * c;
+
+      return { index, distance, waypoint: wp };
+    });
+
+    // Find closest waypoint
+    const closest = distances.reduce((min, curr) =>
+      curr.distance < min.distance ? curr : min,
+    );
+
+    // If within threshold
+    if (closest.distance < PROXIMITY_THRESHOLD) {
+      const waypointId = closest.waypoint.id;
+
+      // Skip origin and destination
+      if (closest.waypoint.type === 'origin' || closest.waypoint.type === 'destination') {
+        setCurrentWaypointIndex(closest.index);
+        return;
+      }
+
+      // Only prompt if driver mode and not already checked in
+      if (user?.driver_mode && !checkedInWaypoints.has(waypointId)) {
+        setWaypointToCheckIn(closest.waypoint);
+        setCheckInModalVisible(true);
+      }
+
+      setCurrentWaypointIndex(closest.index);
+    } else {
+      // Find next unvisited waypoint
+      const nextIndex = waypoints.findIndex(
+        (wp, idx) => idx > currentWaypointIndex,
+      );
+      if (nextIndex !== -1) {
+        setCurrentWaypointIndex(nextIndex);
+      }
+    }
+  };
+
+  const handleWaypointCheckIn = async (status: 'visited' | 'skipped') => {
+    if (!waypointToCheckIn) return;
+
+    try {
+      if (waypointToCheckIn.type === 'stop') {
+        const { error } = await supabase
+          .from('trip_session_stops')
+          .update({
+            status,
+            visit_time: status === 'visited' ? new Date().toISOString() : null,
+          })
+          .eq('trip_session_id', Number(id))
+          .eq('stop_id', waypointToCheckIn.stopId);
+
+        if (error) throw error;
+      } else if (waypointToCheckIn.type === 'meeting_point') {
+        const { error } = await supabase
+          .from('trip_session_meeting_points')
+          .update({
+            status,
+            visit_time: status === 'visited' ? new Date().toISOString() : null,
+          })
+          .eq('trip_session_id', Number(id))
+          .eq('passenger_id', waypointToCheckIn.passengerId);
+
+        if (error) throw error;
+      }
+
+      setCheckedInWaypoints((prev) => new Set(prev).add(waypointToCheckIn.id));
+      setCheckInModalVisible(false);
+      setWaypointToCheckIn(null);
+      buildWaypoints();
+    } catch (error) {
+      console.error('Error updating waypoint status:', error);
+      Alert.alert('Error', 'No se pudo actualizar el estado del punto');
+    }
+  };
+
   // Función para obtener la ruta de Mapbox Directions
   const fetchRouteMap = async () => {
     // Coordenadas para la ruta
-    const origin: [number, number] = session !== null ? [session.start_longitude, session.start_latitude] : [stopsData[0].longitude, stopsData[0].latitude];
-    const destination: [number, number] = session !== null ? [session.end_longitude, session.end_latitude] : [stopsData[stopsData.length - 1].longitude, stopsData[stopsData.length - 1].latitude];
-    const waypoints: [number, number][] = session !== null ? stopsData.map(stop => [stop.longitude, stop.latitude]) : stopsData.slice(1, stopsData.length - 1).map(stop => [stop.longitude, stop.latitude]);
-    const allCoordinates: [number, number][] = [origin, ...waypoints, destination];
+    const origin: [number, number] =
+      session !== null
+        ? [session.start_longitude, session.start_latitude]
+        : [stopsData[0].longitude, stopsData[0].latitude];
+    const destination: [number, number] =
+      session !== null
+        ? [session.end_longitude, session.end_latitude]
+        : [
+          stopsData[stopsData.length - 1].longitude,
+          stopsData[stopsData.length - 1].latitude,
+        ];
+
+    // Combine stops and meeting points as waypoints
+    const stopWaypoints: [number, number][] =
+      session !== null
+        ? stopsData.map((stop) => [stop.longitude, stop.latitude])
+        : stopsData
+          .slice(1, stopsData.length - 1)
+          .map((stop) => [stop.longitude, stop.latitude]);
+
+    const meetingWaypoints: [number, number][] = meetingPoints.map((mp) => [
+      mp.longitude,
+      mp.latitude,
+    ]);
+
+    // Merge all waypoints and sort by distance from origin
+    const allWaypoints = [...stopWaypoints, ...meetingWaypoints];
+
+    // Sort waypoints by their distance from the origin
+    // This ensures meeting points are inserted between the nearest stops
+    const sortedWaypoints = allWaypoints.sort((a, b) => {
+      const distA = Math.sqrt(
+        Math.pow(a[0] - origin[0], 2) + Math.pow(a[1] - origin[1], 2)
+      );
+      const distB = Math.sqrt(
+        Math.pow(b[0] - origin[0], 2) + Math.pow(b[1] - origin[1], 2)
+      );
+      return distA - distB;
+    });
+
+    const allCoordinates: [number, number][] = [
+      origin,
+      ...sortedWaypoints,
+      destination,
+    ];
 
     // Une las coordenadas en el formato requerido por la API: lng,lat;lng,lat...
-    const coordsString = allCoordinates.map(c => c.join(',')).join(';');
-    const accessToken = "pk.eyJ1Ijoiam9uYS1zMTUyIiwiYSI6ImNtaWc0NWw1MDAzMWgzY3E4MzJ6dTVyZngifQ.4LJzkPbbZQufPVGpwk41qA"; // Usar el token aquí también
+    const coordsString = allCoordinates.map((c) => c.join(",")).join(";");
+    const accessToken =
+      "pk.eyJ1Ijoiam9uYS1zMTUyIiwiYSI6ImNtaWc0NWw1MDAzMWgzY3E4MzJ6dTVyZngifQ.4LJzkPbbZQufPVGpwk41qA"; // Usar el token aquí también
 
     // Usamos el perfil de manejo ('driving')
     const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordsString}?geometries=geojson&access_token=${accessToken}`;
@@ -125,20 +399,45 @@ export default function RouteDetail() {
       const data = await response.json();
 
       if (data.routes && data.routes.length > 0) {
-        const route = data.routes[0].geometry; 
-        
+        const route = data.routes[0].geometry;
+
         // El ShapeSource de Mapbox necesita una FeatureCollection
         const routeFeatureCollection = {
-          type: 'FeatureCollection',
-          features: [{ type: 'Feature', geometry: route, properties: {} }]
+          type: "FeatureCollection",
+          features: [{ type: "Feature", geometry: route, properties: {} }],
         };
 
         setRouteGeoJSON(routeFeatureCollection as any);
+      } else {
+        console.warn(
+          "Map routes no pudo encontrar un camino exacto:",
+          data.message,
+        );
+        // Opcional: Fallback a Directions API si falla el matching
       }
     } catch (error) {
       console.error("Error al obtener la ruta de Mapbox:", error);
     }
   };
+
+  useEffect(() => {
+    // Si el viaje está activo y tenemos la ubicación del conductor
+    if (session?.status === "active" && driverLocation) {
+      cameraRef.current?.setCamera({
+        centerCoordinate: [driverLocation.longitude, driverLocation.latitude],
+        zoomLevel: 15,
+        animationDuration: 1000, // Transición suave entre puntos
+      });
+    }
+    // Si el viaje NO ha empezado, centrar en el pasajero (region)
+    else if (region) {
+      cameraRef.current?.setCamera({
+        centerCoordinate: [region.longitude, region.latitude],
+        zoomLevel: 15,
+        animationDuration: 1000,
+      });
+    }
+  }, [driverLocation, session?.status]); // Se dispara cada vez que el conductor se mueve
 
   useEffect(() => {
     let subscriber: Location.LocationSubscription | null = null;
@@ -152,7 +451,7 @@ export default function RouteDetail() {
       subscriber = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
-          timeInterval: 2000,
+          timeInterval: 5000,
           distanceInterval: 5,
         },
         (loc) => {
@@ -164,14 +463,7 @@ export default function RouteDetail() {
           };
 
           setRegion(newRegion);
-          
-          // Mapbox: mover la cámara
-          cameraRef.current?.setCamera({
-            centerCoordinate: [ session?.status === "active" ? driverLocation!.longitude : loc.coords.longitude, session?.status === "active" ? driverLocation!.latitude : loc.coords.latitude ],
-            zoomLevel: 15,
-            animationDuration: 500
-          });
-        }
+        },
       );
     })();
 
@@ -183,21 +475,44 @@ export default function RouteDetail() {
     if (stopsData && stopsData.length >= 2) {
       fetchRouteMap();
     }
-  }, [stopsData]);
+  }, [stopsData, meetingPoints]);
 
   const fetchPassengers = async () => {
     const { data, error } = await supabase
-      .from('passenger_trip_sessions')
-      .select('*')
-      .eq('trip_session_id', id)
-      .eq('status', 'joined')
-      .is('rejected', false);
+      .from("passenger_trip_sessions")
+      .select("*")
+      .eq("trip_session_id", Number(id))
+      .in("status", ["joined", "pending_approval"])
+      .is("rejected", false);
 
     if (error) {
       console.error("Error al obtener pasajeros:", error);
       return null;
     }
     return data as PassengerTripSession[];
+  };
+
+  const fetchMeetingPoints = async () => {
+    const { data, error } = await supabase
+      .from("passenger_meeting_points")
+      .select("*")
+      .eq("trip_session_id", Number(id));
+
+    if (error) {
+      console.error("Error fetching meeting points:", error);
+      return;
+    }
+
+    // Filter only for approved passengers (status = 'joined')
+    const approvedPassengerIds = passengers
+      .filter((p) => p.status === "joined")
+      .map((p) => p.passenger_id);
+
+    const approvedMeetingPoints =
+      data?.filter((mp) => approvedPassengerIds.includes(mp.passenger_id)) ||
+      [];
+
+    setMeetingPoints(approvedMeetingPoints as MeetingPoint[]);
   };
 
   useEffect(() => {
@@ -213,21 +528,25 @@ export default function RouteDetail() {
     const channel = supabase
       .channel(`passengers-in-session-${id}`) // Canal único por viaje
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*', // Escuchamos INSERT y UPDATE (por si cambian de estado)
-          schema: 'public',
-          table: 'passenger_trip_sessions',
+          event: "*", // Escuchamos INSERT y UPDATE (por si cambian de estado)
+          schema: "public",
+          table: "passenger_trip_sessions",
           filter: `trip_session_id=eq.${id}`, // Filtramos solo para este viaje
         },
         (payload) => {
           console.log("Cambio detectado en pasajeros:", payload);
-          
+
           // Opción recomendada: Refrescar la lista completa para asegurar filtros
-          fetchPassengers().then(data => {
-            if (data) setPassengers(data);
+          fetchPassengers().then((data) => {
+            if (data) {
+              setPassengers(data);
+              // Also refresh meeting points when passengers change
+              fetchMeetingPoints();
+            }
           });
-        }
+        },
       )
       .subscribe();
 
@@ -237,25 +556,46 @@ export default function RouteDetail() {
     };
   }, [id]);
 
+  // Fetch meeting points when passengers change
+  useEffect(() => {
+    if (passengers.length > 0) {
+      fetchMeetingPoints();
+    }
+  }, [passengers]);
+
+  // Build waypoints when session, stops, or meeting points change
+  useEffect(() => {
+    if (session && stopsData.length > 0) {
+      buildWaypoints();
+    }
+  }, [session, stopsData, meetingPoints]);
+
+  // Detect current waypoint when driver location or waypoints change
+  useEffect(() => {
+    detectCurrentWaypoint();
+  }, [driverLocation, waypoints]);
+
   // Función para cambiar la ubicación y centrar la cámara de Mapbox
   const changeLocation = (lat: number, lng: number) => {
     if (cameraRef.current) {
       cameraRef.current.setCamera({
         centerCoordinate: [lng, lat], // Mapbox usa [lng, lat]
         zoomLevel: 15,
-        animationDuration: 1000
+        animationDuration: 1000,
       });
       // Actualiza la región también para mantener el estado coherente si es necesario
-      setRegion(prev => prev ? { ...prev, latitude: lat, longitude: lng } : null);
+      setRegion((prev) =>
+        prev ? { ...prev, latitude: lat, longitude: lng } : null,
+      );
     }
   };
 
   const toggleStops = () => {
     if (showStops) {
-      setShowStops(false)
+      setShowStops(false);
       // Ocultar → desliza hacia la derecha (fuera de pantalla)
       Animated.timing(slideAnim, {
-        toValue: SCREEN_WIDTH, 
+        toValue: SCREEN_WIDTH,
         duration: 300,
         useNativeDriver: true,
       }).start();
@@ -263,7 +603,7 @@ export default function RouteDetail() {
       setShowStops(true);
       // Mostrar → desliza hacia la izquierda (dentro de pantalla)
       Animated.timing(slideAnim, {
-        toValue: 0, 
+        toValue: 0,
         duration: 300,
         useNativeDriver: true,
       }).start();
@@ -297,27 +637,22 @@ export default function RouteDetail() {
             {driverLocation && (
               <MarkerView
                 id="driver"
-                coordinate={[
-                  driverLocation.longitude,
-                  driverLocation.latitude,
-                ]}
+                coordinate={[driverLocation.longitude, driverLocation.latitude]}
                 anchor={{ x: 0.5, y: 0.5 }}
               >
-                <Ionicons
-                  name="car-sport"
-                  size={30}
-                  color="#2563eb"
-                />
+                <Ionicons name="car-sport" size={30} color="#2563eb" />
               </MarkerView>
             )}
 
             {/* Ubicación del usuario */}
-            <UserLocation 
+            {!user?.driver_mode && (
+              <UserLocation
                 visible={true}
                 showsUserHeadingIndicator={true}
                 minDisplacement={5} // Actualizar cada 5 metros
-            />
-            
+              />
+            )}
+
             {/* Dibuja la Ruta */}
             {routeGeoJSON && (
               <ShapeSource id="routeSource" shape={routeGeoJSON}>
@@ -326,67 +661,107 @@ export default function RouteDetail() {
                   style={{
                     lineColor: Colors.light.secondary,
                     lineWidth: 6,
-                    lineJoin: 'round',
-                    lineCap: 'round',
+                    lineJoin: "round",
+                    lineCap: "round",
                   }}
                 />
               </ShapeSource>
             )}
 
             {session && (
-              <MarkerView 
+              <MarkerView
                 id="start-point"
                 coordinate={[session.start_longitude, session.start_latitude]}
                 anchor={{ x: 0.5, y: 1 }}
               >
                 <View className="items-center">
                   <View className="bg-white p-1 rounded-full shadow-md">
-                    <Ionicons name="flag" size={30} color="#22c55e" /> {/* Verde para inicio */}
+                    <Ionicons name="flag" size={30} color="#22c55e" />{" "}
+                    {/* Verde para inicio */}
                   </View>
-                  <Text className="bg-white/80 px-1 text-[10px] font-bold">Inicio</Text>
+                  <Text className="bg-white/80 px-1 text-[10px] font-bold">
+                    Inicio
+                  </Text>
                 </View>
               </MarkerView>
             )}
 
             {/* Marcadores para las Paradas (usando MarkerView para más control) */}
             {stopsData.map((stop, index) => (
-              <MarkerView 
+              <MarkerView
                 key={`stop-${index}`}
                 coordinate={[stop.longitude, stop.latitude]}
                 anchor={{ x: 0.5, y: 1 }}
               >
                 <View className="items-center">
-                  <Ionicons name="location-sharp" size={24} color={Colors.light.primary} />
+                  <Ionicons
+                    name="location-sharp"
+                    size={24}
+                    color={Colors.light.primary}
+                  />
+                </View>
+              </MarkerView>
+            ))}
+
+            {/* Meeting Point Markers */}
+            {meetingPoints.map((mp, index) => (
+              <MarkerView
+                key={`meeting-${mp.passenger_id}-${index}`}
+                coordinate={[mp.longitude, mp.latitude]}
+                anchor={{ x: 0.5, y: 1 }}
+              >
+                <View className="items-center">
+                  <View className="bg-blue-500 p-1 rounded-full shadow-md">
+                    <Ionicons name="person" size={20} color="white" />
+                  </View>
+                  <Text className="bg-white/80 px-1 text-[10px] font-bold">
+                    Pasajero
+                  </Text>
                 </View>
               </MarkerView>
             ))}
 
             {session && (
-              <MarkerView 
+              <MarkerView
                 id="end-point"
                 coordinate={[session.end_longitude, session.end_latitude]}
                 anchor={{ x: 0.5, y: 1 }}
               >
                 <View className="items-center">
                   <View className="bg-white p-1 rounded-full shadow-md">
-                    <Ionicons name="location" size={30} color="#ef4444" /> {/* Rojo para fin */}
+                    <Ionicons name="location" size={30} color="#ef4444" />{" "}
+                    {/* Rojo para fin */}
                   </View>
-                  <Text className="bg-white/80 px-1 text-[10px] font-bold">Destino</Text>
+                  <Text className="bg-white/80 px-1 text-[10px] font-bold">
+                    Destino
+                  </Text>
                 </View>
               </MarkerView>
             )}
-
           </Mapbox.MapView>
 
           {/* Botón de Atrás */}
-          <View pointerEvents="box-none" className="absolute top-8 left-[14px] z-50">
-            <Pressable onPress={() => navigation.goBack()} className="p-2 rounded-full shadow-lg bg-white/70">
-              <Ionicons name="arrow-back" size={34} color={Colors.light.primary} />
+          <View
+            pointerEvents="box-none"
+            className="absolute top-8 left-[14px] z-50"
+          >
+            <Pressable
+              onPress={() => navigation.goBack()}
+              className="p-2 rounded-full shadow-lg bg-white/70"
+            >
+              <Ionicons
+                name="arrow-back"
+                size={34}
+                color={Colors.light.primary}
+              />
             </Pressable>
           </View>
 
           {/* Botón para Mostrar/Ocultar Paradas */}
-          <View pointerEvents="box-none" className="absolute top-8 right-[14px] z-50">
+          <View
+            pointerEvents="box-none"
+            className="absolute top-8 right-[14px] z-50"
+          >
             {/* Contenedor del degradado para el fondo del botón (solo si quieres el efecto) */}
             <View className="absolute inset-0 flex-row w-40 h-12 rounded-full overflow-hidden">
               <LinearGradient
@@ -411,60 +786,178 @@ export default function RouteDetail() {
           </View>
 
           {/* Panel Lateral de Paradas (Animation) */}
-          <Animated.View 
-            style={{ 
+          <Animated.View
+            style={{
               transform: [{ translateX: slideAnim }],
-            }} 
+            }}
             className="absolute top-0 right-0 w-1/2 h-full z-40" // Z-index debe ser menor que los botones
           >
             <LinearGradient
-              colors={["transparent", "rgba(255,255,255,0.7)","rgba(255,255,255,0.95)" ]}
+              colors={[
+                "transparent",
+                "rgba(255,255,255,0.7)",
+                "rgba(255,255,255,0.95)",
+              ]}
               style={{ flex: 1, paddingTop: 80, paddingHorizontal: 20 }}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
             >
               <View className="relative flex-1 overflow-hidden rounded-2xl">
-                <ScrollView
-                  showsVerticalScrollIndicator={false}
-                >
-                  {stopsData.map((stop, index) => (
-                    <View key={index} className="flex-row mb-6">
-                      <View className="items-center w-10">
-                        <ThemedView 
-                          lightColor={ stop.stop_order ? Colors.light.textBlack : "#94a3b8"} 
-                          className="w-3 h-3 rounded-full"
-                        />
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  {waypoints.map((waypoint, index) => {
+                    const isVisited = index < currentWaypointIndex;
+                    const isCurrent = index === currentWaypointIndex;
+                    const isNext = index === currentWaypointIndex + 1;
 
-                        {index < stops.length - 1 && (
-                          <View className="w-1 flex-1 bg-slate-300 mt-1"/>
-                        )}
-                      </View>
+                    return (
+                      <View key={waypoint.id} className="flex-row mb-6">
+                        {/* Progress Line */}
+                        <View className="items-center w-10">
+                          {/* Dot/Icon */}
+                          <View
+                            className={`w-8 h-8 rounded-full items-center justify-center ${isVisited
+                              ? "bg-green-500"
+                              : isCurrent
+                                ? "bg-blue-500"
+                                : "bg-slate-300"
+                              }`}
+                          >
+                            {isVisited ? (
+                              <Ionicons name="checkmark" size={16} color="white" />
+                            ) : isCurrent ? (
+                              <Ionicons
+                                name={
+                                  waypoint.type === "meeting_point"
+                                    ? "person"
+                                    : "location"
+                                }
+                                size={16}
+                                color="white"
+                              />
+                            ) : (
+                              <View className="w-3 h-3 rounded-full bg-white" />
+                            )}
+                          </View>
 
-                      <View className="flex-start mb-6">
-                        <Pressable onPress={() => changeLocation(stop.latitude, stop.longitude)}>
-                          <ThemedText 
-                            lightColor={ stop.stop_order ? Colors.light.textBlack : "#94a3b8"} 
-                            className="font-bold"
+                          {/* Connecting Line */}
+                          {index < waypoints.length - 1 && (
+                            <View
+                              className={`w-1 flex-1 mt-1 ${isVisited ? "bg-green-500" : "bg-slate-300"
+                                }`}
+                            />
+                          )}
+                        </View>
+
+                        {/* Waypoint Info */}
+                        <Pressable
+                          onPress={() =>
+                            changeLocation(waypoint.latitude, waypoint.longitude)
+                          }
+                          className="flex-1"
+                        >
+                          <View
+                            className={`${isCurrent ? "bg-blue-50 p-2 rounded-lg" : ""}`}
                           >
-                            {stop.location.split(',')[0]}
-                          </ThemedText>
-                          <ThemedText 
-                            lightColor={ stop.stop_order ? Colors.light.textBlack : "#94a3b8"} 
-                            className="text-sm"
-                          >
-                            {stop.location.split(',')[0]}
-                          </ThemedText>
+                            {/* Type Badge */}
+                            <View className="flex-row items-center mb-1">
+                              {waypoint.type === "origin" && (
+                                <Text className="text-xs font-bold text-green-600">
+                                  INICIO
+                                </Text>
+                              )}
+                              {waypoint.type === "destination" && (
+                                <Text className="text-xs font-bold text-red-600">
+                                  DESTINO
+                                </Text>
+                              )}
+                              {waypoint.type === "stop" && (
+                                <Text className="text-xs font-bold text-purple-600">
+                                  PARADA
+                                </Text>
+                              )}
+                              {waypoint.type === "meeting_point" && (
+                                <Text className="text-xs font-bold text-blue-600">
+                                  PASAJERO
+                                </Text>
+                              )}
+                              {isCurrent && (
+                                <Text className="text-xs font-bold text-blue-600 ml-2">
+                                  ← ACTUAL
+                                </Text>
+                              )}
+                              {isNext && (
+                                <Text className="text-xs font-bold text-orange-600 ml-2">
+                                  SIGUIENTE
+                                </Text>
+                              )}
+                            </View>
+
+                            {/* Location */}
+                            <Text
+                              className={`font-bold ${isVisited
+                                ? "text-slate-400 line-through"
+                                : isCurrent
+                                  ? "text-blue-800"
+                                  : "text-slate-800"
+                                }`}
+                            >
+                              {waypoint.location.split(",")[0]}
+                            </Text>
+                            <Text
+                              className={`text-sm ${isVisited ? "text-slate-300" : "text-slate-500"
+                                }`}
+                            >
+                              {waypoint.location.split(",").slice(1).join(",")}
+                            </Text>
+                          </View>
                         </Pressable>
                       </View>
-                    </View>
-                  ))}       
+                    );
+                  })}
                 </ScrollView>
               </View>
             </LinearGradient>
           </Animated.View>
-          
+
           {/* Bottom Sheet */}
-          <BottomSheetRouteDetail session={session} passengers={passengers} />
+          <BottomSheetRouteDetail
+            session={session}
+            passengers={passengers}
+            onPassengerPress={(pId) => {
+              // Solo abrir si está pendiente (puedes validar esto aquí o en el hijo)
+              // Buscamos el pasajero para ver su estado
+              const p = passengers.find(px => px.passenger_id === pId);
+              if (p?.status === 'pending_approval') {
+                setPassengerIdToProcess(pId);
+                setModalVisible(true);
+              }
+            }}
+          />
+
+          <PassengerActionModal
+            visible={modalVisible}
+            passengerId={passengerIdToProcess}
+            tripSessionId={Number(id)}
+            onClose={() => {
+              setModalVisible(false);
+              setPassengerIdToProcess(null);
+            }}
+            onActionComplete={() => {
+              fetchPassengers().then(data => {
+                if (data) setPassengers(data);
+              });
+            }}
+          />
+
+          <WaypointCheckInModal
+            visible={checkInModalVisible}
+            waypoint={waypointToCheckIn}
+            onConfirm={handleWaypointCheckIn}
+            onClose={() => {
+              setCheckInModalVisible(false);
+              setWaypointToCheckIn(null);
+            }}
+          />
         </>
       )}
     </GestureHandlerRootView>
@@ -473,7 +966,7 @@ export default function RouteDetail() {
 
 // Estilos necesarios para Mapbox (aunque Tailwind se usa para el resto)
 const styles = StyleSheet.create({
-    map: {
-        flex: 1,
-    },
+  map: {
+    flex: 1,
+  },
 });

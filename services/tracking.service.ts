@@ -52,6 +52,7 @@ try {
         timeInterval: 3000,
         distanceInterval: 3,
         pausesUpdatesAutomatically: false,
+        BestForNavigation: true,
         deferredUpdatesInterval: 3000, // tiempo mínimo entre actualizaciones
         deferredUpdatesDistance: 3,   // distancia mínima entre actualizaciones
         foregroundService: {

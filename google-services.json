@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "345202694236",
+    "project_id": "ride-mate-79d13",
+    "storage_bucket": "ride-mate-79d13.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:345202694236:android:7af50a07c055e07b8eee99",
+        "android_client_info": {
+          "package_name": "com.anonymous.RideMate"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDtJ2MWnoRGxlId4JICLg7hmUcZET3meUA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

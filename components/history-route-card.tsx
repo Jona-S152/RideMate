@@ -36,21 +36,6 @@ export default function RouteCard({
     const maxCircles = 3;
     const circlesToRender = Math.min(passengerCount, maxCircles);
 
-    const handleJoinTrip = async () => {
-        if (!user || user.driver_mode === true) return;
-
-        try {
-            Alert.alert("ID: ", String(sessionId));
-            
-            // Si quieres redirigir:
-            // router.push(routeScreen);
-
-        } catch (error: any) {
-            console.error("Error al unirse al viaje:", error.message);
-            Alert.alert("Error", "No se pudo solicitar unirse al viaje.");
-        }
-    };
-
     const handleStartTrip = async () => {
         if (!user || user.driver_mode !== true) {
             return router.push(routeScreen);

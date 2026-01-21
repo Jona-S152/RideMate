@@ -14,38 +14,44 @@ interface StopData {
 }
 
 interface DriverRouteCardProps {
-routeScreen: Href;
-start: string;
-end: string;
-passengers?: number;
-routeId: number; 
-startLongitude: number;
-startLatitude: number;
-endLongitude: number;
-endLatitude: number;
-stops: StopData[]; // Lista de stops con su ID y estado inicial
-trip_session_id: number;
+    routeScreen: Href;
+    start: string;
+    end: string;
+    passengers?: number;
+    routeId: number;
+    startLongitude: number;
+    startLatitude: number;
+    endLongitude: number;
+    endLatitude: number;
+    stops: StopData[]; // Lista de stops con su ID y estado inicial
+    trip_session_id: number;
 }
 
 export default function AvailableRouteCard({
-        routeScreen,
-        start,
-        end,
-        passengers = 3,
-        routeId,
-        startLongitude,
-        startLatitude,
-        endLongitude,
-        endLatitude,
-        stops,
-        trip_session_id
-    }: DriverRouteCardProps) {
+    routeScreen,
+    start,
+    end,
+    passengers = 3,
+    routeId,
+    startLongitude,
+    startLatitude,
+    endLongitude,
+    endLatitude,
+    stops,
+    trip_session_id
+}: DriverRouteCardProps) {
 
     const { user } = useAuth();
     const { setSessionChanged } = useSession();
 
+    const routeSelectionMap: Href = "/(tabs)/available-routes/selection-map-screen";
+
     const handleJoinTrip = async () => {
-        if (!user || user.driver_mode === true) return;
+        if (!user || user.driver_mode === true) {
+            console.log("❌ Cancelando join: Usuario nulo o modo conductor activado.", { user: !!user, driverMode: user?.driver_mode });
+            return;
+        }
+        console.log("✅ Validación de usuario/modo pasó. Iniciando verificación de viaje...");
 
         try {
             const { data: sessionTrip, error } = await supabase
@@ -67,24 +73,34 @@ export default function AvailableRouteCard({
                 Alert.alert("No se pudo solicitar el viaje.", "Ya tiene un viaje en curso");
                 return;
             }
+
+            console.log("Intentando navegar a selección de mapa:", routeSelectionMap);
+            router.push({
+                pathname: routeSelectionMap, // Crea esta ruta
+                params: {
+                    trip_session_id: trip_session_id,
+                    start_name: start,
+                    end_name: end
+                }
+            });
             // Insertar participación del pasajero
-            const { error: insertError } = await supabase
-                .from('passenger_trip_sessions')
-                .insert([
-                    {
-                        trip_session_id: trip_session_id,
-                        passenger_id: user.id,
-                        status: 'joined',      // el conductor debe aceptar
-                        rejected: false,
-                        rejection_reason: null
-                    }
-                ]);
+            // const { error: insertError } = await supabase
+            //     .from('passenger_trip_sessions')
+            //     .insert([
+            //         {
+            //             trip_session_id: trip_session_id,
+            //             passenger_id: user.id,
+            //             status: 'joined',      // el conductor debe aceptar
+            //             rejected: false,
+            //             rejection_reason: null
+            //         }
+            //     ]);
 
-            if (insertError) throw insertError;
+            // if (insertError) throw insertError;
 
-            setSessionChanged(true);
-            router.replace("/(tabs)/home");
-            
+            // setSessionChanged(true);
+            // router.replace("/(tabs)/home");
+
             // Si quieres redirigir:
             // router.push(routeScreen);
 
@@ -160,41 +176,41 @@ export default function AvailableRouteCard({
             setSessionChanged(true);
             router.replace("/(tabs)/home");
 
-        } catch (error: any) {   
+        } catch (error: any) {
             console.error("Error al iniciar el viaje:", error.message);
             Alert.alert("Error", "No se pudo iniciar el viaje. Por favor, intentalo de nuevo.");
         }
     }
 
     return (
-            <ThemedView
-                lightColor={Colors.light.historyCard.background}
-                darkColor={Colors.light.historyCard.background}
-                className="flex-1 justify-center rounded-[28px] m-2 p-5"
+        <ThemedView
+            lightColor={Colors.light.historyCard.background}
+            darkColor={Colors.light.historyCard.background}
+            className="flex-1 justify-center rounded-[28px] m-2 p-5"
+        >
+            <ThemedText
+                lightColor={Colors.light.textBlack}
+                className="text-sm font-bold"
             >
-                <ThemedText
-                    lightColor={Colors.light.textBlack}
-                    className="text-sm font-bold"
-                >
-                    {start} - {end}
-                </ThemedText>
-                <View className="flex-row justify-between">
-                    <View className="flex-1 pr-4">
+                {start} - {end}
+            </ThemedText>
+            <View className="flex-row justify-between">
+                <View className="flex-1 pr-4">
 
-                        <ThemedText lightColor={DefaultTheme.colors.text} className="text-base font-normal mt-2">
-                            Punto de partida
-                        </ThemedText>
-                        <ThemedText lightColor={DefaultTheme.colors.text} className="text-sm font-light mb-2">
-                            {start.split(',')[0]}
-                        </ThemedText>
+                    <ThemedText lightColor={DefaultTheme.colors.text} className="text-base font-normal mt-2">
+                        Punto de partida
+                    </ThemedText>
+                    <ThemedText lightColor={DefaultTheme.colors.text} className="text-sm font-light mb-2">
+                        {start.split(',')[0]}
+                    </ThemedText>
 
-                        <ThemedText lightColor={DefaultTheme.colors.text} className="text-base font-normal">
-                            Punto final
-                        </ThemedText>
-                        <ThemedText lightColor={DefaultTheme.colors.text} className="text-sm font-light">
-                            {end.split(',')[0]}
-                        </ThemedText>
-                        {!user?.driver_mode &&
+                    <ThemedText lightColor={DefaultTheme.colors.text} className="text-base font-normal">
+                        Punto final
+                    </ThemedText>
+                    <ThemedText lightColor={DefaultTheme.colors.text} className="text-sm font-light">
+                        {end.split(',')[0]}
+                    </ThemedText>
+                    {!user?.driver_mode &&
                         <View className="my-3">
                             <View className="flex-row items-center">
                                 {[...Array(passengers)].map((_, i) => (
@@ -206,29 +222,37 @@ export default function AvailableRouteCard({
                                 ))}
                             </View>
                         </View>
-                        }
-                    </View>
-
-                    <View className="justify-around">
-                        <View className="w-40 h-28">
-                            <Image
-                                source={require('@/assets/images/mapExample.png')}
-                                resizeMode="cover"
-                                className="w-full h-full rounded-2xl"
-                            />
-                        </View>
-                        <Pressable 
-                            style={{ backgroundColor: Colors.light.secondary }} 
-                            className="rounded-full p-2 mt-4"
-                            onPress={user?.driver_mode ? handleStartTrip : handleJoinTrip}
-                        >
-                            <Text className="text-lg text-center">
-                                {user?.driver_mode ? "Iniciar" : "Entrar"}
-                            </Text>
-                        </Pressable>
-                    </View>
+                    }
                 </View>
 
-            </ThemedView>
+                <View className="justify-around">
+                    <View className="w-40 h-28">
+                        <Image
+                            source={require('@/assets/images/mapExample.png')}
+                            resizeMode="cover"
+                            className="w-full h-full rounded-2xl"
+                        />
+                    </View>
+                    <Pressable
+                        style={{ backgroundColor: Colors.light.secondary }}
+                        className="rounded-full p-2 mt-4"
+                        onPress={() => {
+                            console.log("🔘 Botón presionado. Modo conductor:", user?.driver_mode);
+                            if (user?.driver_mode) {
+                                handleStartTrip();
+                            } else {
+                                console.log("➡️ Llamando a handleJoinTrip...");
+                                handleJoinTrip();
+                            }
+                        }}
+                    >
+                        <Text className="text-lg text-center">
+                            {user?.driver_mode ? "Iniciar" : "Entrar"}
+                        </Text>
+                    </Pressable>
+                </View>
+            </View>
+
+        </ThemedView>
     );
 }
