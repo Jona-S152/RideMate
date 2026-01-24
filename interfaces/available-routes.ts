@@ -84,6 +84,8 @@ export interface UserData {
     is_driver: boolean;
     display_name: string;
     avatar_profile: string;
+    rating?: number;
+    rating_count?: number;
 }
 
 export interface TripSessionStops {

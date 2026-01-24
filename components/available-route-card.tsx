@@ -25,26 +25,44 @@ interface DriverRouteCardProps {
     endLatitude: number;
     stops: StopData[]; // Lista de stops con su ID y estado inicial
     trip_session_id: number;
+    driverName?: string;
+    driverAvatar?: string;
+    driverRating?: number;
+    passengersData?: {
+        id: string;
+        avatar: string;
+    }[];
 }
 
 export default function AvailableRouteCard({
     routeScreen,
     start,
     end,
-    passengers = 3,
+    passengers = 0,
     routeId,
     startLongitude,
     startLatitude,
     endLongitude,
     endLatitude,
     stops,
-    trip_session_id
+    trip_session_id,
+    driverName,
+    driverAvatar,
+    driverRating,
+    passengersData = []
 }: DriverRouteCardProps) {
 
     const { user } = useAuth();
     const { setSessionChanged } = useSession();
 
     const routeSelectionMap: Href = "/(tabs)/available-routes/selection-map-screen";
+
+    const displayPassengers = passengersData.length > 0
+        ? passengersData
+        : Array(Math.min(passengers, 3)).fill(null);
+
+    const extraPassengers = passengers - (passengersData.length > 0 ? passengersData.length : 3);
+    const showExtraCount = passengersData.length > 0 ? false : (passengers > 3);
 
     const handleJoinTrip = async () => {
         if (!user || user.driver_mode === true) {
@@ -210,19 +228,53 @@ export default function AvailableRouteCard({
                     <ThemedText lightColor={DefaultTheme.colors.text} className="text-sm font-light">
                         {end.split(',')[0]}
                     </ThemedText>
-                    {!user?.driver_mode &&
-                        <View className="my-3">
-                            <View className="flex-row items-center">
-                                {[...Array(passengers)].map((_, i) => (
-                                    <ThemedView
-                                        key={i}
-                                        lightColor={Colors.light.primary}
-                                        className={`w-8 h-8 rounded-full -ml-${i === 0 ? "0" : "3"} opacity-${100 - i * 20}`}
-                                    />
-                                ))}
+
+                    {driverName && (
+                        <View className="flex-row items-center mt-3">
+                            <Image
+                                source={{ uri: driverAvatar || "https://via.placeholder.com/150" }}
+                                className="w-8 h-8 rounded-full border border-gray-200"
+                            />
+                            <View className="ml-2">
+                                <Text className="text-xs font-bold text-gray-700">{driverName}</Text>
+                                <View className="flex-row items-center">
+                                    <Text className="text-[10px] text-gray-500">⭐ {driverRating || "0.0"}</Text>
+                                </View>
                             </View>
                         </View>
-                    }
+                    )}
+                    {!user?.driver_mode && (
+                        <View className="my-3">
+                            <View className="flex-row items-center">
+                                {displayPassengers.map((p, i) => (
+                                    <View
+                                        key={p ? p.id : i}
+                                        style={{
+                                            marginLeft: i === 0 ? 0 : -12,
+                                            zIndex: 30 - i,
+                                        }}
+                                    >
+                                        {p ? (
+                                            <Image
+                                                source={{ uri: p.avatar }}
+                                                className="w-8 h-8 rounded-full border-2 border-white"
+                                            />
+                                        ) : (
+                                            <ThemedView
+                                                lightColor={Colors.light.primary}
+                                                className="w-8 h-8 rounded-full border-2 border-white opacity-40"
+                                            />
+                                        )}
+                                    </View>
+                                ))}
+                                {showExtraCount && (
+                                    <ThemedText className="ml-2 text-sm">
+                                        +{extraPassengers}
+                                    </ThemedText>
+                                )}
+                            </View>
+                        </View>
+                    )}
                 </View>
 
                 <View className="justify-around">

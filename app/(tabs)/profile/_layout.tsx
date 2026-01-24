@@ -4,11 +4,11 @@ import { Text } from "react-native";
 
 export default function ProfileStackLayout() {
   return (
-    <Stack 
-      screenOptions={{ 
-        headerStyle: { backgroundColor: Colors.light.tint},
+    <Stack
+      screenOptions={{
+        headerStyle: { backgroundColor: Colors.light.tint },
         headerTitle: "",
-        
+
       }}>
       <Stack.Screen name="index" options={{
         headerShown: false,
@@ -20,8 +20,12 @@ export default function ProfileStackLayout() {
       }} />
       <Stack.Screen name="become-driver" options={{
         headerShown: false,
-        headerLeft: () => <Text style={{ color: Colors.light.text, fontSize: 40, paddingBottom: 10, fontWeight: 'bold'}}>Convertime en contuctor</Text> 
-      }}/>
+        headerLeft: () => <Text style={{ color: Colors.light.text, fontSize: 40, paddingBottom: 10, fontWeight: 'bold' }}>Convertirme en conductor</Text>
+      }} />
+      <Stack.Screen name="activity" options={{
+        headerShown: false,
+        headerLeft: () => <Text style={{ color: Colors.light.text, fontSize: 40, paddingBottom: 10, fontWeight: 'bold' }}>Mi actividad</Text>
+      }} />
     </Stack>
   );
 }

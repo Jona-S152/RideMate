@@ -8,33 +8,51 @@ import { Alert, Image, Pressable, Text, View } from "react-native";
 import { ThemedText } from "./ThemedText";
 import { ThemedView } from "./ThemedView";
 
-interface HistoryRouteProps{
+interface HistoryRouteProps {
     title: string;
-    startLocation: string; // Nueva prop para el punto de partida
-    endLocation: string;   // Nueva prop para el punto final
-    passengerCount: number; // Nueva prop para el número de círculos
+    startLocation: string;
+    endLocation: string;
+    passengerCount: number; // Mantener por compatibilidad o fallback
     isActive?: string;
     routeScreen: Href;
     sessionId: number;
+    // New Props
+    driver?: {
+        name: string;
+        avatar: string;
+        rating: number;
+    };
+    passengersData?: {
+        id: string;
+        avatar: string;
+    }[];
 }
 
-export default function RouteCard({ 
+export default function RouteCard({
     sessionId,
-    title, 
-    isActive, 
-    routeScreen, 
-    startLocation, 
-    endLocation, 
-    passengerCount = 0 
+    title,
+    isActive,
+    routeScreen,
+    startLocation,
+    endLocation,
+    passengerCount = 0,
+    driver,
+    passengersData = []
 }: HistoryRouteProps) {
     const { user } = useAuth();
+    const { startTracking } = useTripTrackingStore(); // Removed stopTracking unused warning
 
-    const { startTracking, stopTracking } = useTripTrackingStore();
-    // const session = useTripRealtimeById(sessionId);
-    // console.log("SESSION DESDE HISTORY ROUTE CARD: ", session);
-    // Limitamos el número máximo de círculos visibles
-    const maxCircles = 3;
-    const circlesToRender = Math.min(passengerCount, maxCircles);
+    // Use passengersData if available, otherwise fallback to count for history items (which might not have data loaded yet)
+    // Actually, user requested replacing circles with photos.
+    // If passengersData is provided, use it. If not, maybe fallback to circles if we want to keep history working as is for now.
+
+    // Logic for displaying circles:
+    const displayPassengers = passengersData.length > 0
+        ? passengersData
+        : Array(Math.min(passengerCount, 3)).fill(null); // Fallback to nulls for circles
+
+    const extraPassengers = passengerCount - (passengersData.length > 0 ? passengersData.length : 3);
+    const showExtraCount = passengersData.length > 0 ? false : (passengerCount > 3);
 
     const handleStartTrip = async () => {
         if (!user || user.driver_mode !== true) {
@@ -44,7 +62,7 @@ export default function RouteCard({
         try {
             const { data, error } = await supabase
                 .from('trip_sessions')
-                .update({ status: 'active'})
+                .update({ status: 'active' })
                 .eq('id', sessionId);
 
             if (error) {
@@ -56,7 +74,7 @@ export default function RouteCard({
 
             router.push(routeScreen);
 
-        } catch (error: any) {   
+        } catch (error: any) {
             console.error("Error al iniciar el viaje:", error.message);
             Alert.alert("Error", "No se pudo iniciar el viaje. Por favor, intentalo de nuevo.");
         }
@@ -67,99 +85,132 @@ export default function RouteCard({
             lightColor={isActive !== "completed" ? Colors.light.historyCard.activeBackground : Colors.light.historyCard.background}
             darkColor={Colors.light.historyCard.activeBackground}
             className="flex-1 justify-center rounded-[28px] m-2 p-5 overflow-hidden">
-                {isActive !== "completed" && (
-                    <View
+            {isActive !== "completed" && (
+                <View
                     className="
                         absolute -top-15 -left-12 
                         w-[150%] h-40 
                         bg-[#FFD369]/40 
                         -rotate-[70deg]
                     "
-                    />
-                )}
-                <View className="">
+                />
+            )}
+            <View className="">
+                <ThemedText
+                    lightColor={DefaultTheme.colors.text}
+                    darkColor={DarkTheme.colors.text}
+                    className="text-sm font-bold">
+                    {title}
+                </ThemedText>
+            </View>
+            <View className="flex-row justify-between">
+                <View className="flex-1 pr-4">
+
                     <ThemedText
-                        lightColor={DefaultTheme.colors.text} 
+                        lightColor={DefaultTheme.colors.text}
                         darkColor={DarkTheme.colors.text}
-                        className="text-sm font-bold">
-                            {title}
+                        className="text-base font-normal mt-2">
+                        Punto de partida
                     </ThemedText>
-                </View>
-                <View className="flex-row justify-between">
-                    <View className="flex-1 pr-4">
-                        
-                        <ThemedText
-                            lightColor={DefaultTheme.colors.text} 
-                            darkColor={DarkTheme.colors.text}
-                            className="text-base font-normal mt-2">
-                                Punto de partida
-                        </ThemedText>
-                        <ThemedText
-                            lightColor={DefaultTheme.colors.text}
-                            className="text-sm font-light mb-2">
-                                {startLocation} {/* 👈 Dinámico */}
-                        </ThemedText>
-                                
-                        <ThemedText
-                            lightColor={DefaultTheme.colors.text}
-                            className="text-base font-normal">
-                                Punto final
-                        </ThemedText>
-                        <ThemedText
-                            lightColor={DefaultTheme.colors.text}
-                            className="text-sm font-light">
-                                {endLocation} {/* 👈 Dinámico */}
-                        </ThemedText>
-                        <View className="my-2">
+                    <ThemedText
+                        lightColor={DefaultTheme.colors.text}
+                        className="text-sm font-light mb-2">
+                        {startLocation}
+                    </ThemedText>
+
+                    <ThemedText
+                        lightColor={DefaultTheme.colors.text}
+                        className="text-base font-normal">
+                        Punto final
+                    </ThemedText>
+                    <ThemedText
+                        lightColor={DefaultTheme.colors.text}
+                        className="text-sm font-light">
+                        {endLocation}
+                    </ThemedText>
+
+                    {/* Driver Info */}
+                    {driver && (
+                        <View className="flex-row items-center mt-3 mb-1">
+                            <View>
+                                <Image
+                                    source={{ uri: driver.avatar || "https://via.placeholder.com/150" }}
+                                    className="w-8 h-8 rounded-full border border-gray-200"
+                                />
+                                <ThemedView
+                                    lightColor={Colors.light.tird}
+                                    className="absolute -bottom-1 -right-1 rounded-full px-1 justify-center items-center"
+                                    style={{ minWidth: 20 }}
+                                >
+                                    <Text className="text-[8px] font-bold text-slate-800">
+                                        {driver.rating.toFixed(1)}
+                                    </Text>
+                                </ThemedView>
+                            </View>
+                            <View className="ml-2">
+                                <Text className="text-xs font-bold text-gray-700">{driver.name}</Text>
+                                <Text className="text-[10px] text-gray-500">Conductor</Text>
+                            </View>
+                        </View>
+                    )}
+
+                    <View className="my-2 min-h-[32px]">
+                        {/* Passengers List */}
+                        {(passengersData.length > 0 || passengerCount > 0) && (
                             <View className="flex-row items-center">
-                                {/* 👈 Círculos Dinámicos */}
-                                {[...Array(circlesToRender)].map((_, i) => (
-                                    <ThemedView
-                                        key={i}
-                                        lightColor={Colors.light.primary}
-                                        // Usamos un estilo dinámico simple para el solapamiento y la opacidad
-                                        style={{ 
-                                            width: 32, 
-                                            height: 32, 
-                                            borderRadius: 16, 
-                                            marginLeft: i === 0 ? 0 : -12, 
-                                            zIndex: 30 - i, // Para el orden de solapamiento
-                                            opacity: 1 - (i * 0.2), // Efecto de atenuación
+                                {displayPassengers.map((p, i) => (
+                                    <View
+                                        key={p ? p.id : i}
+                                        style={{
+                                            marginLeft: i === 0 ? 0 : -12,
+                                            zIndex: 30 - i,
                                         }}
-                                        className="z-30" 
-                                    />
+                                    >
+                                        {p ? (
+                                            <Image
+                                                source={{ uri: p.avatar }}
+                                                className="w-8 h-8 rounded-full border-2 border-white"
+                                            />
+                                        ) : (
+                                            <ThemedView
+                                                lightColor={Colors.light.primary}
+                                                className="w-8 h-8 rounded-full border-2 border-white opacity-80"
+                                            />
+                                        )}
+                                    </View>
                                 ))}
-                                {passengerCount > maxCircles && (
+                                {showExtraCount && (
                                     <ThemedText className="ml-2 text-sm">
-                                        +{passengerCount - maxCircles}
+                                        +{extraPassengers}
                                     </ThemedText>
                                 )}
                             </View>
-                        </View> 
+                        )}
                     </View>
-                    <View className="justify-around">
-                        <View className="w-44 h-28">
-                            <Image
-                                source={require('@/assets/images/mapExample.png')}
-                                resizeMode="cover"
-                                className="w-full h-full rounded-2xl"/>
-                        </View>
-                        {isActive === "active" ? 
+                </View>
+                <View className="justify-around">
+                    <View className="w-44 h-28">
+                        <Image
+                            source={require('@/assets/images/mapExample.png')}
+                            resizeMode="cover"
+                            className="w-full h-full rounded-2xl" />
+                    </View>
+                    {isActive === "active" ?
+                        (
+                            <Pressable
+                                style={{ backgroundColor: Colors.light.primary }}
+                                className="rounded-full p-2 mt-4"
+                                onPress={() => router.push(routeScreen)}
+                            >
+                                <Text className="text-lg text-center text-white">
+                                    {"Ver"}
+                                </Text>
+                            </Pressable>
+                        )
+                        : isActive === "pending" ?
                             (
-                                <Pressable 
-                                    style={{ backgroundColor: Colors.light.primary }} 
-                                    className="rounded-full p-2 mt-4"
-                                    onPress={() => router.push(routeScreen)}
-                                >
-                                    <Text className="text-lg text-center text-white">
-                                        {"Ver"}
-                                    </Text>
-                                </Pressable>
-                            )
-                            : isActive === "pending" ? 
-                            (
-                                <Pressable 
-                                    style={{ backgroundColor: Colors.light.primary }} 
+                                <Pressable
+                                    style={{ backgroundColor: Colors.light.primary }}
                                     className="rounded-full p-2 mt-4"
                                     onPress={user?.driver_mode ? handleStartTrip : () => router.push(routeScreen)}
                                 >
@@ -172,9 +223,9 @@ export default function RouteCard({
                             (
                                 <View></View>
                             )
-                        }
-                    </View>
-                </View>  
+                    }
+                </View>
+            </View>
         </ThemedView>
     );
 }

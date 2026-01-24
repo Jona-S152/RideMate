@@ -13,8 +13,9 @@ import {
 
 // Mapbox Imports
 import { useAuth } from "@/app/context/AuthContext";
-import { MeetingPoint, PassengerTripSession, StopData } from "@/interfaces/available-routes";
+import { MeetingPoint, PassengerTripSession, StopData, UserData } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
+import { ratingsService } from "@/services/ratings.service";
 import Mapbox, {
   Camera,
   LineLayer,
@@ -48,11 +49,16 @@ interface Waypoint {
   order: number;
   passengerId?: string;
   stopId?: number;
+  status?: string;
+  visitTime?: string | null;
 }
 
+import DriverRatingListModal from "@/components/DriverRatingListModal";
 import PassengerActionModal from "@/components/PassengerActionModal";
+import PassengerDropOffModal from "@/components/PassengerDropOffModal";
 import WaypointCheckInModal from "@/components/WaypointCheckInModal";
 import { useDriverLocation, useTripRealtimeById, useTripStops } from "@/hooks/useRealTime";
+import { useTripTrackingStore } from "@/store/tripTrackinStore";
 
 
 
@@ -96,11 +102,18 @@ export default function RouteDetail() {
   // Modal State
   const [modalVisible, setModalVisible] = useState(false);
   const [passengerIdToProcess, setPassengerIdToProcess] = useState<string | null>(null);
+  const [sessionUsers, setSessionUsers] = useState<UserData[]>([]);
 
-  // Check-in Modal State
   const [checkInModalVisible, setCheckInModalVisible] = useState(false);
   const [waypointToCheckIn, setWaypointToCheckIn] = useState<Waypoint | null>(null);
   const [checkedInWaypoints, setCheckedInWaypoints] = useState<Set<string>>(new Set());
+
+  // Drop-off Modal State
+  const [dropOffModalVisible, setDropOffModalVisible] = useState(false);
+  const [dropOffTitle, setDropOffTitle] = useState("¿Quiénes se bajan aquí?");
+
+  // Rating Modal State
+  const [driverRatingModalVisible, setDriverRatingModalVisible] = useState(false);
 
   // ... existing code
 
@@ -114,9 +127,10 @@ export default function RouteDetail() {
 
   useEffect(() => {
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+      console.log("AppState changed to:", nextAppState);
+      // Disable auto-redirect on app state change for debugging
+      /* 
       if (nextAppState === "active") {
-        // El usuario volvió a la app. Forzamos una consulta a Supabase
-        // para ver si el viaje ya se completó mientras estábamos fuera.
         const { data } = await supabase
           .from("trip_sessions")
           .select("status")
@@ -126,7 +140,8 @@ export default function RouteDetail() {
         if (data?.status === "completed") {
           router.replace("/(tabs)/home");
         }
-      }
+      } 
+      */
     };
 
     const subscription = AppState.addEventListener(
@@ -142,7 +157,13 @@ export default function RouteDetail() {
   useEffect(() => {
     if (session === null) return;
 
-    if (session.status === "completed") router.navigate("/(tabs)/home");
+    // console.log("Checking session status for ID:", id, "Status:", session.status);
+
+    if (session.status === "completed") {
+      // Temporary Debug Alert to catch why it redirects on start
+      // Alert.alert("DEBUG", `Session ${id} is completed. Redirecting.`);
+      router.navigate("/(tabs)/home");
+    }
   }, [session]);
 
   const fetchStops = async () => {
@@ -168,7 +189,7 @@ export default function RouteDetail() {
     fetchStops();
   }, [stops]);
 
-  const buildWaypoints = () => {
+  const buildWaypoints = async () => {
     if (!session) return;
 
     const allWaypoints: Waypoint[] = [];
@@ -183,18 +204,40 @@ export default function RouteDetail() {
       order: 0,
     });
 
+    // 4. Fetch stop statuses
+    const { data: stopStatuses } = await supabase
+      .from('trip_session_stops')
+      .select('stop_id, status, visit_time')
+      .eq('trip_session_id', Number(id));
+
+    // 5. Fetch meeting point statuses
+    const { data: meetingStatuses } = await supabase
+      .from('trip_session_meeting_points')
+      .select('passenger_id, status, visit_time')
+      .eq('trip_session_id', Number(id));
+
     // Combine stops and meeting points
     const combined = [
-      ...stopsData.map((stop) => ({
-        ...stop,
-        type: 'stop' as const,
-        stopId: stop.id,
-      })),
-      ...meetingPoints.map((mp) => ({
-        ...mp,
-        type: 'meeting_point' as const,
-        passengerId: mp.passenger_id,
-      })),
+      ...stopsData.map((stop) => {
+        const statusInfo = stopStatuses?.find(s => s.stop_id === stop.id);
+        return {
+          ...stop,
+          type: 'stop' as const,
+          stopId: stop.id,
+          status: statusInfo?.status || 'pending',
+          visitTime: statusInfo?.visit_time,
+        };
+      }),
+      ...meetingPoints.map((mp) => {
+        const statusInfo = meetingStatuses?.find(m => m.passenger_id === mp.passenger_id);
+        return {
+          ...mp,
+          type: 'meeting_point' as const,
+          passengerId: mp.passenger_id,
+          status: statusInfo?.status || 'pending',
+          visitTime: statusInfo?.visit_time,
+        };
+      }),
     ];
 
     // Sort by distance from origin (same logic as route calculation)
@@ -225,6 +268,8 @@ export default function RouteDetail() {
         stopId: item.type === 'stop' ? item.stopId : undefined,
         passengerId:
           item.type === 'meeting_point' ? item.passengerId : undefined,
+        status: item.status,
+        visitTime: item.visitTime,
       });
     });
 
@@ -275,8 +320,8 @@ export default function RouteDetail() {
     if (closest.distance < PROXIMITY_THRESHOLD) {
       const waypointId = closest.waypoint.id;
 
-      // Skip origin and destination
-      if (closest.waypoint.type === 'origin' || closest.waypoint.type === 'destination') {
+      // Skip origin
+      if (closest.waypoint.type === 'origin') {
         setCurrentWaypointIndex(closest.index);
         return;
       }
@@ -314,6 +359,12 @@ export default function RouteDetail() {
           .eq('stop_id', waypointToCheckIn.stopId);
 
         if (error) throw error;
+
+        // If visited a stop, show drop-off modal
+        if (status === 'visited') {
+          setDropOffTitle("¿Quiénes se bajan en esta parada?");
+          setDropOffModalVisible(true);
+        }
       } else if (waypointToCheckIn.type === 'meeting_point') {
         const { error } = await supabase
           .from('trip_session_meeting_points')
@@ -325,6 +376,11 @@ export default function RouteDetail() {
           .eq('passenger_id', waypointToCheckIn.passengerId);
 
         if (error) throw error;
+      } else if (waypointToCheckIn.type === 'destination') {
+        if (status === 'visited') {
+          setDropOffTitle("¿Quiénes completaron el viaje?");
+          setDropOffModalVisible(true);
+        }
       }
 
       setCheckedInWaypoints((prev) => new Set(prev).add(waypointToCheckIn.id));
@@ -334,6 +390,115 @@ export default function RouteDetail() {
     } catch (error) {
       console.error('Error updating waypoint status:', error);
       Alert.alert('Error', 'No se pudo actualizar el estado del punto');
+    }
+  };
+
+  const handleFinishTrip = async () => {
+    if (!session) return;
+
+    try {
+      // 1. Actualizar estado de la sesión de viaje
+      const { error: sessionError } = await supabase
+        .from("trip_sessions")
+        .update({ status: "completed" })
+        .eq("id", session.id);
+
+      if (sessionError) throw sessionError;
+
+      // 2. Actualizar pasajeros unidos a 'completed'
+      const { error: passengersError } = await supabase
+        .from("passenger_trip_sessions")
+        .update({ status: "completed" })
+        .eq("trip_session_id", session.id)
+        .eq("status", "joined");
+
+      if (passengersError) throw passengersError;
+
+      // 3. Detener el tracking de ubicación
+      await useTripTrackingStore.getState().stopTracking();
+
+      // 4. Obtener datos frescos para el modal
+      const latestPassengers = await fetchPassengers();
+      if (latestPassengers) {
+        setPassengers(latestPassengers);
+        await fetchSessionUsers(latestPassengers);
+
+        const participants = latestPassengers.filter(p => p.status === 'joined' || p.status === 'completed');
+        if (participants.length > 0) {
+          setDriverRatingModalVisible(true);
+          return;
+        }
+      }
+
+      Alert.alert("¡Viaje finalizado!", "Has llegado al destino y completado el viaje.");
+      router.replace("/(tabs)/home");
+
+    } catch (error) {
+      console.error("Error finishing trip:", error);
+      Alert.alert("Error", "No se pudo finalizar el viaje correctamente.");
+    }
+  };
+
+  const handleLeaveTrip = async () => {
+    if (!session || !user) return;
+
+    Alert.alert(
+      "Abandonar viaje",
+      "¿Estás seguro de que quieres salirte de este viaje?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Sí, salir",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from("passenger_trip_sessions")
+                .update({ status: "left" })
+                .eq("trip_session_id", session.id)
+                .eq("passenger_id", user.id);
+
+              if (error) throw error;
+
+              router.replace("/(tabs)/available-routes");
+            } catch (error) {
+              console.error("Error leaving trip:", error);
+              Alert.alert("Error", "No se pudo abandonar el viaje.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleDropOffPassengers = async (passengerIds: string[]) => {
+    if (!session || passengerIds.length === 0) return;
+
+    try {
+      const { error } = await supabase
+        .from("passenger_trip_sessions")
+        .update({ status: "completed" })
+        .eq("trip_session_id", session.id)
+        .in("passenger_id", passengerIds);
+
+      if (error) throw error;
+
+      setDropOffModalVisible(false);
+
+      // Actualizar la lista de pasajeros localmente
+      const updatedPassengers = await fetchPassengers();
+      if (updatedPassengers) {
+        setPassengers(updatedPassengers);
+      }
+
+      if (dropOffTitle === "¿Quiénes completaron el viaje?") {
+        await handleFinishTrip();
+      } else {
+        Alert.alert("Éxito", "Los pasajeros han sido marcados como viaje completado.");
+      }
+    } catch (error) {
+      console.error("Error dropping off passengers:", error);
+      Alert.alert("Error", "No se pudo actualizar el estado de los pasajeros.");
     }
   };
 
@@ -482,7 +647,7 @@ export default function RouteDetail() {
       .from("passenger_trip_sessions")
       .select("*")
       .eq("trip_session_id", Number(id))
-      .in("status", ["joined", "pending_approval"])
+      .in("status", ["joined", "pending_approval", "completed"])
       .is("rejected", false);
 
     if (error) {
@@ -490,6 +655,36 @@ export default function RouteDetail() {
       return null;
     }
     return data as PassengerTripSession[];
+  };
+
+  const fetchSessionUsers = async (passengerSessions: PassengerTripSession[]) => {
+    if (!passengerSessions.length) {
+      setSessionUsers([]);
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .in('id', passengerSessions.map(p => p.passenger_id));
+
+    if (error) {
+      console.error("Error fetching session users:", error);
+      return [];
+    }
+
+    // Fetch ratings for all these users
+    const userIds = data.map(u => u.id);
+    const ratingsMap = await ratingsService.getUsersRatings(userIds);
+
+    const userData = data.map(u => ({
+      ...(u as UserData),
+      rating: ratingsMap[u.id]?.rating || 0,
+      rating_count: ratingsMap[u.id]?.count || 0
+    }));
+
+    setSessionUsers(userData);
+    return userData;
   };
 
   const fetchMeetingPoints = async () => {
@@ -519,7 +714,10 @@ export default function RouteDetail() {
     // 1. Carga inicial
     const loadInitialPassengers = async () => {
       const data = await fetchPassengers();
-      if (data) setPassengers(data);
+      if (data) {
+        setPassengers(data);
+        fetchSessionUsers(data);
+      }
     };
 
     loadInitialPassengers();
@@ -542,6 +740,7 @@ export default function RouteDetail() {
           fetchPassengers().then((data) => {
             if (data) {
               setPassengers(data);
+              fetchSessionUsers(data);
               // Also refresh meeting points when passengers change
               fetchMeetingPoints();
             }
@@ -676,7 +875,7 @@ export default function RouteDetail() {
               >
                 <View className="items-center">
                   <View className="bg-white p-1 rounded-full shadow-md">
-                    <Ionicons name="flag" size={30} color="#22c55e" />{" "}
+                    <Ionicons name="flag" size={30} color="#22c55e" />
                     {/* Verde para inicio */}
                   </View>
                   <Text className="bg-white/80 px-1 text-[10px] font-bold">
@@ -729,7 +928,7 @@ export default function RouteDetail() {
               >
                 <View className="items-center">
                   <View className="bg-white p-1 rounded-full shadow-md">
-                    <Ionicons name="location" size={30} color="#ef4444" />{" "}
+                    <Ionicons name="location" size={30} color="#ef4444" />
                     {/* Rojo para fin */}
                   </View>
                   <Text className="bg-white/80 px-1 text-[10px] font-bold">
@@ -790,7 +989,7 @@ export default function RouteDetail() {
             style={{
               transform: [{ translateX: slideAnim }],
             }}
-            className="absolute top-0 right-0 w-1/2 h-full z-40" // Z-index debe ser menor que los botones
+            className="absolute top-0 right-0 w-1/2 h-full z-40"
           >
             <LinearGradient
               colors={[
@@ -921,15 +1120,19 @@ export default function RouteDetail() {
 
           {/* Bottom Sheet */}
           <BottomSheetRouteDetail
-            session={session}
             passengers={passengers}
+            users={sessionUsers}
+            session={session}
+            onFinishTrip={handleFinishTrip}
+            onLeaveTrip={handleLeaveTrip}
             onPassengerPress={(pId) => {
-              // Solo abrir si está pendiente (puedes validar esto aquí o en el hijo)
-              // Buscamos el pasajero para ver su estado
               const p = passengers.find(px => px.passenger_id === pId);
               if (p?.status === 'pending_approval') {
                 setPassengerIdToProcess(pId);
                 setModalVisible(true);
+              } else if (p?.status === 'joined') {
+                setDropOffTitle("Finalizar viaje para pasajero");
+                setDropOffModalVisible(true);
               }
             }}
           />
@@ -958,8 +1161,44 @@ export default function RouteDetail() {
               setWaypointToCheckIn(null);
             }}
           />
+
+          <PassengerDropOffModal
+            visible={dropOffModalVisible}
+            passengers={passengers}
+            users={sessionUsers}
+            title={dropOffTitle}
+            onConfirm={handleDropOffPassengers}
+            onClose={() => setDropOffModalVisible(false)}
+          />
         </>
       )}
+      <DriverRatingListModal
+        visible={driverRatingModalVisible}
+        onClose={() => {
+          setDriverRatingModalVisible(false);
+          router.replace("/(tabs)/home");
+        }}
+        passengers={sessionUsers.filter(u =>
+          passengers.some(p => p.passenger_id === u.id && (p.status === 'joined' || p.status === 'completed'))
+        )}
+        onSubmit={async (ratings) => {
+          try {
+            await ratingsService.saveMultipleRatings(
+              ratings.map(r => ({
+                trip_session_id: Number(id),
+                rater_id: user?.id || '',
+                ratee_id: r.passenger_id,
+                rating: r.rating,
+                comment: r.comment
+              }))
+            );
+            Alert.alert("Éxito", "¡Gracias por tus calificaciones!");
+          } catch (error) {
+            console.error("Error saving ratings:", error);
+            throw error;
+          }
+        }}
+      />
     </GestureHandlerRootView>
   );
 }

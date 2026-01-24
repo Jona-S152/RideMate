@@ -2,11 +2,12 @@ import { useAuth } from "@/app/context/AuthContext";
 import { Colors } from "@/constants/Colors";
 import { PassengerTripSession, SessionData, UserData } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
+import { ratingsService } from "@/services/ratings.service";
 import { useTripTrackingStore } from "@/store/tripTrackinStore";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Image, Pressable, ScrollView, View } from "react-native";
+import { Image, Pressable, ScrollView, View } from "react-native";
 import { FlatList } from "react-native-gesture-handler";
 import Animated, { interpolate, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { ThemedText } from "./ThemedText";
@@ -14,23 +15,24 @@ import { ThemedView } from "./ThemedView";
 
 interface BottomSheetRouteDetailProps {
   passengers?: PassengerTripSession[];
+  users?: UserData[];
   session?: SessionData | null;
   onPassengerPress?: (passengerId: string) => void;
+  onFinishTrip?: () => Promise<void>;
+  onLeaveTrip?: () => Promise<void>;
 }
 
-export default function BottomSheetRouteDetail({ passengers, session, onPassengerPress }: BottomSheetRouteDetailProps) {
+export default function BottomSheetRouteDetail({
+  passengers,
+  users: propUsers = [],
+  session,
+  onPassengerPress,
+  onFinishTrip,
+  onLeaveTrip
+}: BottomSheetRouteDetailProps) {
   const imagenes = [
-    { url: 'https://www.az.cl/wp-content/uploads/2021/07/ariela-agosin-480x385.jpg' },
-    { url: 'https://i.pinimg.com/originals/02/35/66/023566c2bbfcf49a65b014382f522af3.jpg' },
-    { url: 'https://tse4.mm.bing.net/th/id/OIP.LPLdkS9c-vB5LMKZygVhIAHaLF?cb=thfvnext&rs=1&pid=ImgDetMain&o=7&rm=3' },
-    { url: 'https://www.az.cl/wp-content/uploads/2021/07/ariela-agosin-480x385.jpg' },
-    { url: 'https://www.az.cl/wp-content/uploads/2021/07/ariela-agosin-480x385.jpg' },
-    { url: 'https://www.az.cl/wp-content/uploads/2021/07/ariela-agosin-480x385.jpg' },
-    { url: 'https://www.az.cl/wp-content/uploads/2021/07/ariela-agosin-480x385.jpg' },
-    { url: 'https://www.az.cl/wp-content/uploads/2021/07/ariela-agosin-480x385.jpg' },
+    // ... (rest of images)
   ]
-
-  console.log("PASAJEROS: ", passengers);
 
   const { user } = useAuth();
   const { stopTracking } = useTripTrackingStore();
@@ -42,8 +44,10 @@ export default function BottomSheetRouteDetail({ passengers, session, onPassenge
       label: "Salir",
       icon: "log-out-outline",
       color: "#ef4444",
-      onPress: () => {
-        console.log("Salir del viaje");
+      onPress: async () => {
+        if (onLeaveTrip) {
+          await onLeaveTrip();
+        }
       },
       hidden: user?.driver_mode || !isActive
     },
@@ -60,42 +64,37 @@ export default function BottomSheetRouteDetail({ passengers, session, onPassenge
       label: "Finalizar",
       icon: "flag-outline",
       color: "#22c55e",
-      onPress: () => {
-        console.log("Finalizar viaje");
-        onFinishTrip();
+      onPress: async () => {
+        if (onFinishTrip) {
+          await onFinishTrip();
+        }
       },
       hidden: !(user?.driver_mode && user?.is_driver) || !isActive,
     },
   ].filter(a => !a.hidden);
 
-  const onFinishTrip = async () => {
-    if (!session) return;
-
-    stopTracking();
-    const { error } = await supabase
-      .from("trip_sessions")
-      .update({ status: "completed" })
-      .eq("id", session?.id)
-
-    if (error)
-      Alert.alert("Error: ", error.message)
-  }
-
   const bottomSheetRef = useRef<BottomSheet>(null);
   const [currentSnapPoint, setCurrentSnapPoint] = useState<number>(0);
-  const [users, setUsers] = useState<UserData[]>([]);
   const [userData, setUserData] = useState<UserData | null>(null);
   const snapPoints = useMemo(() => ["45%"], []);
   const animatedIndex = useSharedValue(0);
 
   const fetchUser = async () => {
+    if (!user?.id) return;
     const { data, error } = await supabase
       .from("users")
       .select("*")
-      .eq('id', user?.id)
+      .eq('id', user.id)
       .maybeSingle();
 
-    setUserData(data as UserData)
+    if (data) {
+      const ratingInfo = await ratingsService.getUserRating(user.id);
+      setUserData({
+        ...(data as UserData),
+        rating: ratingInfo.rating,
+        rating_count: ratingInfo.count
+      });
+    }
   }
 
   useEffect(() => {
@@ -146,24 +145,6 @@ export default function BottomSheetRouteDetail({ passengers, session, onPassenge
       </ThemedView>
     </View>
   )
-
-  const fetchUsers = async () => {
-    const { data, error } = await supabase
-      .from("users")
-      .select("*")
-      .in('id', passengers?.map(p => p.passenger_id) ?? []);
-
-    console.log("DATA", data);
-
-    if (error)
-      console.error(error);
-    setUsers(data as UserData[]);
-  };
-
-  useEffect(() => {
-    fetchUsers();
-    console.log("USERS", users);
-  }, [passengers]);
 
   return (
     <BottomSheet
@@ -326,7 +307,7 @@ export default function BottomSheetRouteDetail({ passengers, session, onPassenge
                     </View>
                     <ThemedView lightColor={Colors.light.tird} className="absolute -bottom-3 rounded-full justify-center items-center max-w-[40px] px-2">
                       <ThemedText lightColor={Colors.light.textBlack}>
-                        4.8
+                        {userData?.rating || "0.0"}
                       </ThemedText>
                     </ThemedView>
                   </View>
@@ -334,7 +315,7 @@ export default function BottomSheetRouteDetail({ passengers, session, onPassenge
                 <View className="h-full bg-slate-300 w-[1px] mr-4 opacity-40" />
                 <FlatList
                   horizontal
-                  data={users}
+                  data={propUsers}
                   keyExtractor={(item, index) => index.toString()}
                   renderItem={({ item }) => {
                     const pSession = passengers?.find(
@@ -344,7 +325,11 @@ export default function BottomSheetRouteDetail({ passengers, session, onPassenge
                       pSession?.status === "pending_approval";
 
                     const handlePress = () => {
-                      if (!user?.driver_mode || !isPending || !pSession) return;
+                      if (!user?.driver_mode || !pSession) return;
+
+                      const canProcess = pSession.status === 'pending_approval' || pSession.status === 'joined';
+                      if (!canProcess) return;
+
                       // Delegate to parent/modal
                       onPassengerPress?.(item.id);
                     };
@@ -369,7 +354,7 @@ export default function BottomSheetRouteDetail({ passengers, session, onPassenge
                             className="rounded-full justify-center items-center max-w-[40px] px-2  -translate-y-3"
                           >
                             <ThemedText lightColor={Colors.light.textBlack}>
-                              {isPending ? "..." : "4.8"}
+                              {isPending ? "..." : (item.rating || "0.0")}
                             </ThemedText>
                           </ThemedView>
                         </View>

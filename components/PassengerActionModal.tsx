@@ -1,5 +1,6 @@
 import { Colors } from "@/constants/Colors";
 import { supabase } from "@/lib/supabase";
+import { ratingsService } from "@/services/ratings.service";
 import { Ionicons } from "@expo/vector-icons";
 import Mapbox, { Camera, MarkerView } from "@rnmapbox/maps";
 import React, { useEffect, useState } from "react";
@@ -20,6 +21,7 @@ interface PassengerDetails {
     pickup_location?: string;
     pickup_latitude?: number;
     pickup_longitude?: number;
+    rating?: number;
 }
 
 export default function PassengerActionModal({
@@ -63,6 +65,9 @@ export default function PassengerActionModal({
 
             if (meetingError) console.warn("No meeting point found", meetingError);
 
+            // 3. Obtener rating del usuario
+            const ratingInfo = await ratingsService.getUserRating(userData.id);
+
             setDetails({
                 id: userData.id,
                 name: userData.name,
@@ -70,6 +75,7 @@ export default function PassengerActionModal({
                 pickup_location: meetingData?.location || "Punto desconocido",
                 pickup_latitude: meetingData?.latitude,
                 pickup_longitude: meetingData?.longitude,
+                rating: ratingInfo.rating,
             });
 
         } catch (error) {
@@ -84,24 +90,45 @@ export default function PassengerActionModal({
         setActionLoading(true);
 
         try {
+            let updateResult;
             if (status === 'rejected') {
-                await supabase
+                updateResult = await supabase
                     .from("passenger_trip_sessions")
                     .update({ rejected: true })
                     .eq("trip_session_id", tripSessionId)
-                    .eq("passenger_id", passengerId);
+                    .eq("passenger_id", passengerId)
+                    .select();
             } else {
-                await supabase
+                updateResult = await supabase
                     .from("passenger_trip_sessions")
-                    .update({ status: 'joined' })
+                    .update({ status: 'joined', rejected: false })
                     .eq("trip_session_id", tripSessionId)
-                    .eq("passenger_id", passengerId);
+                    .eq("passenger_id", passengerId)
+                    .select();
+            }
+
+            const { data, error } = updateResult;
+
+            if (error) {
+                console.error("Supabase error updating status:", error);
+                alert("Error al actualizar estado: " + error.message);
+                throw error;
+            }
+
+            console.log("Status update success. Data:", data);
+
+            if (!data || data.length === 0) {
+                console.warn("No rows were updated. Check if the tripSessionId and passengerId are correct.");
+                alert("No se encontró el registro para actualizar.");
+            } else {
+                alert("Estado actualizado correctamente a: " + status);
             }
 
             onActionComplete();
             onClose();
         } catch (error) {
             console.error("Error updating status:", error);
+            // Podrías agregar una alerta aquí si lo deseas
         } finally {
             setActionLoading(false);
         }
@@ -148,6 +175,12 @@ export default function PassengerActionModal({
                             <Text className="text-xl font-bold text-slate-800 text-center mb-1">
                                 {details.name}
                             </Text>
+                            <View className="flex-row items-center mb-1">
+                                <Ionicons name="star" size={14} color="#fbbf24" />
+                                <Text className="text-sm font-bold text-slate-700 ml-1">
+                                    {details.rating || "0.0"}
+                                </Text>
+                            </View>
                             <Text className="text-sm font-semibold text-slate-500 mb-6 text-center">
                                 Quiere unirse a tu viaje
                             </Text>
