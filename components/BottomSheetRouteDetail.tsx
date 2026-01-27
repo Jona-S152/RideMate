@@ -20,6 +20,7 @@ interface BottomSheetRouteDetailProps {
   onPassengerPress?: (passengerId: string) => void;
   onFinishTrip?: () => Promise<void>;
   onLeaveTrip?: () => Promise<void>;
+  distanceRemaining?: string;
 }
 
 export default function BottomSheetRouteDetail({
@@ -28,7 +29,8 @@ export default function BottomSheetRouteDetail({
   session,
   onPassengerPress,
   onFinishTrip,
-  onLeaveTrip
+  onLeaveTrip,
+  distanceRemaining = "0Km"
 }: BottomSheetRouteDetailProps) {
   const imagenes = [
     // ... (rest of images)
@@ -140,7 +142,7 @@ export default function BottomSheetRouteDetail({
         <ThemedText
           lightColor={Colors.light.text}
           className="text-2xl font-bold px-4">
-          23Km
+          {distanceRemaining}
         </ThemedText>
       </ThemedView>
     </View>

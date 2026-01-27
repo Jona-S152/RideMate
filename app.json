@@ -43,8 +43,8 @@
         "INTERNET"
       ],
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/images/TitleApp.png",
+        "backgroundColor": "#000D3A"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.anonymous.RideMate",

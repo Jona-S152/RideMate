@@ -59,6 +59,7 @@ import PassengerDropOffModal from "@/components/PassengerDropOffModal";
 import WaypointCheckInModal from "@/components/WaypointCheckInModal";
 import { useDriverLocation, useTripRealtimeById, useTripStops } from "@/hooks/useRealTime";
 import { useTripTrackingStore } from "@/store/tripTrackinStore";
+import { calculateDistance, formatDistance } from "@/utils/geo";
 
 
 
@@ -98,6 +99,7 @@ export default function RouteDetail() {
   const [meetingPoints, setMeetingPoints] = useState<MeetingPoint[]>([]);
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
   const [currentWaypointIndex, setCurrentWaypointIndex] = useState<number>(-1);
+  const [distanceToNextPoint, setDistanceToNextPoint] = useState<string>("0m");
 
   // Modal State
   const [modalVisible, setModalVisible] = useState(false);
@@ -315,6 +317,48 @@ export default function RouteDetail() {
     const closest = distances.reduce((min, curr) =>
       curr.distance < min.distance ? curr : min,
     );
+
+    // Update remaining distance to the *next* logical point
+    // Logic: If 'closest' is the one we are visiting, we show distance to it.
+    // However, if we are "in" the waypoint (within threshold), we might want to show distance to the *next* one?
+    // User request: "distance from driver to next point (meeting, stop or destination)"
+
+    // Let's refine based on currentWaypointIndex logic.
+    // If we haven't reached 'closest' yet (distance > threshold), closest is likely the target.
+    // But if we passed it, we look ahead.
+
+    // We can rely on `currentWaypointIndex` logic below which advances index.
+    // Actually, let's just use the closest waypoint that is visually "next" in the sequence
+    // or simply calculate distance to waypoints[currentWaypointIndex] if available.
+
+    // Better yet, just use the `closest` logic directly for display if it's meaningful,
+    // OR use waypoints.find(w => w.order > currentOrder)
+
+    // Let's stick to the existing logic flow:
+    // It updates `currentWaypointIndex` to be the target we are approaching.
+
+    // So we can calculate distance to waypoints[currentWaypointIndex] (if valid)
+    // BUT `detectCurrentWaypoint` runs continuously. Let's update state here.
+
+    // Find the relevant target waypoint:
+    // It should be the first waypoint that hasn't been visited/completed/skipped.
+    const nextTargetIndex = waypoints.findIndex(wp => {
+      if (wp.type === 'origin') return false;
+      return !checkedInWaypoints.has(wp.id) && (wp.status === 'pending' || !wp.status);
+    });
+
+    if (nextTargetIndex !== -1) {
+      const target = waypoints[nextTargetIndex];
+      const distKm = calculateDistance(
+        driverLocation.latitude,
+        driverLocation.longitude,
+        target.latitude,
+        target.longitude
+      );
+      setDistanceToNextPoint(formatDistance(distKm));
+    } else {
+      setDistanceToNextPoint("0m");
+    }
 
     // If within threshold
     if (closest.distance < PROXIMITY_THRESHOLD) {
@@ -1135,6 +1179,7 @@ export default function RouteDetail() {
                 setDropOffModalVisible(true);
               }
             }}
+            distanceRemaining={distanceToNextPoint}
           />
 
           <PassengerActionModal
