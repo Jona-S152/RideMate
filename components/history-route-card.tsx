@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { useTripTrackingStore } from "@/store/tripTrackinStore";
 import { DarkTheme, DefaultTheme } from "@react-navigation/native";
 import { Href, router } from "expo-router";
+import { useState } from "react";
 import { Alert, Image, Pressable, Text, View } from "react-native";
 import { ThemedText } from "./ThemedText";
 import { ThemedView } from "./ThemedView";
@@ -16,6 +17,7 @@ interface HistoryRouteProps {
     isActive?: string;
     routeScreen: Href;
     sessionId: number;
+    routeId?: number;
     // New Props
     driver?: {
         name: string;
@@ -26,10 +28,12 @@ interface HistoryRouteProps {
         id: string;
         avatar: string;
     }[];
+    imageUrl?: string;
 }
 
 export default function RouteCard({
     sessionId,
+    routeId,
     title,
     isActive,
     routeScreen,
@@ -37,8 +41,10 @@ export default function RouteCard({
     endLocation,
     passengerCount = 0,
     driver,
-    passengersData = []
+    passengersData = [],
+    imageUrl
 }: HistoryRouteProps) {
+    console.log(`[HistoryCard] id=${sessionId} imageUrl=${imageUrl}`);
     const { user } = useAuth();
     const { startTracking } = useTripTrackingStore(); // Removed stopTracking unused warning
 
@@ -53,6 +59,8 @@ export default function RouteCard({
 
     const extraPassengers = passengerCount - (passengersData.length > 0 ? passengersData.length : 3);
     const showExtraCount = passengersData.length > 0 ? false : (passengerCount > 3);
+
+    const [imageError, setImageError] = useState(false);
 
     const handleStartTrip = async () => {
         if (!user || user.driver_mode !== true) {
@@ -191,7 +199,12 @@ export default function RouteCard({
                 <View className="justify-around">
                     <View className="w-44 h-28">
                         <Image
-                            source={require('@/assets/images/mapExample.png')}
+                            source={
+                                imageUrl && !imageError
+                                    ? { uri: imageUrl }
+                                    : require('@/assets/images/mapExample.png')
+                            }
+                            onError={() => setImageError(true)}
                             resizeMode="cover"
                             className="w-full h-full rounded-2xl" />
                     </View>

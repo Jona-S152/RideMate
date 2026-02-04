@@ -2,10 +2,10 @@ import { useAuth } from "@/app/context/AuthContext";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
+import { useThemeColor } from "@/hooks/useThemeColor";
 import { UserData } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
 import { ratingsService } from "@/services/ratings.service";
-import { DarkTheme, DefaultTheme } from "@react-navigation/native";
 import { Link } from "expo-router";
 import { useEffect, useState } from "react";
 import { Image, Pressable, ScrollView, View } from "react-native";
@@ -38,19 +38,27 @@ export default function ProfileScreen() {
         fetchUser();
     }, []);
 
+    const primaryColor = useThemeColor({}, 'primary');
+    const textColor = useThemeColor({}, 'text');
+    const textBlackColor = useThemeColor({}, 'textBlack');
+
+    // We want "Dark Text" in Light Mode (on light bg) and "Light Text" in Dark Mode (on dark bg)
+    // Colors.light.text is Light (for navy bg), Colors.light.textBlack is Black.
+    // Colors.dark.text is Light.
+    // So for content on "Background" (Light/Dark Page):
+    // Light Mode: textBlack (#000)
+    // Dark Mode: text (#ECEDEE)
+    const contentTextColor = useThemeColor({ light: Colors.light.textBlack, dark: Colors.dark.text }, 'text');
+
     return (
-        <View className="flex-1">
-            <ThemedView lightColor={Colors.light.primary} className="w-full px-4 py-6 rounded-bl-[40px]">
+        <ThemedView className="flex-1">
+            <ThemedView lightColor={Colors.light.primary} darkColor={Colors.dark.primary} className="w-full px-4 py-6 rounded-bl-[40px]">
                 <ThemedText
-                    lightColor={Colors.light.text}
-                    darkColor={DarkTheme.colors.text}
                     className="text-3xl mt-6">
                     Perfil
                 </ThemedText>
                 <View className="items-center">
                     <ThemedText
-                        lightColor={Colors.light.text}
-                        darkColor={DarkTheme.colors.text}
                         className="text-2xl mt-6">
                         {userData?.name}
                     </ThemedText>
@@ -69,8 +77,6 @@ export default function ProfileScreen() {
                         }
                     </View>
                     <ThemedText
-                        lightColor={Colors.light.text}
-                        darkColor={DarkTheme.colors.text}
                         className="text-2xl mt-4">
                         {userData?.rating || '5.0'}
                     </ThemedText>
@@ -80,8 +86,7 @@ export default function ProfileScreen() {
                 <Link href="/(tabs)/profile/edit-profile" asChild>
                     <Pressable className="active:bg-slate-300 w-full">
                         <ThemedText
-                            lightColor={DefaultTheme.colors.text}
-                            darkColor={DarkTheme.colors.text}
+                            style={{ color: contentTextColor }}
                             className="py-6 px-4">
                             Editar perfil
                         </ThemedText>
@@ -90,8 +95,7 @@ export default function ProfileScreen() {
                 <Link href="/(tabs)/profile/activity" asChild>
                     <Pressable className="active:bg-slate-300">
                         <ThemedText
-                            lightColor={DefaultTheme.colors.text}
-                            darkColor={DarkTheme.colors.text}
+                            style={{ color: contentTextColor }}
                             className="py-6 px-4">
                             Mi actividad
                         </ThemedText>
@@ -101,8 +105,7 @@ export default function ProfileScreen() {
                     <Link href="/(tabs)/profile/become-driver" asChild>
                         <Pressable className="active:bg-slate-300">
                             <ThemedText
-                                lightColor={DefaultTheme.colors.text}
-                                darkColor={DarkTheme.colors.text}
+                                style={{ color: contentTextColor }}
                                 className="py-6 px-4">
                                 Convertirme en conductor
                             </ThemedText>
@@ -111,22 +114,21 @@ export default function ProfileScreen() {
                 }
                 {/* <Pressable className="active:bg-slate-300">
                     <ThemedText
-                        lightColor={DefaultTheme.colors.text}
-                        darkColor={DarkTheme.colors.text}
+                        style={{ color: contentTextColor }}
                         className="py-6 px-4">
                         Editar vehículo
                     </ThemedText>
                 </Pressable> */}
                 <Pressable className="active:bg-red-300" onPress={() => { logout() }}>
                     <ThemedText
-                        lightColor={DefaultTheme.colors.text}
-                        darkColor={DarkTheme.colors.text}
+                        lightColor="red"
+                        darkColor="#ff6b6b"
                         className="py-6 px-4 text-red-600">
                         Cerrar sesion
                     </ThemedText>
                 </Pressable>
             </ScrollView>
             <View className="h-28 w-full" />
-        </View>
+        </ThemedView>
     );
 }

@@ -1,5 +1,4 @@
-import { Colors } from "@/constants/Colors";
-import { DarkTheme, DefaultTheme } from "@react-navigation/native";
+import { useThemeColor } from "@/hooks/useThemeColor";
 import { Pressable } from "react-native";
 import { ThemedText } from "./ThemedText";
 
@@ -11,14 +10,15 @@ interface FilterCardProps {
 }
 
 export default function FilterCard({ title, value, isSelected = false, onPress }: FilterCardProps) {
+    const secondaryColor = useThemeColor({}, 'secondary');
+    const tirdColor = useThemeColor({}, 'tird');
+
     return (
         <Pressable
             onPress={() => onPress?.(value)}
-            style={{ backgroundColor: isSelected ? Colors.light.secondary : Colors.light.tird }}
+            style={{ backgroundColor: isSelected ? secondaryColor as string : tirdColor as string }}
             className="rounded-full py-1 px-4 items-center mr-2">
             <ThemedText
-                lightColor={DefaultTheme.colors.text}
-                darkColor={DarkTheme.colors.text}
                 className="text-lg font-normal">
                 {title}
             </ThemedText>

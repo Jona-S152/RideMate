@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 
-export const useTripRealtimeById = (sessionId : number) => {
+export const useTripRealtimeById = (sessionId: number) => {
     const [session, setSession] = useState<SessionData | null>(null);
 
     const refreshSession = async () => {
@@ -24,38 +24,38 @@ export const useTripRealtimeById = (sessionId : number) => {
         }
     }
 
-  useEffect(() => {
-    refreshSession();
+    useEffect(() => {
+        refreshSession();
 
-    try {
-        // 1. Suscribirse a cambios en la tabla trip_sessions
-        const channel = supabase
-          .channel(`session-${sessionId}`) // Nombre único para el canal
-          .on(
-            'postgres_changes',
-            {
-              event: 'UPDATE', // Solo nos interesan las actualizaciones
-              schema: 'public',
-              table: 'trip_sessions',
-              filter: `id=eq.${sessionId}`, // Filtro crucial para no escuchar otros viajes
-            },
-            (payload) => {
-                const newData = payload.new as SessionData;
-              setSession(newData); // Actualiza el estado automáticamente
-            }
-          )
-          .subscribe();
-    
-        return () => {
-          supabase.removeChannel(channel);
-        };
-        
-    } catch (error) {
-        console.error("ERROR: ", error);
-    }
-  }, [sessionId]);
+        try {
+            // 1. Suscribirse a cambios en la tabla trip_sessions
+            const channel = supabase
+                .channel(`session-${sessionId}`) // Nombre único para el canal
+                .on(
+                    'postgres_changes',
+                    {
+                        event: 'UPDATE', // Solo nos interesan las actualizaciones
+                        schema: 'public',
+                        table: 'trip_sessions',
+                        filter: `id=eq.${sessionId}`, // Filtro crucial para no escuchar otros viajes
+                    },
+                    (payload) => {
+                        const newData = payload.new as SessionData;
+                        setSession(newData); // Actualiza el estado automáticamente
+                    }
+                )
+                .subscribe();
 
-  return {session};
+            return () => {
+                supabase.removeChannel(channel);
+            };
+
+        } catch (error) {
+            console.error("ERROR: ", error);
+        }
+    }, [sessionId]);
+
+    return { session };
 };
 
 export const useActiveSession = (user: User | null) => {
@@ -65,12 +65,12 @@ export const useActiveSession = (user: User | null) => {
     // 1. La función de carga original adaptada
     const refreshSession = async () => {
         if (!user?.id) return;
-        
+
         try {
             if (user.driver_mode) {
                 const { data } = await supabase
                     .from('trip_sessions')
-                    .select("*")
+                    .select("*, routes(image_url)")
                     .eq('driver_id', user.id)
                     .in('status', ["pending", "active"])
                     .is('end_time', null)
@@ -92,7 +92,7 @@ export const useActiveSession = (user: User | null) => {
                 if (pSession) {
                     const { data: trip } = await supabase
                         .from('trip_sessions')
-                        .select('*')
+                        .select('*, routes(image_url)')
                         .eq('id', pSession.trip_session_id)
                         .in('status', ['pending', 'active'])
                         .is('end_time', null)
@@ -135,7 +135,7 @@ export const useActiveSession = (user: User | null) => {
     useFocusEffect(
         useCallback(() => {
             if (user?.id) {
-            refreshSession();
+                refreshSession();
             }
         }, [user?.id, user?.driver_mode])
     );
@@ -144,7 +144,7 @@ export const useActiveSession = (user: User | null) => {
 };
 
 export const useTripStops = (tripSessionId: number) => {
-    const [ stops, setStops ] = useState<TripSessionStops[]>([]);
+    const [stops, setStops] = useState<TripSessionStops[]>([]);
 
     const refreshStops = async () => {
         if (!tripSessionId) return;
@@ -178,7 +178,7 @@ export const useTripStops = (tripSessionId: number) => {
         };
     }, [tripSessionId]);
 
-    return {stops};
+    return { stops };
 }
 
 export const useDriverLocation = (tripSessionId: number) => {
@@ -205,25 +205,25 @@ export const useDriverLocation = (tripSessionId: number) => {
         refreshDriverLocation();
 
         const channel = supabase
-        .channel(`driver-location-${tripSessionId}`)
-        .on(
-            "postgres_changes",
-            {
-            event: "*",
-            schema: "public",
-            table: "driver_locations",
-            filter: `trip_session_id=eq.${tripSessionId}`,
-            },
-            (payload) => {
-            setDriverLocation(payload.new as DriverLocation);
-            }
-        )
-        .subscribe();
+            .channel(`driver-location-${tripSessionId}`)
+            .on(
+                "postgres_changes",
+                {
+                    event: "*",
+                    schema: "public",
+                    table: "driver_locations",
+                    filter: `trip_session_id=eq.${tripSessionId}`,
+                },
+                (payload) => {
+                    setDriverLocation(payload.new as DriverLocation);
+                }
+            )
+            .subscribe();
 
         return () => {
-        supabase.removeChannel(channel);
+            supabase.removeChannel(channel);
         };
     }, [tripSessionId]);
 
-    return {driverLocation}
+    return { driverLocation }
 }

@@ -5,16 +5,25 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { useActiveSession } from "@/hooks/useRealTime";
-import { supabase } from "@/lib/supabase";
-import { registerDeviceToken } from "@/services/notifications.service";
-import { ratingsService } from "@/services/ratings.service";
 import { useEffect, useRef, useState } from "react";
 import { Animated, ScrollView, Switch, View } from "react-native";
+
+import { useThemeColor } from "@/hooks/useThemeColor";
+import { supabase } from "@/lib/supabase";
+import { ratingsService } from "@/services/ratings.service";
+import { registerDeviceToken } from "@/services/notifications.service";
+// ... imports
 
 export default function HomeScreen() {
   const { user, updateUser } = useAuth();
   const { sessionChanged, setSessionChanged } = useSession();
   const { activeSession, loading } = useActiveSession(user);
+
+  // Theme hooks
+  const primaryColor = useThemeColor({}, 'primary');
+  const textColor = useThemeColor({}, 'text');
+  const tirdColor = useThemeColor({}, 'tird');
+  const secondaryColor = useThemeColor({}, 'secondary');
 
   const [isEnabled, setIsEnabled] = useState(false);
   const toggleSwitch = () => {
@@ -131,7 +140,7 @@ export default function HomeScreen() {
       // Fetch trip session to get Driver ID (if not in history)
       const { data: session } = await supabase
         .from('trip_sessions')
-        .select('driver_id')
+        .select('driver_id, route_id, routes(image_url)')
         .eq('id', item.trip_session_id)
         .single();
 
@@ -177,7 +186,11 @@ export default function HomeScreen() {
       return {
         ...item,
         driver_details: driverInfo,
-        passengers_data: passengersData
+        passengers_data: passengersData,
+        route_id: session?.route_id,
+        image_url: Array.isArray(session?.routes)
+          ? (session.routes[0] as any)?.image_url
+          : (session?.routes as any)?.image_url
       };
     }));
 
@@ -251,18 +264,17 @@ export default function HomeScreen() {
     <View className="flex-1">
       <ThemedView
         lightColor={Colors.light.primary}
+        darkColor={Colors.dark.primary}
         className="w-full rounded-bl-[40px]"
       >
         <View className="flex-row justify-between px-8 pt-16">
           <View>
             <ThemedText
-              lightColor={Colors.light.text}
               className="font-semibold text-4xl"
             >
               Hola, {user?.name}
             </ThemedText>
             <ThemedText
-              lightColor={Colors.light.text}
               className="font-light text-sm"
             >
               ¿Que ruta quieres tomar?
@@ -270,11 +282,11 @@ export default function HomeScreen() {
           </View>
           {user?.is_driver && (
             <Switch
-              trackColor={{ false: Colors.light.tird, true: Colors.light.tird }}
+              trackColor={{ false: tirdColor, true: tirdColor }}
               thumbColor={
-                isEnabled ? Colors.light.secondary : Colors.light.primary
+                isEnabled ? secondaryColor : primaryColor // Dynamic colors
               }
-              ios_backgroundColor={Colors.light.text}
+              ios_backgroundColor={textColor}
               value={isEnabled}
               onValueChange={toggleSwitch}
             ></Switch>
@@ -283,19 +295,16 @@ export default function HomeScreen() {
         <View className="flex-row justify-between mx-8">
           <View className="flex-col gap-4 mt-4">
             <ThemedText
-              lightColor={Colors.light.text}
               className="font-light text-base"
             >
               {`Te has unido a ${history.length} ruta${history.length > 1 ? "s" : ""}`}
             </ThemedText>
             <ThemedText
-              lightColor={Colors.light.text}
               className="font-light text-base"
             >
               Has ahorrado $20
             </ThemedText>
             <ThemedText
-              lightColor={Colors.light.text}
               className="font-light text-base"
             >
               Conociste +1 estudiante
@@ -331,6 +340,7 @@ export default function HomeScreen() {
             <RouteCard
               key={`active-${activeSession.id}`}
               sessionId={activeSession.id}
+              routeId={activeSession.route_id}
               title={`${activeSession.start_location} - ${activeSession.end_location}`}
               isActive={activeSession.status}
               routeScreen={`/(tabs)/home/route-detail?id=${activeSession.id}`}
@@ -339,6 +349,7 @@ export default function HomeScreen() {
               passengerCount={passengerDetails.length}
               driver={driverDetails}
               passengersData={passengerDetails}
+              imageUrl={(activeSession as any).routes?.image_url}
             />
           )}
           {history.length > 0 ? (
@@ -346,6 +357,7 @@ export default function HomeScreen() {
               <RouteCard
                 key={`hist-${item.id}`}
                 sessionId={item.id}
+                routeId={(item as any).route_id}
                 title={`${item.start_location} - ${item.end_location}`}
                 isActive={"completed"}
                 routeScreen={`/(tabs)/home/route-detail?id=${item.trip_session_id}`}
@@ -356,6 +368,7 @@ export default function HomeScreen() {
                 passengerCount={(item as any).passengers_data?.length || 0}
                 driver={(item as any).driver_details}
                 passengersData={(item as any).passengers_data}
+                imageUrl={(item as any).image_url}
               />
             ))
           ) : (

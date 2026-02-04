@@ -25,11 +25,19 @@ export const Colors = {
     }
   },
   dark: {
-    text: '#EAE9E7',
-    background: '#151718',
+    text: '#ECEDEE', // Light text for dark bg
+    textBlack: '#000000', // Keeps black text for light badges in dark mode
+    background: '#020617', // Very dark slate/blue
+    primary: '#0B1647', // Slightly lighter navy for components
+    secondary: '#FCA311', // Orange (Same as light)
+    tird: '#A0A0A0', // Dimmed gray for secondary backgrounds/badges
     tint: tintColorDark,
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
+    historyCard: {
+      background: '#2C2C2C',
+      activeBackground: '#FCA311'
+    }
   },
 };

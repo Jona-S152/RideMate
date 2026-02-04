@@ -4,6 +4,7 @@ import { Colors } from "@/constants/Colors";
 import { supabase } from "@/lib/supabase";
 import { DefaultTheme } from "@react-navigation/native";
 import { Href, router } from "expo-router";
+import { useState } from "react";
 import { Alert, Image, Pressable, Text, View } from "react-native";
 import { ThemedText } from "./ThemedText";
 import { ThemedView } from "./ThemedView";
@@ -32,6 +33,7 @@ interface DriverRouteCardProps {
         id: string;
         avatar: string;
     }[];
+    imageUrl?: string;
 }
 
 export default function AvailableRouteCard({
@@ -49,13 +51,16 @@ export default function AvailableRouteCard({
     driverName,
     driverAvatar,
     driverRating,
-    passengersData = []
+    passengersData = [],
+    imageUrl
 }: DriverRouteCardProps) {
 
     const { user } = useAuth();
     const { setSessionChanged } = useSession();
 
     const routeSelectionMap: Href = "/(tabs)/available-routes/selection-map-screen";
+
+    const [imageError, setImageError] = useState(false);
 
     const displayPassengers = passengersData.length > 0
         ? passengersData
@@ -280,7 +285,12 @@ export default function AvailableRouteCard({
                 <View className="justify-around">
                     <View className="w-40 h-28">
                         <Image
-                            source={require('@/assets/images/mapExample.png')}
+                            source={
+                                imageUrl && !imageError
+                                    ? { uri: imageUrl } // Usar la URL exacta de la base de datos
+                                    : require('@/assets/images/mapExample.png')
+                            }
+                            onError={() => setImageError(true)}
                             resizeMode="cover"
                             className="w-full h-full rounded-2xl"
                         />

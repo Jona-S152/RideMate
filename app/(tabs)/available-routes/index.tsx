@@ -5,6 +5,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
+import { useThemeColor } from "@/hooks/useThemeColor";
 import { AvailableRoute, RouteData, RouteStop, SessionData, SessionStop } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
 import { ratingsService } from "@/services/ratings.service";
@@ -21,6 +22,12 @@ export default function AvailableRoutesScreen() {
 
     const { user } = useAuth();
     const [routes, setRoutes] = useState<AvailableRoute[]>([]);
+
+    const primaryColor = useThemeColor({}, 'primary');
+    const secondaryColor = useThemeColor({}, 'secondary');
+    const tirdColor = useThemeColor({}, 'tird');
+    const backgroundColor = useThemeColor({}, 'background');
+    const textColor = useThemeColor({}, 'text');
 
     useEffect(() => {
         fetchRoutes();
@@ -64,6 +71,7 @@ export default function AvailableRoutesScreen() {
                     start_longitude,
                     end_latitude,
                     end_longitude,
+                    image_url,
                     stops (
                         id,
                         location,
@@ -78,6 +86,9 @@ export default function AvailableRoutesScreen() {
                 .select(`
                     id,
                     route_id,
+                    routes (
+                        image_url
+                    ),
                     driver_id,
                     status,
                     start_location,
@@ -102,6 +113,7 @@ export default function AvailableRoutesScreen() {
         }
 
         const { data, error } = await query;
+        if (data) console.log("🔍 ROUTES DATA:", JSON.stringify(data[0], null, 2));
 
         if (!error && data) {
             let validRoutes = (data as any[]).filter(route => {
@@ -222,15 +234,15 @@ export default function AvailableRoutesScreen() {
 
     return (
         <View className="flex-1">
-            <ThemedView lightColor={Colors.light.primary} className="w-full px-4 py-6 rounded-bl-[40px]">
+            <ThemedView lightColor={Colors.light.primary} darkColor={Colors.dark.primary} className="w-full px-4 py-6 rounded-bl-[40px]">
                 <ThemedText
-                    lightColor={Colors.light.text}
                     className="font-semibold text-4xl py-3">
                     Hola, {user?.name}
                 </ThemedText>
                 <View className="flex-row items-center mb-4">
                     <ThemedTextInput
                         lightColor={Colors.light.background}
+                        darkColor={Colors.dark.background}
                         placeholder="Buscar..."
                         onChangeText={setText} value={text}
                         className="flex-1 mr-2"
@@ -238,7 +250,7 @@ export default function AvailableRoutesScreen() {
 
                     <Pressable
                         onPress={switchVisibleFilters}
-                        style={{ backgroundColor: Colors.light.secondary }} className="rounded-full justify-center items-center w-10 h-10">
+                        style={{ backgroundColor: secondaryColor }} className="rounded-full justify-center items-center w-10 h-10">
                         <Ionicons name="filter" size={30} color="black" />
                     </Pressable>
                 </View>
@@ -276,12 +288,12 @@ export default function AvailableRoutesScreen() {
                 <ScrollView
                     showsVerticalScrollIndicator={false}
                     refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.light.secondary]} />
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[secondaryColor]} />
                     }
                 >
                     {filteredRoutes.length === 0 ? (
                         <View className="flex-1 items-center justify-center mt-20">
-                            <Ionicons name="car-outline" size={80} color={Colors.light.tird} />
+                            <Ionicons name="car-outline" size={80} color={tirdColor} />
                             <ThemedText className="text-xl font-semibold mt-4 text-slate-500">
                                 No se encontraron rutas
                             </ThemedText>
@@ -338,6 +350,13 @@ export default function AvailableRoutesScreen() {
                                     driverAvatar={(item as any).driver_avatar}
                                     driverRating={(item as any).driver_rating}
                                     passengersData={(item as any).passengers_data}
+                                    imageUrl={
+                                        isRouteData(item)
+                                            ? (item as any).image_url
+                                            : Array.isArray((item as any).routes)
+                                                ? ((item as any).routes[0] as any)?.image_url
+                                                : ((item as any).routes as any)?.image_url
+                                    }
                                 />
                             );
                         })
