@@ -4,7 +4,7 @@
     "slug": "RideMate",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/TitleIcon.png",
+    "icon": "./assets/images/TitleTecsu.png",
     "scheme": "ridemate",
     "platforms": [
       "ios",
@@ -43,7 +43,7 @@
         "INTERNET"
       ],
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/TitleIcon.png",
+        "foregroundImage": "./assets/images/TitleTecsu.png",
         "backgroundColor": "#000D3A"
       },
       "edgeToEdgeEnabled": true,
@@ -53,7 +53,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/TitleIcon.png"
+      "favicon": "./assets/images/TitleTecsu.png"
     },
     "plugins": [
       [

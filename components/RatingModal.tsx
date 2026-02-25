@@ -72,14 +72,14 @@ export default function RatingModal({
 
                     <View style={styles.header}>
                         <View style={styles.iconContainer}>
-                            <Ionicons name="star" size={32} color="#fbbf24" />
+                            <Ionicons name="star" size={32} color="#BC3333" />
                         </View>
                         <Text style={styles.title}>{title}</Text>
                         {userName && (
                             <View style={{ alignItems: 'center' }}>
                                 <Text style={styles.userName}>{userName}</Text>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                                    <Ionicons name="star" size={14} color="#fbbf24" />
+                                    <Ionicons name="star" size={14} color="#BC3333" />
                                     <Text style={{ fontSize: 14, color: '#64748b', marginLeft: 4, fontWeight: 'bold' }}>
                                         {userRating || "0.0"}
                                     </Text>
@@ -99,7 +99,7 @@ export default function RatingModal({
                                 <Ionicons
                                     name={rating >= value ? "star" : "star-outline"}
                                     size={40}
-                                    color={rating >= value ? "#fbbf24" : "#cbd5e1"}
+                                    color={rating >= value ? "#BC3333" : "#cbd5e1"}
                                 />
                             </Pressable>
                         ))}
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
         textAlignVertical: "top",
     },
     submitButton: {
-        backgroundColor: "#001147",
+        backgroundColor: "#000D3A",
         width: "100%",
         height: 56,
         borderRadius: 28,

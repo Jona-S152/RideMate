@@ -46,7 +46,7 @@ export default function TabLayout() {
             left: 20,
             right: 20,
             height: 70, // alto del tab bar
-            backgroundColor: "#001147",
+            backgroundColor: "#000D3A",
             borderRadius: 35, // hace que se vea ovalado
             borderTopWidth: 0, // elimina borde feo default
             overflow: "hidden",

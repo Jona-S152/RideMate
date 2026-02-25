@@ -18,7 +18,7 @@ export default function RegisterScreen() {
 
   const AnimatedThemedView = Animated.createAnimatedComponent(ThemedView);
 
-  const [ keyboardHeight, setKeyboardHeight ] = useState(0);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [loading, setLoading] = useState(false);
 
   const headerHeight = useCollapsingHeader({
@@ -63,7 +63,7 @@ export default function RegisterScreen() {
       hideSub.remove();
     };
   }, []);
-  
+
   /** Helper: obtain an active session (tries getSession, then signInWithPassword) */
   const ensureSession = async (email: string, password: string) => {
     // try current session first
@@ -129,7 +129,7 @@ export default function RegisterScreen() {
       if (insertError) throw insertError;
 
       // 4) Construir objeto user para el context (puedes ajustar campos que necesites)
-      const userForContext : User = {
+      const userForContext: User = {
         id: userId,
         email: form.email,
         is_driver: false,
@@ -152,8 +152,8 @@ export default function RegisterScreen() {
 
   return (
     <View className="flex-1">
-      <AnimatedThemedView 
-        lightColor={Colors.light.primary} 
+      <AnimatedThemedView
+        lightColor={Colors.light.primary}
         style={{ height: headerHeight }}
         className="w-full px-4 pt-6 rounded-bl-[40px]"
       >
@@ -214,9 +214,9 @@ export default function RegisterScreen() {
           <Pressable
             onPress={handleRegister}
             disabled={loading}
-            className="bg-yellow-500 py-4 rounded-full mt-4"
+            className="bg-[#BC3333] py-4 rounded-full mt-4"
           >
-            {loading ? <ActivityIndicator color="white" /> : <Text className="text-center font-semibold">Continuar</Text>}
+            {loading ? <ActivityIndicator color="white" /> : <Text className="text-center font-semibold text-white">Continuar</Text>}
           </Pressable>
         </View>
       </ScrollView>

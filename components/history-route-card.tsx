@@ -96,16 +96,16 @@ export default function RouteCard({
             {isActive !== "completed" && (
                 <View
                     className="
-                        absolute -top-15 -left-12 
-                        w-[150%] h-40 
-                        bg-[#FFD369]/40 
+                        absolute -top-15 -left-24
+                        w-[180%] h-40 
+                        bg-[#FDCACA]/40 
                         -rotate-[70deg]
                     "
                 />
             )}
             <View className="">
                 <ThemedText
-                    lightColor={DefaultTheme.colors.text}
+                    lightColor={isActive !== "completed" ? 'white' : DefaultTheme.colors.text}
                     darkColor={DarkTheme.colors.text}
                     className="text-sm font-bold">
                     {title}
@@ -115,24 +115,24 @@ export default function RouteCard({
                 <View className="flex-1 pr-4">
 
                     <ThemedText
-                        lightColor={DefaultTheme.colors.text}
+                        lightColor={isActive !== "completed" ? 'white' : DefaultTheme.colors.text}
                         darkColor={DarkTheme.colors.text}
                         className="text-base font-normal mt-2">
                         Punto de partida
                     </ThemedText>
                     <ThemedText
-                        lightColor={DefaultTheme.colors.text}
+                        lightColor={isActive !== "completed" ? 'white' : DefaultTheme.colors.text}
                         className="text-sm font-light mb-2">
                         {startLocation}
                     </ThemedText>
 
                     <ThemedText
-                        lightColor={DefaultTheme.colors.text}
+                        lightColor={isActive !== "completed" ? 'white' : DefaultTheme.colors.text}
                         className="text-base font-normal">
                         Punto final
                     </ThemedText>
                     <ThemedText
-                        lightColor={DefaultTheme.colors.text}
+                        lightColor={isActive !== "completed" ? 'white' : DefaultTheme.colors.text}
                         className="text-sm font-light">
                         {endLocation}
                     </ThemedText>
@@ -146,7 +146,8 @@ export default function RouteCard({
                                     className="w-8 h-8 rounded-full border border-gray-200"
                                 />
                                 <ThemedView
-                                    lightColor={Colors.light.tird}
+                                    lightColor={isActive !== "completed" ? 'white' : Colors.light.tird}
+                                    darkColor={isActive !== "completed" ? 'white' : DarkTheme.colors.text}
                                     className="absolute -bottom-1 -right-1 rounded-full px-1 justify-center items-center"
                                     style={{ minWidth: 20 }}
                                 >
@@ -156,8 +157,8 @@ export default function RouteCard({
                                 </ThemedView>
                             </View>
                             <View className="ml-2">
-                                <Text className="text-xs font-bold text-gray-700">{driver.name}</Text>
-                                <Text className="text-[10px] text-gray-500">Conductor</Text>
+                                <Text className="text-xs font-bold text-gray-100">{driver.name}</Text>
+                                <Text className="text-[10px] text-gray-300">Conductor</Text>
                             </View>
                         </View>
                     )}

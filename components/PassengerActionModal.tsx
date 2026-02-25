@@ -176,7 +176,7 @@ export default function PassengerActionModal({
                                 {details.name}
                             </Text>
                             <View className="flex-row items-center mb-1">
-                                <Ionicons name="star" size={14} color="#fbbf24" />
+                                <Ionicons name="star" size={14} color="#BC3333" />
                                 <Text className="text-sm font-bold text-slate-700 ml-1">
                                     {details.rating || "0.0"}
                                 </Text>
@@ -206,7 +206,7 @@ export default function PassengerActionModal({
                                             anchor={{ x: 0.5, y: 1 }}
                                         >
                                             <View className="items-center">
-                                                <Ionicons name="location-sharp" size={32} color="#2563eb" />
+                                                <Ionicons name="location-sharp" size={32} color="#000D3A" />
                                             </View>
                                         </MarkerView>
                                     </Mapbox.MapView>
@@ -216,7 +216,7 @@ export default function PassengerActionModal({
                             {/* Info Card */}
                             <View className="w-full bg-slate-50 p-4 rounded-xl mb-6 flex-row items-center border border-slate-100">
                                 <View className="w-10 h-10 rounded-full bg-blue-100 items-center justify-center mr-3">
-                                    <Ionicons name="location" size={20} color="#2563eb" />
+                                    <Ionicons name="location" size={20} color="#000D3A" />
                                 </View>
                                 <View className="flex-1">
                                     <Text className="text-xs text-slate-400 font-bold uppercase">Punto de Recogida</Text>

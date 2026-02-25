@@ -27,7 +27,7 @@ import Mapbox, {
 // REEMPLAZA ESTO CON TU CLAVE REAL DE MAPBOX
 // Se recomienda manejar esto en un archivo de configuración o variables de entorno.
 Mapbox.setAccessToken(
-  "pk.eyJ1Ijoiam9uYS1zMTUyIiwiYSI6ImNtaWc0NWw1MDAzMWgzY3E4MzJ6dTVyZngifQ.4LJzkPbbZQufPVGpwk41qA",
+  process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || ""
 );
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -598,7 +598,7 @@ export default function RouteDetail() {
     // Une las coordenadas en el formato requerido por la API: lng,lat;lng,lat...
     const coordsString = allCoordinates.map((c) => c.join(",")).join(";");
     const accessToken =
-      "pk.eyJ1Ijoiam9uYS1zMTUyIiwiYSI6ImNtaWc0NWw1MDAzMWgzY3E4MzJ6dTVyZngifQ.4LJzkPbbZQufPVGpwk41qA"; // Usar el token aquí también
+      process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || ""; // Usar el token de entorno aquí también
 
     // Usamos el perfil de manejo ('driving')
     const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordsString}?geometries=geojson&access_token=${accessToken}`;
@@ -883,7 +883,7 @@ export default function RouteDetail() {
                 coordinate={[driverLocation.longitude, driverLocation.latitude]}
                 anchor={{ x: 0.5, y: 0.5 }}
               >
-                <Ionicons name="car-sport" size={30} color="#2563eb" />
+                <Ionicons name="car-sport" size={30} color="#000D3A" />
               </MarkerView>
             )}
 
@@ -902,7 +902,7 @@ export default function RouteDetail() {
                 <LineLayer
                   id="routeLine"
                   style={{
-                    lineColor: Colors.light.secondary,
+                    lineColor: "#BC3333",
                     lineWidth: 6,
                     lineJoin: "round",
                     lineCap: "round",
@@ -954,7 +954,7 @@ export default function RouteDetail() {
                 anchor={{ x: 0.5, y: 1 }}
               >
                 <View className="items-center">
-                  <View className="bg-blue-500 p-1 rounded-full shadow-md">
+                  <View className="bg-[#000D3A] p-1 rounded-full shadow-md">
                     <Ionicons name="person" size={20} color="white" />
                   </View>
                   <Text className="bg-white/80 px-1 text-[10px] font-bold">

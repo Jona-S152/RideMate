@@ -56,7 +56,7 @@ export default function BottomSheetRouteDetail({
     {
       label: "Cancelar",
       icon: "close-circle-outline",
-      color: "#f97316",
+      color: "#BC3333",
       onPress: () => {
         console.log("Cancelar viaje");
       },
@@ -341,7 +341,7 @@ export default function BottomSheetRouteDetail({
                         <View className="items-center">
                           <View
                             className={`w-16 h-24 rounded-full border-2 overflow-hidden ${isPending
-                              ? "border-yellow-500"
+                              ? "border-[#BC3333]"
                               : "border-[#E5E5E5]"
                               }`}
                           >

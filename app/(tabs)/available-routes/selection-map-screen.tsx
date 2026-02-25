@@ -1,5 +1,4 @@
 import { useAuth } from "@/app/context/AuthContext";
-import { Colors } from "@/constants/Colors";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import Mapbox, {
@@ -22,8 +21,8 @@ import {
   View,
 } from "react-native";
 
-// Token recuperado de route-detail.tsx
-const MAPBOX_TOKEN = "pk.eyJ1Ijoiam9uYS1zMTUyIiwiYSI6ImNtaWc0NWw1MDAzMWgzY3E4MzJ6dTVyZngifQ.4LJzkPbbZQufPVGpwk41qA";
+// Token recuperado de variables de entorno
+const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
 Mapbox.setAccessToken(MAPBOX_TOKEN);
 
 export default function SelectionMapScreen() {
@@ -256,7 +255,7 @@ export default function SelectionMapScreen() {
             <LineLayer
               id="guideLine"
               style={{
-                lineColor: Colors.light.secondary,
+                lineColor: "#BC3333",
                 lineWidth: 5,
                 lineOpacity: 0.7,
                 lineJoin: "round",
@@ -275,7 +274,7 @@ export default function SelectionMapScreen() {
               {isValidSelection ? "RECOGER AQUÍ" : `MUY LEJOS (${Math.round(distanceToRoute)}m)`}
             </Text>
           </View>
-          <Ionicons name="location" size={45} color={isValidSelection ? "#2563eb" : "#ef4444"} />
+          <Ionicons name="location" size={40} color={isValidSelection ? "#000D3A" : "#ef4444"} />
           <View style={styles.shadow} />
         </View>
       </View>
@@ -285,14 +284,14 @@ export default function SelectionMapScreen() {
         <Pressable
           onPress={confirmPoint}
           disabled={loading || !isValidSelection}
-          className={`h-16 rounded-full flex-row items-center justify-center shadow-2xl ${loading || !isValidSelection ? "bg-gray-400" : "bg-[#FCA311]"
+          className={`h-16 rounded-full flex-row items-center justify-center shadow-2xl ${loading || !isValidSelection ? "bg-gray-400" : "bg-[#BC3333]"
             }`}
           style={({ pressed }) => [{ opacity: pressed ? 0.9 : 1 }]}
         >
           {loading ? (
             <ActivityIndicator color="white" />
           ) : (
-            <Text className={`font-bold text-lg ${isValidSelection ? "text-black" : "text-white"}`}>
+            <Text className={`font-bold text-lg ${isValidSelection ? "text-white" : "text-white"}`}>
               {isValidSelection ? "Confirmar Ubicación" : "Ubicación Inválida"}
             </Text>
           )}
@@ -301,9 +300,9 @@ export default function SelectionMapScreen() {
 
       <Pressable
         onPress={() => router.back()}
-        className="absolute top-14 left-6 w-10 h-10 rounded-full items-center justify-center shadow-md z-50 bg-[#FCA311]"
+        className="absolute top-14 left-6 w-10 h-10 rounded-full items-center justify-center shadow-md z-50 bg-[#BC3333]"
       >
-        <Ionicons name="close" size={24} color="black" />
+        <Ionicons name="close" size={24} color="white" />
       </Pressable>
     </View>
   );

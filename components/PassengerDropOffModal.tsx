@@ -82,7 +82,7 @@ export default function PassengerDropOffModal({
                                         <Pressable
                                             onPress={() => togglePassenger(item.passenger_id)}
                                             className={`flex-row items-center p-4 mb-2 rounded-xl border-2 ${isSelected
-                                                ? "bg-blue-50 border-blue-500"
+                                                ? "bg-blue-50 border-[#000D3A]"
                                                 : "bg-slate-50 border-transparent"
                                                 }`}
                                         >
@@ -104,7 +104,7 @@ export default function PassengerDropOffModal({
                                                 </Text>
                                                 <View className="flex-row items-center">
                                                     <View className="flex-row items-center mr-2">
-                                                        <Ionicons name="star" size={12} color="#fbbf24" />
+                                                        <Ionicons name="star" size={12} color="#BC3333" />
                                                         <Text className="text-[10px] font-bold text-slate-600 ml-0.5">
                                                             {passengerUser?.rating || "0.0"}
                                                         </Text>
@@ -113,7 +113,7 @@ export default function PassengerDropOffModal({
                                             </View>
                                             <View
                                                 className={`w-6 h-6 rounded-full items-center justify-center border-2 ${isSelected
-                                                    ? "bg-blue-500 border-blue-500"
+                                                    ? "bg-[#000D3A] border-[#000D3A]"
                                                     : "border-slate-300"
                                                     }`}
                                             >

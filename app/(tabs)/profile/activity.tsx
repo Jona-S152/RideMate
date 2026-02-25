@@ -135,8 +135,8 @@ export default function ActivityScreen() {
                         {item.start_location.split(',')[0]}
                     </ThemedText>
                 </View>
-                <View className={`px-3 py-1 rounded-full ${item.status === 'completed' ? 'bg-green-100' : item.status === 'cancelled' ? 'bg-red-100' : 'bg-blue-100'}`}>
-                    <ThemedText className={`text-[10px] font-bold uppercase ${item.status === 'completed' ? 'text-green-600' : item.status === 'cancelled' ? 'text-red-600' : 'text-blue-600'}`}>
+                <View className={`px-3 py-1 rounded-full ${item.status === 'completed' ? 'bg-green-100' : item.status === 'cancelled' ? 'bg-red-100' : 'bg-blue-50'}`}>
+                    <ThemedText className={`text-[10px] font-bold uppercase ${item.status === 'completed' ? 'text-green-600' : item.status === 'cancelled' ? 'text-red-800' : 'text-[#000D3A]'}`}>
                         {item.status === 'completed' ? 'Finalizado' : item.status === 'joined' ? 'En curso' : item.status}
                     </ThemedText>
                 </View>
