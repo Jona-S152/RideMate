@@ -19,15 +19,21 @@ export interface SessionStop {
 
 // 2. Tipos base para las rutas/sesiones
 
+export interface Coords {
+    coordinates: number[];
+    crs: {
+        properties: {};
+        type: string;
+    };
+}
+
 // Estructura de la tabla 'routes' (Modo Conductor)
 export interface RouteData {
     id: number;
     start_location: string;
     end_location: string;
-    start_latitude: number;
-    start_longitude: number;
-    end_latitude: number;
-    end_longitude: number;
+    start_coords: Coords;
+    end_coords: Coords;
     // Propiedad Única 1
     stops: RouteStop[]; 
 }
@@ -40,10 +46,8 @@ export interface SessionData {
     status: string;
     start_location: string;
     end_location: string;
-    start_latitude: number;
-    start_longitude: number;
-    end_latitude: number;
-    end_longitude: number;
+    start_coords: Coords;
+    end_coords: Coords;
     // Propiedad Única 2
     trip_session_stops: SessionStop[]; 
 }
@@ -101,8 +105,7 @@ export interface StopData {
     id: number;
     route_id: number;
     location: string;
-    latitude: number;
-    longitude: number;
+    coords: {latitude: number, longitude: number};
     stop_order: number;
     created_at: Date;
 }
@@ -110,8 +113,7 @@ export interface StopData {
 export interface DriverLocation {
     trip_session_id: number;
     driver_id: string;
-    latitude: number;
-    longitude: number;
+    coords: {latitude: number, longitude: number};
     recorded_at: Date;
 }
 
@@ -120,8 +122,7 @@ export interface MeetingPoint {
     trip_session_id: number;
     passenger_id: string;
     location: string;
-    latitude: number;
-    longitude: number;
+    coords: {latitude: number, longitude: number};
     created_at: string;
 }
 

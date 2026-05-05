@@ -97,7 +97,7 @@ export default function DriverRatingListModal({
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Text style={styles.passengerRole}>Pasajero</Text>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
-                            <Ionicons name="star" size={10} color="#BC3333" />
+                            <Ionicons name="star" size={10} color="#FCA311" />
                             <Text style={{ fontSize: 10, color: '#64748b', marginLeft: 2, fontWeight: 'bold' }}>
                                 {item.rating || "0.0"}
                             </Text>
@@ -116,7 +116,7 @@ export default function DriverRatingListModal({
                         <Ionicons
                             name={item.selectedRating >= value ? "star" : "star-outline"}
                             size={32}
-                            color={item.selectedRating >= value ? "#BC3333" : "#cbd5e1"}
+                            color={item.selectedRating >= value ? "#FCA311" : "#cbd5e1"}
                         />
                     </Pressable>
                 ))}

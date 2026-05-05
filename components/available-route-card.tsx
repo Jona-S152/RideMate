@@ -1,6 +1,7 @@
 import { useAuth } from "@/app/context/AuthContext";
 import { useSession } from "@/app/context/SessionContext";
 import { Colors } from "@/constants/Colors";
+import { Coords } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
 import { DefaultTheme } from "@react-navigation/native";
 import { Href, router } from "expo-router";
@@ -20,10 +21,8 @@ interface DriverRouteCardProps {
     end: string;
     passengers?: number;
     routeId: number;
-    startLongitude: number;
-    startLatitude: number;
-    endLongitude: number;
-    endLatitude: number;
+    startCoords: Coords;
+    endCoords: Coords;
     stops: StopData[]; // Lista de stops con su ID y estado inicial
     trip_session_id: number;
     driverName?: string;
@@ -42,10 +41,8 @@ export default function AvailableRouteCard({
     end,
     passengers = 0,
     routeId,
-    startLongitude,
-    startLatitude,
-    endLongitude,
-    endLatitude,
+    startCoords,
+    endCoords,
     stops,
     trip_session_id,
     driverName,
@@ -168,10 +165,8 @@ export default function AvailableRouteCard({
                         start_location: start,
                         end_location: end,
                         start_time: new Date().toISOString(),
-                        start_longitude: startLongitude,
-                        start_latitude: startLatitude,
-                        end_longitude: endLongitude,
-                        end_latitude: endLatitude,
+                        start_coords: startCoords,
+                        end_coords: endCoords,
                         is_active: true,
                     },
                 ])

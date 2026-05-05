@@ -10,8 +10,8 @@ import { Animated, ScrollView, Switch, View } from "react-native";
 
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { supabase } from "@/lib/supabase";
-import { ratingsService } from "@/services/ratings.service";
 import { registerDeviceToken } from "@/services/notifications.service";
+import { ratingsService } from "@/services/ratings.service";
 // ... imports
 
 export default function HomeScreen() {

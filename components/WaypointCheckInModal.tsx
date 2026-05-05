@@ -7,8 +7,10 @@ interface Waypoint {
     id: string;
     type: 'stop' | 'meeting_point' | 'origin' | 'destination';
     location: string;
-    latitude: number;
-    longitude: number;
+    coords: {
+        latitude: number;
+        longitude: number;
+    };
     order: number;
     passengerId?: string;
     stopId?: number;

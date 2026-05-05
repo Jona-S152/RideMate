@@ -67,16 +67,13 @@ export default function AvailableRoutesScreen() {
                     id,
                     start_location,
                     end_location,
-                    start_latitude,
-                    start_longitude,
-                    end_latitude,
-                    end_longitude,
+                    start_coords,
+                    end_coords,
                     image_url,
                     stops (
                         id,
                         location,
-                        latitude,
-                        longitude,
+                        coords,
                         stop_order
                     )
                 `);
@@ -93,10 +90,8 @@ export default function AvailableRoutesScreen() {
                     status,
                     start_location,
                     end_location,
-                    start_latitude,
-                    start_longitude,
-                    end_latitude,
-                    end_longitude,
+                    start_coords,
+                    end_coords,
                     trip_session_stops (
                         id,
                         stop_id,
@@ -220,15 +215,15 @@ export default function AvailableRoutesScreen() {
 
         switch (activeFilter) {
             case 'puntoPartida':
-                return route.start_location.toLowerCase().includes(searchLower);
+                return route.start_coords.coordinates[0].toString().toLowerCase().includes(searchLower);
             case 'puntoFinal':
-                return route.end_location.toLowerCase().includes(searchLower);
+                return route.end_coords.coordinates[0].toString().toLowerCase().includes(searchLower);
             case 'nombreRuta':
                 // Buscamos si el origen o el destino coinciden (comportamiento por defecto)
-                return route.start_location.toLowerCase().includes(searchLower) ||
-                    route.end_location.toLowerCase().includes(searchLower);
+                return route.start_coords.coordinates[0].toString().toLowerCase().includes(searchLower) ||
+                    route.end_coords.coordinates[0].toString().toLowerCase().includes(searchLower);
             default:
-                return route.start_location.toLowerCase().includes(searchLower);
+                return route.start_coords.coordinates[0].toString().toLowerCase().includes(searchLower);
         }
     });
 
@@ -308,6 +303,8 @@ export default function AvailableRoutesScreen() {
 
                             const isDriverMode = user?.driver_mode;
 
+                            console.log('VALIDACIÓN ITEM: ', item);
+
                             // Función para verificar si el ítem es una RouteData
                             const isRouteData = (route: AvailableRoute): route is RouteData => {
                                 return (route as RouteData).stops !== undefined;
@@ -335,10 +332,8 @@ export default function AvailableRoutesScreen() {
 
                                     // Aquí usamos el operador ternario para acceder a la propiedad correcta
                                     routeId={isRouteData(item) ? item.id : (item as SessionData).route_id}
-                                    startLongitude={item.start_longitude}
-                                    startLatitude={item.start_latitude}
-                                    endLongitude={item.end_longitude}
-                                    endLatitude={item.end_latitude}
+                                    startCoords={item.start_coords}
+                                    endCoords={item.end_coords}
 
                                     // Mapeo adaptativo:
                                     stops={currentStops.map(stop => ({

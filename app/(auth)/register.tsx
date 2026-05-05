@@ -214,7 +214,7 @@ export default function RegisterScreen() {
           <Pressable
             onPress={handleRegister}
             disabled={loading}
-            className="bg-[#BC3333] py-4 rounded-full mt-4"
+            className="bg-[#FCA311] py-4 rounded-full mt-4"
           >
             {loading ? <ActivityIndicator color="white" /> : <Text className="text-center font-semibold text-white">Continuar</Text>}
           </Pressable>

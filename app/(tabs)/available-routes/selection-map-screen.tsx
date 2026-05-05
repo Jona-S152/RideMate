@@ -82,7 +82,7 @@ export default function SelectionMapScreen() {
       // Obtener inicio/fin del viaje
       const { data: sessionData, error: sessionError } = await supabase
         .from("trip_sessions")
-        .select("start_longitude, start_latitude, end_longitude, end_latitude")
+        .select("start_coords, end_coords")
         .eq("id", sessionId)
         .single();
 
@@ -94,15 +94,15 @@ export default function SelectionMapScreen() {
       // Obtener paradas (stops)
       const { data: stopsData } = await supabase
         .from("trip_session_stops")
-        .select("stops(longitude, latitude)")
+        .select("stops(coords)")
         .eq("trip_session_id", sessionId)
         .order("visit_time", { ascending: true });
 
-      const origin = `${sessionData.start_longitude},${sessionData.start_latitude}`;
-      const destination = `${sessionData.end_longitude},${sessionData.end_latitude}`;
+      const origin = `${sessionData.start_coords.longitude},${sessionData.start_coords.latitude}`;
+      const destination = `${sessionData.end_coords.longitude},${sessionData.end_coords.latitude}`;
 
       const waypoints = stopsData
-        ?.map((s: any) => `${s.stops?.longitude},${s.stops?.latitude}`)
+        ?.map((s: any) => `${s.stops?.coords.longitude},${s.stops?.coords.latitude}`)
         .filter(Boolean)
         .join(";");
 
@@ -197,8 +197,7 @@ export default function SelectionMapScreen() {
         {
           trip_session_id: sessionId,
           passenger_id: user?.id,
-          latitude: selectedCoords[1],
-          longitude: selectedCoords[0],
+          coords: { latitude: selectedCoords[1], longitude: selectedCoords[0] },
           location: start_name || "Punto Seleccionado",
         },
       ]);
@@ -255,7 +254,7 @@ export default function SelectionMapScreen() {
             <LineLayer
               id="guideLine"
               style={{
-                lineColor: "#BC3333",
+                lineColor: "#FCA311",
                 lineWidth: 5,
                 lineOpacity: 0.7,
                 lineJoin: "round",
@@ -284,7 +283,7 @@ export default function SelectionMapScreen() {
         <Pressable
           onPress={confirmPoint}
           disabled={loading || !isValidSelection}
-          className={`h-16 rounded-full flex-row items-center justify-center shadow-2xl ${loading || !isValidSelection ? "bg-gray-400" : "bg-[#BC3333]"
+          className={`h-16 rounded-full flex-row items-center justify-center shadow-2xl ${loading || !isValidSelection ? "bg-gray-400" : "bg-[#FCA311]"
             }`}
           style={({ pressed }) => [{ opacity: pressed ? 0.9 : 1 }]}
         >
@@ -300,7 +299,7 @@ export default function SelectionMapScreen() {
 
       <Pressable
         onPress={() => router.back()}
-        className="absolute top-14 left-6 w-10 h-10 rounded-full items-center justify-center shadow-md z-50 bg-[#BC3333]"
+        className="absolute top-14 left-6 w-10 h-10 rounded-full items-center justify-center shadow-md z-50 bg-[#FCA311]"
       >
         <Ionicons name="close" size={24} color="white" />
       </Pressable>

@@ -104,7 +104,7 @@ export default function PassengerDropOffModal({
                                                 </Text>
                                                 <View className="flex-row items-center">
                                                     <View className="flex-row items-center mr-2">
-                                                        <Ionicons name="star" size={12} color="#BC3333" />
+                                                        <Ionicons name="star" size={12} color="#FCA311" />
                                                         <Text className="text-[10px] font-bold text-slate-600 ml-0.5">
                                                             {passengerUser?.rating || "0.0"}
                                                         </Text>

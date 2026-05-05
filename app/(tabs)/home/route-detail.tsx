@@ -44,8 +44,7 @@ interface Waypoint {
   id: string;
   type: 'stop' | 'meeting_point' | 'origin' | 'destination';
   location: string;
-  latitude: number;
-  longitude: number;
+  coords: { latitude: number, longitude: number };
   order: number;
   passengerId?: string;
   stopId?: number;
@@ -201,8 +200,7 @@ export default function RouteDetail() {
       id: 'origin',
       type: 'origin',
       location: session.start_location,
-      latitude: session.start_latitude,
-      longitude: session.start_longitude,
+      coords: { latitude: session.start_coords.coordinates[0], longitude: session.start_coords.coordinates[1] },
       order: 0,
     });
 
@@ -245,12 +243,12 @@ export default function RouteDetail() {
     // Sort by distance from origin (same logic as route calculation)
     const sorted = combined.sort((a, b) => {
       const distA = Math.sqrt(
-        Math.pow(a.longitude - session.start_longitude, 2) +
-        Math.pow(a.latitude - session.start_latitude, 2),
+        Math.pow(a.coords.longitude - session.start_coords.coordinates[0], 2) +
+        Math.pow(a.coords.latitude - session.start_coords.coordinates[1], 2),
       );
       const distB = Math.sqrt(
-        Math.pow(b.longitude - session.start_longitude, 2) +
-        Math.pow(b.latitude - session.start_latitude, 2),
+        Math.pow(b.coords.longitude - session.start_coords.coordinates[0], 2) +
+        Math.pow(b.coords.latitude - session.start_coords.coordinates[1], 2),
       );
       return distA - distB;
     });
@@ -264,8 +262,7 @@ export default function RouteDetail() {
             : `meeting-${item.passenger_id}`,
         type: item.type,
         location: item.location,
-        latitude: item.latitude,
-        longitude: item.longitude,
+        coords: { latitude: item.coords.latitude, longitude: item.coords.longitude },
         order: index + 1,
         stopId: item.type === 'stop' ? item.stopId : undefined,
         passengerId:
@@ -280,8 +277,7 @@ export default function RouteDetail() {
       id: 'destination',
       type: 'destination',
       location: session.end_location,
-      latitude: session.end_latitude,
-      longitude: session.end_longitude,
+      coords: { latitude: session.end_coords.coordinates[0], longitude: session.end_coords.coordinates[1] },
       order: allWaypoints.length,
     });
 
@@ -296,10 +292,10 @@ export default function RouteDetail() {
     // Calculate distance to each waypoint using Haversine formula
     const distances = waypoints.map((wp, index) => {
       const R = 6371e3; // Earth radius in meters
-      const φ1 = (driverLocation.latitude * Math.PI) / 180;
-      const φ2 = (wp.latitude * Math.PI) / 180;
-      const Δφ = ((wp.latitude - driverLocation.latitude) * Math.PI) / 180;
-      const Δλ = ((wp.longitude - driverLocation.longitude) * Math.PI) / 180;
+      const φ1 = (driverLocation.coords.latitude * Math.PI) / 180;
+      const φ2 = (wp.coords.latitude * Math.PI) / 180;
+      const Δφ = ((wp.coords.latitude - driverLocation.coords.latitude) * Math.PI) / 180;
+      const Δλ = ((wp.coords.longitude - driverLocation.coords.longitude) * Math.PI) / 180;
 
       const a =
         Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
@@ -350,10 +346,10 @@ export default function RouteDetail() {
     if (nextTargetIndex !== -1) {
       const target = waypoints[nextTargetIndex];
       const distKm = calculateDistance(
-        driverLocation.latitude,
-        driverLocation.longitude,
-        target.latitude,
-        target.longitude
+        driverLocation.coords.latitude,
+        driverLocation.coords.longitude,
+        target.coords.latitude,
+        target.coords.longitude
       );
       setDistanceToNextPoint(formatDistance(distKm));
     } else {
@@ -551,27 +547,27 @@ export default function RouteDetail() {
     // Coordenadas para la ruta
     const origin: [number, number] =
       session !== null
-        ? [session.start_longitude, session.start_latitude]
-        : [stopsData[0].longitude, stopsData[0].latitude];
+        ? [session.start_coords.coordinates[0], session.start_coords.coordinates[1]]
+        : [stopsData[0].coords.longitude, stopsData[0].coords.latitude];
     const destination: [number, number] =
       session !== null
-        ? [session.end_longitude, session.end_latitude]
+        ? [session.end_coords.coordinates[0], session.end_coords.coordinates[1]]
         : [
-          stopsData[stopsData.length - 1].longitude,
-          stopsData[stopsData.length - 1].latitude,
+          stopsData[stopsData.length - 1].coords.longitude,
+          stopsData[stopsData.length - 1].coords.latitude,
         ];
 
     // Combine stops and meeting points as waypoints
     const stopWaypoints: [number, number][] =
       session !== null
-        ? stopsData.map((stop) => [stop.longitude, stop.latitude])
+        ? stopsData.map((stop) => [stop.coords.longitude, stop.coords.latitude])
         : stopsData
           .slice(1, stopsData.length - 1)
-          .map((stop) => [stop.longitude, stop.latitude]);
+          .map((stop) => [stop.coords.longitude, stop.coords.latitude]);
 
     const meetingWaypoints: [number, number][] = meetingPoints.map((mp) => [
-      mp.longitude,
-      mp.latitude,
+      mp.coords.longitude,
+      mp.coords.latitude,
     ]);
 
     // Merge all waypoints and sort by distance from origin
@@ -633,7 +629,7 @@ export default function RouteDetail() {
     // Si el viaje está activo y tenemos la ubicación del conductor
     if (session?.status === "active" && driverLocation) {
       cameraRef.current?.setCamera({
-        centerCoordinate: [driverLocation.longitude, driverLocation.latitude],
+        centerCoordinate: [driverLocation.coords.longitude, driverLocation.coords.latitude],
         zoomLevel: 15,
         animationDuration: 1000, // Transición suave entre puntos
       });
@@ -880,7 +876,7 @@ export default function RouteDetail() {
             {driverLocation && (
               <MarkerView
                 id="driver"
-                coordinate={[driverLocation.longitude, driverLocation.latitude]}
+                coordinate={[driverLocation.coords.longitude, driverLocation.coords.latitude]}
                 anchor={{ x: 0.5, y: 0.5 }}
               >
                 <Ionicons name="car-sport" size={30} color="#000D3A" />
@@ -902,7 +898,7 @@ export default function RouteDetail() {
                 <LineLayer
                   id="routeLine"
                   style={{
-                    lineColor: "#BC3333",
+                    lineColor: "#FCA311",
                     lineWidth: 6,
                     lineJoin: "round",
                     lineCap: "round",
@@ -914,7 +910,7 @@ export default function RouteDetail() {
             {session && (
               <MarkerView
                 id="start-point"
-                coordinate={[session.start_longitude, session.start_latitude]}
+                coordinate={[session.start_coords.coordinates[0], session.start_coords.coordinates[1]]}
                 anchor={{ x: 0.5, y: 1 }}
               >
                 <View className="items-center">
@@ -933,7 +929,7 @@ export default function RouteDetail() {
             {stopsData.map((stop, index) => (
               <MarkerView
                 key={`stop-${index}`}
-                coordinate={[stop.longitude, stop.latitude]}
+                coordinate={[stop.coords.longitude, stop.coords.latitude]}
                 anchor={{ x: 0.5, y: 1 }}
               >
                 <View className="items-center">
@@ -950,7 +946,7 @@ export default function RouteDetail() {
             {meetingPoints.map((mp, index) => (
               <MarkerView
                 key={`meeting-${mp.passenger_id}-${index}`}
-                coordinate={[mp.longitude, mp.latitude]}
+                coordinate={[mp.coords.longitude, mp.coords.latitude]}
                 anchor={{ x: 0.5, y: 1 }}
               >
                 <View className="items-center">
@@ -967,7 +963,7 @@ export default function RouteDetail() {
             {session && (
               <MarkerView
                 id="end-point"
-                coordinate={[session.end_longitude, session.end_latitude]}
+                coordinate={[session.end_coords.coordinates[0], session.end_coords.coordinates[1]]}
                 anchor={{ x: 0.5, y: 1 }}
               >
                 <View className="items-center">
@@ -1094,7 +1090,7 @@ export default function RouteDetail() {
                         {/* Waypoint Info */}
                         <Pressable
                           onPress={() =>
-                            changeLocation(waypoint.latitude, waypoint.longitude)
+                            changeLocation(waypoint.coords.latitude, waypoint.coords.longitude)
                           }
                           className="flex-1"
                         >

@@ -4,13 +4,13 @@
  */
 
 
-const tintColorLight = '#BC3333';
+const tintColorLight = '#FCA311';
 const tintColorDark = '#fff';
 
 export const Colors = {
   light: {
     primary: '#000D3A',
-    secondary: '#BC3333',
+    secondary: '#FCA311',
     tird: '#E5E5E5',
     text: '#E5E5E5',
     textBlack: '#000000',
@@ -21,7 +21,7 @@ export const Colors = {
     tabIconSelected: tintColorLight,
     historyCard: {
       background: '#D9D9D9',
-      activeBackground: '#BC3333'
+      activeBackground: '#FCA311'
     }
   },
   dark: {
@@ -29,7 +29,7 @@ export const Colors = {
     textBlack: '#000000', // Keeps black text for light badges in dark mode
     background: '#020617', // Very dark slate/blue
     primary: '#000D3A', // Slightly lighter navy for components -> Changed back to Blue
-    secondary: '#BC3333', // Red (Was Blue)
+    secondary: '#FCA311', // Red (Was Blue)
     tird: '#A0A0A0', // Dimmed gray for secondary backgrounds/badges
     tint: tintColorDark,
     icon: '#9BA1A6',
@@ -37,7 +37,7 @@ export const Colors = {
     tabIconSelected: tintColorDark,
     historyCard: {
       background: '#2C2C2C',
-      activeBackground: '#BC3333'
+      activeBackground: '#FCA311'
     }
   },
 };
