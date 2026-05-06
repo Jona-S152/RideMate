@@ -1,30 +1,18 @@
-import { Colors } from "@/constants/Colors";
-import { useColorScheme } from "@/hooks/useColorScheme";
 import { Stack } from "expo-router";
-import { Text } from "react-native";
 
-export default function HomeStackLayout() {
-  const colorScheme = useColorScheme();
+export default function AvailableRoutesLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: Colors.light.tint },
-        headerTitle: "",
-        headerTransparent: true,
-        headerLeft: () => <Text style={{ color: Colors.light.text, fontSize: 40, paddingBottom: 10, fontWeight: 'bold' }}>Rutas disponibles</Text>,
-      }}>
-      <Stack.Screen name="index" options={{
         headerShown: false,
-      }} />
-      <Stack.Screen name="route-detail" options={{
-        headerShown: false
-      }} />
-      <Stack.Screen name="selection-map-screen" options={{
-        headerShown: false
-      }} />
-      <Stack.Screen name="route-preview" options={{
-        headerShown: false
-      }} />
+      }}>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="passenger" />
+      <Stack.Screen name="driver" />
+      <Stack.Screen name="create-route-screen" />
+      <Stack.Screen name="route-detail" />
+      <Stack.Screen name="selection-map-screen" />
+      <Stack.Screen name="route-preview" />
     </Stack>
   );
 }

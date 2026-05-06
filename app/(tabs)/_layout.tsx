@@ -14,7 +14,7 @@ import { useAuth } from "../context/AuthContext";
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const pathName = usePathname();
-  const hideTabBar = ["edit-profile", "route-detail", "become-driver"].some((route) =>
+  const hideTabBar = ["edit-profile", "route-detail", "become-driver", "create-route-screen"].some((route) =>
     pathName.includes(route),
   ); // Colocar rutas secundarias
 
