@@ -30,13 +30,12 @@ TaskManager.defineTask(DRIVER_LOCATION_TASK, async ({ data, error }) => {
 
     const { latitude, longitude } = location.coords;
 
-    // ✅ UPSERT REAL
+    // ✅ UPSERT REAL (Usando formato geometry)
     const { error: err } = await supabase.from('driver_locations').upsert(
       {
         trip_session_id: tripSessionId,
         driver_id: driverId,
-        latitude,
-        longitude,
+        coords: `POINT(${longitude} ${latitude})`,
         recorded_at: new Date().toISOString(),
       },
       {

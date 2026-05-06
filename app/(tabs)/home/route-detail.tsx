@@ -20,19 +20,29 @@ import Mapbox, {
   Camera,
   LineLayer,
   MarkerView,
+  PointAnnotation,
   ShapeSource,
   UserLocation,
 } from "@rnmapbox/maps";
 
 // REEMPLAZA ESTO CON TU CLAVE REAL DE MAPBOX
-// Se recomienda manejar esto en un archivo de configuración o variables de entorno.
 Mapbox.setAccessToken(
   process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || ""
 );
 
+import DriverRatingListModal from "@/components/DriverRatingListModal";
+import PassengerActionModal from "@/components/PassengerActionModal";
+import PassengerDropOffModal from "@/components/PassengerDropOffModal";
+import WaypointCheckInModal from "@/components/WaypointCheckInModal";
+import { useDriverLocation, useTripRealtimeById, useTripStops } from "@/hooks/useRealTime";
+import { useTripTrackingStore } from "@/store/tripTrackinStore";
+import { calculateDistance, formatDistance } from "@/utils/geo";
+
+
+
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-// Interfaz para el estado de la región (aunque Mapbox usa Camera, mantenemos esto para la ubicación del usuario)
+// Interfaz para el estado de la región
 interface MapRegion {
   latitude: number;
   longitude: number;
@@ -51,16 +61,6 @@ interface Waypoint {
   status?: string;
   visitTime?: string | null;
 }
-
-import DriverRatingListModal from "@/components/DriverRatingListModal";
-import PassengerActionModal from "@/components/PassengerActionModal";
-import PassengerDropOffModal from "@/components/PassengerDropOffModal";
-import WaypointCheckInModal from "@/components/WaypointCheckInModal";
-import { useDriverLocation, useTripRealtimeById, useTripStops } from "@/hooks/useRealTime";
-import { useTripTrackingStore } from "@/store/tripTrackinStore";
-import { calculateDistance, formatDistance } from "@/utils/geo";
-
-
 
 export default function RouteDetail() {
   const navigation = useNavigation();
@@ -99,6 +99,7 @@ export default function RouteDetail() {
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
   const [currentWaypointIndex, setCurrentWaypointIndex] = useState<number>(-1);
   const [distanceToNextPoint, setDistanceToNextPoint] = useState<string>("0m");
+  const [sessionLoaded, setSessionLoaded] = useState(false);
 
   // Modal State
   const [modalVisible, setModalVisible] = useState(false);
@@ -119,12 +120,15 @@ export default function RouteDetail() {
   // ... existing code
 
   useEffect(() => {
-    if (params.autoOpenModal === "true" && params.passenger_id) {
+    // 🛡️ SEGURIDAD: Solo abrir el modal de acción si el usuario actual es el CONDUCTOR
+    const isDriver = session && user && session.driver_id === user.id;
+
+    if (params.autoOpenModal === "true" && params.passenger_id && isDriver) {
       // Abrir modal automáticamente
       setPassengerIdToProcess(params.passenger_id);
       setModalVisible(true);
     }
-  }, [params.autoOpenModal, params.passenger_id]);
+  }, [params.autoOpenModal, params.passenger_id, session, user]);
 
   useEffect(() => {
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
@@ -178,9 +182,15 @@ export default function RouteDetail() {
         )
         .order("stop_order", { ascending: true });
 
-      console.log("DATA STOPS: ", data);
+      const formattedData = (data || []).map((stop: any) => ({
+        ...stop,
+        coords: {
+          latitude: Number(stop.coords?.coordinates?.[1] ?? stop.coords?.latitude ?? 0),
+          longitude: Number(stop.coords?.coordinates?.[0] ?? stop.coords?.longitude ?? 0),
+        }
+      }));
 
-      setStopsData(data as StopData[]);
+      setStopsData(formattedData as StopData[]);
     } catch (error) {
       console.error(error);
     }
@@ -200,7 +210,10 @@ export default function RouteDetail() {
       id: 'origin',
       type: 'origin',
       location: session.start_location,
-      coords: { latitude: session.start_coords.coordinates[0], longitude: session.start_coords.coordinates[1] },
+      coords: { 
+        latitude: Number(session.start_coords?.coordinates?.[1] ?? 0), 
+        longitude: Number(session.start_coords?.coordinates?.[0] ?? 0) 
+      },
       order: 0,
     });
 
@@ -277,11 +290,15 @@ export default function RouteDetail() {
       id: 'destination',
       type: 'destination',
       location: session.end_location,
-      coords: { latitude: session.end_coords.coordinates[0], longitude: session.end_coords.coordinates[1] },
+      coords: { 
+        latitude: Number(session.end_coords?.coordinates?.[1] ?? 0), 
+        longitude: Number(session.end_coords?.coordinates?.[0] ?? 0) 
+      },
       order: allWaypoints.length,
     });
 
     setWaypoints(allWaypoints);
+    setSessionLoaded(true);
   };
 
   const PROXIMITY_THRESHOLD = 50; // meters
@@ -289,98 +306,23 @@ export default function RouteDetail() {
   const detectCurrentWaypoint = () => {
     if (!driverLocation || waypoints.length === 0) return;
 
-    // Calculate distance to each waypoint using Haversine formula
-    const distances = waypoints.map((wp, index) => {
-      const R = 6371e3; // Earth radius in meters
-      const φ1 = (driverLocation.coords.latitude * Math.PI) / 180;
-      const φ2 = (wp.coords.latitude * Math.PI) / 180;
-      const Δφ = ((wp.coords.latitude - driverLocation.coords.latitude) * Math.PI) / 180;
-      const Δλ = ((wp.coords.longitude - driverLocation.coords.longitude) * Math.PI) / 180;
-
-      const a =
-        Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-        Math.cos(φ1) *
-        Math.cos(φ2) *
-        Math.sin(Δλ / 2) *
-        Math.sin(Δλ / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      const distance = R * c;
-
-      return { index, distance, waypoint: wp };
-    });
-
-    // Find closest waypoint
-    const closest = distances.reduce((min, curr) =>
-      curr.distance < min.distance ? curr : min,
-    );
-
-    // Update remaining distance to the *next* logical point
-    // Logic: If 'closest' is the one we are visiting, we show distance to it.
-    // However, if we are "in" the waypoint (within threshold), we might want to show distance to the *next* one?
-    // User request: "distance from driver to next point (meeting, stop or destination)"
-
-    // Let's refine based on currentWaypointIndex logic.
-    // If we haven't reached 'closest' yet (distance > threshold), closest is likely the target.
-    // But if we passed it, we look ahead.
-
-    // We can rely on `currentWaypointIndex` logic below which advances index.
-    // Actually, let's just use the closest waypoint that is visually "next" in the sequence
-    // or simply calculate distance to waypoints[currentWaypointIndex] if available.
-
-    // Better yet, just use the `closest` logic directly for display if it's meaningful,
-    // OR use waypoints.find(w => w.order > currentOrder)
-
-    // Let's stick to the existing logic flow:
-    // It updates `currentWaypointIndex` to be the target we are approaching.
-
-    // So we can calculate distance to waypoints[currentWaypointIndex] (if valid)
-    // BUT `detectCurrentWaypoint` runs continuously. Let's update state here.
-
-    // Find the relevant target waypoint:
-    // It should be the first waypoint that hasn't been visited/completed/skipped.
-    const nextTargetIndex = waypoints.findIndex(wp => {
+    // Buscar el primer waypoint que no esté completado/visitado
+    const nextTarget = waypoints.find(wp => {
       if (wp.type === 'origin') return false;
-      return !checkedInWaypoints.has(wp.id) && (wp.status === 'pending' || !wp.status);
+      const isCompleted = wp.status === 'completed' || wp.status === 'visited' || wp.status === 'dropped_off';
+      return !isCompleted;
     });
 
-    if (nextTargetIndex !== -1) {
-      const target = waypoints[nextTargetIndex];
+    if (nextTarget) {
       const distKm = calculateDistance(
         driverLocation.coords.latitude,
         driverLocation.coords.longitude,
-        target.coords.latitude,
-        target.coords.longitude
+        nextTarget.coords.latitude,
+        nextTarget.coords.longitude
       );
       setDistanceToNextPoint(formatDistance(distKm));
     } else {
       setDistanceToNextPoint("0m");
-    }
-
-    // If within threshold
-    if (closest.distance < PROXIMITY_THRESHOLD) {
-      const waypointId = closest.waypoint.id;
-
-      // Skip origin
-      if (closest.waypoint.type === 'origin') {
-        setCurrentWaypointIndex(closest.index);
-        return;
-      }
-
-      // Only prompt if driver mode and not already checked in
-      if (user?.driver_mode && !checkedInWaypoints.has(waypointId)) {
-        setWaypointToCheckIn(closest.waypoint);
-        setCheckInModalVisible(true);
-      }
-
-      setCurrentWaypointIndex(closest.index);
-    } else {
-      // Find next unvisited waypoint
-      const nextIndex = waypoints.findIndex(
-        (wp, idx) => idx > currentWaypointIndex,
-      );
-      if (nextIndex !== -1) {
-        setCurrentWaypointIndex(nextIndex);
-      }
     }
   };
 
@@ -407,7 +349,7 @@ export default function RouteDetail() {
         }
       } else if (waypointToCheckIn.type === 'meeting_point') {
         const { error } = await supabase
-          .from('trip_session_meeting_points')
+          .from('passenger_meeting_points')
           .update({
             status,
             visit_time: status === 'visited' ? new Date().toISOString() : null,
@@ -544,105 +486,105 @@ export default function RouteDetail() {
 
   // Función para obtener la ruta de Mapbox Directions
   const fetchRouteMap = async () => {
-    // Coordenadas para la ruta
-    const origin: [number, number] =
-      session !== null
-        ? [session.start_coords.coordinates[0], session.start_coords.coordinates[1]]
-        : [stopsData[0].coords.longitude, stopsData[0].coords.latitude];
-    const destination: [number, number] =
-      session !== null
-        ? [session.end_coords.coordinates[0], session.end_coords.coordinates[1]]
-        : [
-          stopsData[stopsData.length - 1].coords.longitude,
-          stopsData[stopsData.length - 1].coords.latitude,
-        ];
-
-    // Combine stops and meeting points as waypoints
-    const stopWaypoints: [number, number][] =
-      session !== null
-        ? stopsData.map((stop) => [stop.coords.longitude, stop.coords.latitude])
-        : stopsData
-          .slice(1, stopsData.length - 1)
-          .map((stop) => [stop.coords.longitude, stop.coords.latitude]);
-
-    const meetingWaypoints: [number, number][] = meetingPoints.map((mp) => [
-      mp.coords.longitude,
-      mp.coords.latitude,
-    ]);
-
-    // Merge all waypoints and sort by distance from origin
-    const allWaypoints = [...stopWaypoints, ...meetingWaypoints];
-
-    // Sort waypoints by their distance from the origin
-    // This ensures meeting points are inserted between the nearest stops
-    const sortedWaypoints = allWaypoints.sort((a, b) => {
-      const distA = Math.sqrt(
-        Math.pow(a[0] - origin[0], 2) + Math.pow(a[1] - origin[1], 2)
-      );
-      const distB = Math.sqrt(
-        Math.pow(b[0] - origin[0], 2) + Math.pow(b[1] - origin[1], 2)
-      );
-      return distA - distB;
-    });
-
-    const allCoordinates: [number, number][] = [
-      origin,
-      ...sortedWaypoints,
-      destination,
-    ];
-
-    // Une las coordenadas en el formato requerido por la API: lng,lat;lng,lat...
-    const coordsString = allCoordinates.map((c) => c.join(",")).join(";");
-    const accessToken =
-      process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || ""; // Usar el token de entorno aquí también
-
-    // Usamos el perfil de manejo ('driving')
-    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordsString}?geometries=geojson&access_token=${accessToken}`;
+    // 1. Validar que tengamos los datos mínimos necesarios
+    if (!session || !stopsData || stopsData.length < 2) {
+      console.log("⏳ Esperando datos suficientes para trazar la ruta...", {
+        hasSession: !!session,
+        stopsCount: stopsData?.length
+      });
+      return;
+    }
 
     try {
+      // 2. Extraer origen y destino de la sesión de forma segura (GeoJSON Point: [lng, lat])
+      const origin: [number, number] | null = session.start_coords?.coordinates
+        ? [session.start_coords.coordinates[0], session.start_coords.coordinates[1]]
+        : null;
+
+      const destination: [number, number] | null = session.end_coords?.coordinates
+        ? [session.end_coords.coordinates[0], session.end_coords.coordinates[1]]
+        : null;
+
+      if (!origin || !destination) {
+        console.warn("⚠️ No se pudieron obtener las coordenadas de origen o destino de la sesión.", { origin, destination });
+        return;
+      }
+
+      // 3. Procesar las paradas de la ruta
+      // Nota: Si cambiaste a geometry, asegúrate de que stop.coords tenga {longitude, latitude} o usa la estructura de GeoJSON
+      const stopWaypoints: [number, number][] = stopsData
+        .filter(s => s.coords && (s.coords.longitude !== undefined || (s.coords as any).coordinates))
+        .map(s => {
+          // Soporte tanto para objeto {lat, lng} como para GeoJSON [lng, lat]
+          if ((s.coords as any).coordinates) {
+            return [(s.coords as any).coordinates[0], (s.coords as any).coordinates[1]];
+          }
+          return [s.coords.longitude, s.coords.latitude];
+        });
+
+      // 4. Procesar los puntos de encuentro de los pasajeros
+      const meetingWaypoints: [number, number][] = meetingPoints
+        .filter(mp => mp.coords && (mp.coords.longitude !== undefined || (mp.coords as any).coordinates))
+        .map(mp => {
+          if ((mp.coords as any).coordinates) {
+            return [(mp.coords as any).coordinates[0], (mp.coords as any).coordinates[1]];
+          }
+          return [mp.coords.longitude, mp.coords.latitude];
+        });
+
+      // Unir todos los puntos intermedios
+      const allWaypoints = [...stopWaypoints, ...meetingWaypoints];
+
+      // Ordenar los puntos intermedios por cercanía al origen para una ruta lógica
+      const sortedWaypoints = allWaypoints.sort((a, b) => {
+        const distA = Math.sqrt(Math.pow(a[0] - origin[0], 2) + Math.pow(a[1] - origin[1], 2));
+        const distB = Math.sqrt(Math.pow(b[0] - origin[0], 2) + Math.pow(b[1] - origin[1], 2));
+        return distA - distB;
+      });
+
+      const allCoordinates: [number, number][] = [origin, ...sortedWaypoints, destination];
+
+      // 5. Validar que no haya valores indefinidos en la lista final
+      if (allCoordinates.some(c => c.includes(undefined as any) || c.includes(null as any))) {
+        console.error("❌ Hay coordenadas inválidas en la lista de ruta:", allCoordinates);
+        return;
+      }
+
+      const coordsString = allCoordinates.map((c) => c.join(",")).join(";");
+      const accessToken = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
+
+      console.log("🗺️ Pidiendo ruta Mapbox:", coordsString);
+
+      const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordsString}?geometries=geojson&access_token=${accessToken}`;
+
       const response = await fetch(url);
       const data = await response.json();
 
       if (data.routes && data.routes.length > 0) {
         const route = data.routes[0].geometry;
 
-        // El ShapeSource de Mapbox necesita una FeatureCollection
-        const routeFeatureCollection = {
+        setRouteGeoJSON({
           type: "FeatureCollection",
           features: [{ type: "Feature", geometry: route, properties: {} }],
-        };
-
-        setRouteGeoJSON(routeFeatureCollection as any);
+        } as any);
       } else {
-        console.warn(
-          "Map routes no pudo encontrar un camino exacto:",
-          data.message,
-        );
-        // Opcional: Fallback a Directions API si falla el matching
+        console.warn("Map routes no pudo encontrar un camino exacto:", data.message || "Sin mensaje");
       }
     } catch (error) {
-      console.error("Error al obtener la ruta de Mapbox:", error);
+      console.error("❌ Error al obtener la ruta de Mapbox:", error);
     }
   };
 
   useEffect(() => {
-    // Si el viaje está activo y tenemos la ubicación del conductor
-    if (session?.status === "active" && driverLocation) {
+    // Solo centrar automáticamente si el viaje acaba de activarse o es la primera vez que tenemos ubicación
+    if (session?.status === "active" && driverLocation && !region) {
       cameraRef.current?.setCamera({
         centerCoordinate: [driverLocation.coords.longitude, driverLocation.coords.latitude],
-        zoomLevel: 15,
-        animationDuration: 1000, // Transición suave entre puntos
-      });
-    }
-    // Si el viaje NO ha empezado, centrar en el pasajero (region)
-    else if (region) {
-      cameraRef.current?.setCamera({
-        centerCoordinate: [region.longitude, region.latitude],
         zoomLevel: 15,
         animationDuration: 1000,
       });
     }
-  }, [driverLocation, session?.status]); // Se dispara cada vez que el conductor se mueve
+  }, [session?.status]); // Quitamos driverLocation de las dependencias para evitar el snap constante
 
   useEffect(() => {
     let subscriber: Location.LocationSubscription | null = null;
@@ -738,16 +680,15 @@ export default function RouteDetail() {
       return;
     }
 
-    // Filter only for approved passengers (status = 'joined')
-    const approvedPassengerIds = passengers
-      .filter((p) => p.status === "joined")
-      .map((p) => p.passenger_id);
+    const formattedData = (data || []).map((mp: any) => ({
+      ...mp,
+      coords: {
+        latitude: Number(mp.coords?.coordinates?.[1] ?? mp.coords?.latitude ?? 0),
+        longitude: Number(mp.coords?.coordinates?.[0] ?? mp.coords?.longitude ?? 0),
+      }
+    }));
 
-    const approvedMeetingPoints =
-      data?.filter((mp) => approvedPassengerIds.includes(mp.passenger_id)) ||
-      [];
-
-    setMeetingPoints(approvedMeetingPoints as MeetingPoint[]);
+    setMeetingPoints(formattedData as MeetingPoint[]);
   };
 
   useEffect(() => {
@@ -816,15 +757,23 @@ export default function RouteDetail() {
 
   // Función para cambiar la ubicación y centrar la cámara de Mapbox
   const changeLocation = (lat: number, lng: number) => {
+    const safeLat = Number(lat);
+    const safeLng = Number(lng);
+
+    if (isNaN(safeLat) || isNaN(safeLng) || (safeLat === 0 && safeLng === 0)) {
+      console.warn("⚠️ Intentando mover la cámara a una ubicación inválida:", { lat, lng });
+      return;
+    }
+
     if (cameraRef.current) {
       cameraRef.current.setCamera({
-        centerCoordinate: [lng, lat], // Mapbox usa [lng, lat]
+        centerCoordinate: [safeLng, safeLat], // Mapbox usa [lng, lat]
         zoomLevel: 15,
         animationDuration: 1000,
       });
-      // Actualiza la región también para mantener el estado coherente si es necesario
+      // Actualiza la región también para mantener el estado coherente
       setRegion((prev) =>
-        prev ? { ...prev, latitude: lat, longitude: lng } : null,
+        prev ? { ...prev, latitude: safeLat, longitude: safeLng } : null,
       );
     }
   };
@@ -851,49 +800,50 @@ export default function RouteDetail() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      {region === null ? (
-        <View className="flex-1 justify-center items-center">
-          <Text>Cargando mapa...</Text>
-        </View>
-      ) : (
-        <>
-          {/* Mapa de Mapbox */}
-          <Mapbox.MapView
-            ref={mapRef}
-            styleURL={Mapbox.StyleURL.Street} // Puedes cambiar el estilo aquí
-            style={StyleSheet.absoluteFillObject}
-            localizeLabels={true}
-          >
-            {/* Cámara inicial / centrado */}
-            <Camera
-              ref={cameraRef}
-              zoomLevel={15}
-              centerCoordinate={[region.longitude, region.latitude]}
-              animationMode="flyTo"
-              animationDuration={500}
-            />
+      <View style={{ flex: 1 }}>
+        {/* Mapa de Mapbox - Siempre montado */}
+        <Mapbox.MapView
+          ref={mapRef}
+          styleURL={Mapbox.StyleURL.Street}
+          style={StyleSheet.absoluteFillObject}
+          localizeLabels={true}
+        >
+          {/* Cámara inicial */}
+          <Camera
+            ref={cameraRef}
+            defaultSettings={{
+              centerCoordinate: [-79.9424633, -2.2035283],
+              zoomLevel: 15,
+            }}
+          />
 
-            {driverLocation && (
+          {region && !user?.driver_mode && (
+            <UserLocation
+              visible={true}
+              showsUserHeadingIndicator={true}
+              minDisplacement={5}
+            />
+          )}
+
+            {driverLocation?.coords ? (
               <MarkerView
                 id="driver"
-                coordinate={[driverLocation.coords.longitude, driverLocation.coords.latitude]}
+                coordinate={[
+                  isNaN(Number(driverLocation.coords.longitude)) ? 0 : Number(driverLocation.coords.longitude),
+                  isNaN(Number(driverLocation.coords.latitude)) ? 0 : Number(driverLocation.coords.latitude)
+                ]}
                 anchor={{ x: 0.5, y: 0.5 }}
               >
-                <Ionicons name="car-sport" size={30} color="#000D3A" />
+                <View style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="car-sport" size={30} color="#000D3A" />
+                </View>
               </MarkerView>
-            )}
+            ) : null}
 
-            {/* Ubicación del usuario */}
-            {!user?.driver_mode && (
-              <UserLocation
-                visible={true}
-                showsUserHeadingIndicator={true}
-                minDisplacement={5} // Actualizar cada 5 metros
-              />
-            )}
+
 
             {/* Dibuja la Ruta */}
-            {routeGeoJSON && (
+            {sessionLoaded && routeGeoJSON && (
               <ShapeSource id="routeSource" shape={routeGeoJSON}>
                 <LineLayer
                   id="routeLine"
@@ -907,94 +857,129 @@ export default function RouteDetail() {
               </ShapeSource>
             )}
 
-            {session && (
-              <MarkerView
-                id="start-point"
-                coordinate={[session.start_coords.coordinates[0], session.start_coords.coordinates[1]]}
-                anchor={{ x: 0.5, y: 1 }}
-              >
-                <View className="items-center">
-                  <View className="bg-white p-1 rounded-full shadow-md">
-                    <Ionicons name="flag" size={30} color="#22c55e" />
-                    {/* Verde para inicio */}
+            {sessionLoaded && session?.start_coords?.coordinates ? (() => {
+              const lng = Number(session.start_coords.coordinates[0]);
+              const lat = Number(session.start_coords.coordinates[1]);
+              if (isNaN(lng) || isNaN(lat) || (lng === 0 && lat === 0)) return null;
+              
+              return (
+                <MarkerView
+                  id="start-point"
+                  coordinate={[lng, lat]}
+                  anchor={{ x: 0.5, y: 1 }}
+                >
+                  <View style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
+                    <View className="items-center">
+                      <View className="bg-white p-1 rounded-full shadow-md">
+                        <Ionicons name="flag" size={24} color="#22c55e" />
+                      </View>
+                      <Text className="bg-white/80 px-1 text-[8px] font-bold">Inicio</Text>
+                    </View>
                   </View>
-                  <Text className="bg-white/80 px-1 text-[10px] font-bold">
-                    Inicio
-                  </Text>
-                </View>
-              </MarkerView>
-            )}
+                </MarkerView>
+              );
+            })() : null}
 
-            {/* Marcadores para las Paradas (usando MarkerView para más control) */}
-            {stopsData.map((stop, index) => (
-              <MarkerView
-                key={`stop-${index}`}
-                coordinate={[stop.coords.longitude, stop.coords.latitude]}
-                anchor={{ x: 0.5, y: 1 }}
-              >
-                <View className="items-center">
-                  <Ionicons
-                    name="location-sharp"
-                    size={24}
-                    color={Colors.light.primary}
-                  />
-                </View>
-              </MarkerView>
-            ))}
+            {/* Marcadores para las Paradas */}
+            {sessionLoaded && stopsData?.map((stop, index) => {
+              const coords = stop.coords as any;
+              const lng = Number(coords?.longitude ?? coords?.coordinates?.[0] ?? 0);
+              const lat = Number(coords?.latitude ?? coords?.coordinates?.[1] ?? 0);
+              
+              if (isNaN(lng) || isNaN(lat) || (lng === 0 && lat === 0)) return null;
+
+              return (
+                <MarkerView
+                  key={`stop-${index}`}
+                  id={`stop-${index}`}
+                  coordinate={[lng, lat]}
+                  anchor={{ x: 0.5, y: 1 }}
+                >
+                  <View style={{ width: 30, height: 30, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons
+                      name="location-sharp"
+                      size={24}
+                      color={Colors.light.primary}
+                    />
+                  </View>
+                </MarkerView>
+              );
+            })}
 
             {/* Meeting Point Markers */}
-            {meetingPoints.map((mp, index) => (
-              <MarkerView
-                key={`meeting-${mp.passenger_id}-${index}`}
-                coordinate={[mp.coords.longitude, mp.coords.latitude]}
-                anchor={{ x: 0.5, y: 1 }}
-              >
-                <View className="items-center">
-                  <View className="bg-[#000D3A] p-1 rounded-full shadow-md">
-                    <Ionicons name="person" size={20} color="white" />
-                  </View>
-                  <Text className="bg-white/80 px-1 text-[10px] font-bold">
-                    Pasajero
-                  </Text>
-                </View>
-              </MarkerView>
-            ))}
+            {sessionLoaded && meetingPoints?.map((mp, index) => {
+              const coords = mp.coords as any;
+              const lng = Number(coords?.longitude ?? coords?.coordinates?.[0] ?? 0);
+              const lat = Number(coords?.latitude ?? coords?.coordinates?.[1] ?? 0);
 
-            {session && (
-              <MarkerView
-                id="end-point"
-                coordinate={[session.end_coords.coordinates[0], session.end_coords.coordinates[1]]}
-                anchor={{ x: 0.5, y: 1 }}
-              >
-                <View className="items-center">
-                  <View className="bg-white p-1 rounded-full shadow-md">
-                    <Ionicons name="location" size={30} color="#ef4444" />
-                    {/* Rojo para fin */}
-                  </View>
-                  <Text className="bg-white/80 px-1 text-[10px] font-bold">
-                    Destino
-                  </Text>
-                </View>
-              </MarkerView>
-            )}
-          </Mapbox.MapView>
+              if (isNaN(lng) || isNaN(lat) || (lng === 0 && lat === 0)) return null;
 
-          {/* Botón de Atrás */}
-          <View
-            pointerEvents="box-none"
-            className="absolute top-8 left-[14px] z-50"
-          >
-            <Pressable
-              onPress={() => navigation.goBack()}
-              className="p-2 rounded-full shadow-lg bg-white/70"
-            >
-              <Ionicons
-                name="arrow-back"
-                size={34}
-                color={Colors.light.primary}
-              />
-            </Pressable>
+              return (
+                <MarkerView
+                  key={`meeting-${mp.passenger_id}-${index}`}
+                  id={`meeting-${mp.passenger_id}-${index}`}
+                  coordinate={[lng, lat]}
+                  anchor={{ x: 0.5, y: 1 }}
+                >
+                  <View style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
+                    <View className="items-center">
+                      <View className="bg-[#000D3A] p-1 rounded-full shadow-md">
+                        <Ionicons name="person" size={18} color="white" />
+                      </View>
+                      <Text className="bg-white/80 px-1 text-[8px] font-bold">Pasajero</Text>
+                    </View>
+                  </View>
+                </MarkerView>
+              );
+            })}
+
+            {sessionLoaded && session?.end_coords?.coordinates ? (() => {
+              const lng = Number(session.end_coords.coordinates[0]);
+              const lat = Number(session.end_coords.coordinates[1]);
+              if (isNaN(lng) || isNaN(lat) || (lng === 0 && lat === 0)) return null;
+
+              return (
+                <MarkerView
+                  id="end-point"
+                  coordinate={[lng, lat]}
+                  anchor={{ x: 0.5, y: 1 }}
+                >
+                  <View style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
+                    <View className="items-center">
+                      <View className="bg-white p-1 rounded-full shadow-md">
+                        <Ionicons name="location" size={24} color="#ef4444" />
+                      </View>
+                      <Text className="bg-white/80 px-1 text-[8px] font-bold">Destino</Text>
+                    </View>
+                  </View>
+                </MarkerView>
+              );
+            })() : null}
+        </Mapbox.MapView>
+
+        {/* Overlay de Carga */}
+        {!region && (
+          <View className="absolute inset-0 bg-white/80 items-center justify-center z-[60]">
+            <Text className="font-bold text-slate-500">Cargando ubicación...</Text>
           </View>
+        )}
+
+        {/* Botón de Atrás */}
+        <View
+          pointerEvents="box-none"
+          className="absolute top-8 left-[14px] z-50"
+        >
+          <Pressable
+            onPress={() => navigation.goBack()}
+            className="p-2 rounded-full shadow-lg bg-white/70"
+          >
+            <Ionicons
+              name="arrow-back"
+              size={34}
+              color={Colors.light.primary}
+            />
+          </Pressable>
+        </View>
 
           {/* Botón para Mostrar/Ocultar Paradas */}
           <View
@@ -1043,13 +1028,19 @@ export default function RouteDetail() {
             >
               <View className="relative flex-1 overflow-hidden rounded-2xl">
                 <ScrollView showsVerticalScrollIndicator={false}>
-                  {waypoints.map((waypoint, index) => {
-                    const isVisited = index < currentWaypointIndex;
-                    const isCurrent = index === currentWaypointIndex;
-                    const isNext = index === currentWaypointIndex + 1;
+                  {(() => {
+                    const firstUnvisitedIndex = waypoints.findIndex(w => {
+                      if (w.type === 'origin') return false; // El inicio no cuenta como pendiente de visita una vez arrancado
+                      return !(w.status === 'completed' || w.status === 'visited' || w.status === 'dropped_off');
+                    });
 
-                    return (
-                      <View key={waypoint.id} className="flex-row mb-6">
+                    return waypoints.map((waypoint, index) => {
+                      const isVisited = waypoint.status === 'completed' || waypoint.status === 'visited' || waypoint.status === 'dropped_off' || (waypoint.type === 'origin');
+                      const isCurrent = index === firstUnvisitedIndex;
+                      const isNext = index === firstUnvisitedIndex + 1;
+
+                      return (
+                        <View key={waypoint.id} className="flex-row mb-6">
                         {/* Progress Line */}
                         <View className="items-center w-10">
                           {/* Dot/Icon */}
@@ -1089,9 +1080,13 @@ export default function RouteDetail() {
 
                         {/* Waypoint Info */}
                         <Pressable
-                          onPress={() =>
-                            changeLocation(waypoint.coords.latitude, waypoint.coords.longitude)
-                          }
+                          onPress={() => {
+                            if (!isVisited) {
+                              setWaypointToCheckIn(waypoint);
+                              setCheckInModalVisible(true);
+                            }
+                            changeLocation(waypoint.coords.latitude, waypoint.coords.longitude);
+                          }}
                           className="flex-1"
                         >
                           <View
@@ -1150,9 +1145,10 @@ export default function RouteDetail() {
                             </Text>
                           </View>
                         </Pressable>
-                      </View>
-                    );
-                  })}
+                        </View>
+                      );
+                    });
+                  })()}
                 </ScrollView>
               </View>
             </LinearGradient>
@@ -1211,8 +1207,6 @@ export default function RouteDetail() {
             onConfirm={handleDropOffPassengers}
             onClose={() => setDropOffModalVisible(false)}
           />
-        </>
-      )}
       <DriverRatingListModal
         visible={driverRatingModalVisible}
         onClose={() => {
@@ -1240,7 +1234,8 @@ export default function RouteDetail() {
           }
         }}
       />
-    </GestureHandlerRootView>
+    </View>
+  </GestureHandlerRootView>
   );
 }
 

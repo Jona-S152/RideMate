@@ -1,10 +1,13 @@
 import { useAuth } from "@/app/context/AuthContext";
+import { TripSessionStops } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import Mapbox, {
   Camera,
   LineLayer,
   MapView,
+  MarkerView,
+  PointAnnotation,
   ShapeSource,
   UserLocation,
 } from "@rnmapbox/maps";
@@ -41,6 +44,8 @@ export default function SelectionMapScreen() {
   const [loading, setLoading] = useState(false);
   const [isValidSelection, setIsValidSelection] = useState(true);
   const [distanceToRoute, setDistanceToRoute] = useState(0);
+  const [sessionData, setSessionData] = useState<any>(null);
+  const [stopsData, setStopsData] = useState<any[]>([]);
 
   const cameraRef = useRef<Mapbox.Camera>(null);
 
@@ -67,6 +72,17 @@ export default function SelectionMapScreen() {
     })();
   }, []);
 
+  // Centrar la cámara solo la primera vez que tenemos la ubicación
+  useEffect(() => {
+    if (initialLocation && cameraRef.current) {
+      cameraRef.current.setCamera({
+        centerCoordinate: initialLocation,
+        zoomLevel: 15,
+        animationDuration: 1000,
+      });
+    }
+  }, [initialLocation]);
+
   // 2. Obtener Ruta Real desde Supabase
   useEffect(() => {
     const fetchRoute = async () => {
@@ -91,20 +107,41 @@ export default function SelectionMapScreen() {
         return;
       }
 
-      // Obtener paradas (stops)
-      const { data: stopsData } = await supabase
+      setSessionData(sessionData);
+
+      // Obtener paradas (stops) con join a la tabla stops para obtener las coordenadas
+      const { data: stopsData, error: stopsError } = await supabase
         .from("trip_session_stops")
-        .select("stops(coords)")
+        .select(`
+          *,
+          stops (
+            coords
+          )
+        `)
         .eq("trip_session_id", sessionId)
         .order("visit_time", { ascending: true });
 
-      const origin = `${sessionData.start_coords.longitude},${sessionData.start_coords.latitude}`;
-      const destination = `${sessionData.end_coords.longitude},${sessionData.end_coords.latitude}`;
+      if (stopsError) {
+        console.error("Error fetching stops data:", stopsError);
+        return;
+      }
+
+      setStopsData(stopsData || []);
+
+      const origin = `${sessionData.start_coords.coordinates[0]},${sessionData.start_coords.coordinates[1]}`;
+      const destination = `${sessionData.end_coords.coordinates[0]},${sessionData.end_coords.coordinates[1]}`;
 
       const waypoints = stopsData
-        ?.map((s: any) => `${s.stops?.coords.longitude},${s.stops?.coords.latitude}`)
+        ?.map((s: any) => {
+          const coords = s.stops?.coords?.coordinates;
+          return coords ? `${coords[0]},${coords[1]}` : null;
+        })
         .filter(Boolean)
         .join(";");
+
+      console.log("📍 Ubicación inicial obtenida:", sessionData.start_coords.coordinates);
+      console.log("📍 Ubicación final obtenida:", sessionData.end_coords.coordinates);
+      console.log("📍 Paradas con coordenadas:", stopsData?.map(s => (s as any).stops?.coords));
 
       const coordsString = waypoints
         ? `${origin};${waypoints};${destination}`
@@ -197,14 +234,20 @@ export default function SelectionMapScreen() {
         {
           trip_session_id: sessionId,
           passenger_id: user?.id,
-          coords: { latitude: selectedCoords[1], longitude: selectedCoords[0] },
+          coords: {
+            type: "Point",
+            coordinates: [selectedCoords[0], selectedCoords[1]],
+          },
           location: start_name || "Punto Seleccionado",
         },
       ]);
 
-      if (meetingError) console.error("❌ Error al guardar el punto de encuentro:", meetingError);
+      if (meetingError) {
+        console.error("❌ Error al guardar el punto de encuentro:", meetingError);
+        throw new Error("No se pudo guardar tu punto de encuentro. Por favor, inténtalo de nuevo.");
+      }
 
-      Alert.alert("Solicitud Enviada", "Espera a que el conductor la apruebe.");
+      Alert.alert("Solicitud Enviada", "Tu solicitud ha sido enviada con éxito. Espera a que el conductor la apruebe.");
       router.replace("/(tabs)/home");
     } catch (error: any) {
       console.error(error);
@@ -232,19 +275,17 @@ export default function SelectionMapScreen() {
 
       <MapView
         style={{ flex: 1 }}
-        onRegionDidChange={(e) => setSelectedCoords(e.geometry.coordinates)}
+        onRegionDidChange={(e) => {
+          if (e.geometry && e.geometry.coordinates) {
+            setSelectedCoords(e.geometry.coordinates);
+          }
+        }}
         logoEnabled={false}
         compassEnabled={false}
       >
-        {initialLocation && (
-          <Camera
-            ref={cameraRef}
-            zoomLevel={15}
-            centerCoordinate={initialLocation}
-            animationMode="flyTo"
-            animationDuration={1000}
-          />
-        )}
+        <Camera
+          ref={cameraRef}
+        />
 
         <UserLocation visible={true} />
 
@@ -262,6 +303,74 @@ export default function SelectionMapScreen() {
               }}
             />
           </ShapeSource>
+        )}
+
+        {/* Marcadores de Ubicaciones con PointAnnotation para estabilidad total */}
+        {sessionData && (
+          <>
+            {/* Inicio (Origen) */}
+            <PointAnnotation
+              id="originPoint"
+              coordinate={[sessionData.start_coords.coordinates[0], sessionData.start_coords.coordinates[1]]}
+            >
+              <View style={{ width: 30, height: 40, alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ 
+                  backgroundColor: '#4CAF50', 
+                  padding: 5, 
+                  borderRadius: 20, 
+                  borderWidth: 2,
+                  borderColor: 'white'
+                }}>
+                  <Ionicons name="car" size={16} color="white" />
+                </View>
+              </View>
+            </PointAnnotation>
+
+            {/* Paradas intermedias representadas como Pickups (Recogida) */}
+            {stopsData?.map((stop: any, index: number) => {
+              const coords = stop.stops?.coords?.coordinates;
+              if (!coords) return null;
+              return (
+                <PointAnnotation
+                  key={`stop-${index}`}
+                  id={`stop-${index}`}
+                  coordinate={[coords[0], coords[1]]}
+                >
+                  <View style={{ width: 26, height: 26, alignItems: 'center', justifyContent: 'center' }}>
+                    <View style={{ 
+                      backgroundColor: '#000D3A', 
+                      width: 22, height: 22,
+                      borderRadius: 11, 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      borderWidth: 2, 
+                      borderColor: 'white'
+                    }}>
+                      <Ionicons name="person" size={12} color="white" />
+                    </View>
+                  </View>
+                </PointAnnotation>
+              );
+            })}
+
+            {/* Fin (Destino) */}
+            <PointAnnotation
+              id="destinationPoint"
+              coordinate={[sessionData.end_coords.coordinates[0], sessionData.end_coords.coordinates[1]]}
+            >
+              <View style={{ width: 30, height: 40, alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ 
+                  backgroundColor: '#F44336', 
+                  padding: 5, 
+                  borderRadius: 20, 
+                  borderWidth: 2,
+                  borderColor: 'white'
+                }}>
+                  <Ionicons name="flag" size={16} color="white" />
+                </View>
+              </View>
+            </PointAnnotation>
+          </>
         )}
       </MapView>
 
