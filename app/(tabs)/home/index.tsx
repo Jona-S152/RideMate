@@ -12,6 +12,7 @@ import { useThemeColor } from "@/hooks/useThemeColor";
 import { supabase } from "@/lib/supabase";
 import { registerDeviceToken } from "@/services/notifications.service";
 import { ratingsService } from "@/services/ratings.service";
+import MasonryGrid from "@/components/common/MasonryGrid";
 // ... imports
 
 export default function HomeScreen() {
@@ -353,24 +354,25 @@ export default function HomeScreen() {
             />
           )}
           {history.length > 0 ? (
-            history.map((item) => (
-              <RouteCard
-                key={`hist-${item.id}`}
-                sessionId={item.id}
-                routeId={(item as any).route_id}
-                title={`${item.start_location} - ${item.end_location}`}
-                isActive={"completed"}
-                routeScreen={`/(tabs)/home/route-detail?id=${item.trip_session_id}`}
-                // 🚀 Pasando datos dinámicos
-                startLocation={item.start_location.split(",")[0].trim()}
-                endLocation={item.end_location.split(",")[0].trim()}
-                // 🚧 Valor Temporal: DEBES reemplazar '3' con el resultado de una consulta
-                passengerCount={(item as any).passengers_data?.length || 0}
-                driver={(item as any).driver_details}
-                passengersData={(item as any).passengers_data}
-                imageUrl={(item as any).image_url}
-              />
-            ))
+            <MasonryGrid
+              data={history}
+              keyExtractor={(item) => `hist-${item.id}`}
+              renderItem={(item) => (
+                <RouteCard
+                  sessionId={item.id}
+                  routeId={(item as any).route_id}
+                  title={`${item.start_location} - ${item.end_location}`}
+                  isActive={"completed"}
+                  routeScreen={`/(tabs)/home/route-detail?id=${item.trip_session_id}`}
+                  startLocation={item.start_location.split(",")[0].trim()}
+                  endLocation={item.end_location.split(",")[0].trim()}
+                  passengerCount={(item as any).passengers_data?.length || 0}
+                  driver={(item as any).driver_details}
+                  passengersData={(item as any).passengers_data}
+                  imageUrl={(item as any).image_url}
+                />
+              )}
+            />
           ) : (
             <ThemedText className="text-center mt-10 text-gray-500">
               No tienes rutas en tu historial.

@@ -2,12 +2,12 @@ import { useAuth } from "@/app/context/AuthContext";
 import { Colors } from "@/constants/Colors";
 import { supabase } from "@/lib/supabase";
 import { useTripTrackingStore } from "@/store/tripTrackinStore";
-import { DarkTheme, DefaultTheme } from "@react-navigation/native";
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Href, router } from "expo-router";
 import { useState } from "react";
 import { Alert, Image, Pressable, Text, View } from "react-native";
-import { ThemedText } from "./ThemedText";
-import { ThemedView } from "./ThemedView";
+import { ThemedText } from "../ui/ThemedText";
+import { ThemedView } from "../ui/ThemedView";
 
 interface HistoryRouteProps {
     title: string;
@@ -90,154 +90,104 @@ export default function RouteCard({
 
     return (
         <ThemedView
-            lightColor={isActive !== "completed" ? Colors.light.historyCard.activeBackground : Colors.light.historyCard.background}
-            darkColor={Colors.light.historyCard.activeBackground}
-            className="flex-1 justify-center rounded-[28px] m-2 p-5 overflow-hidden">
-            {isActive !== "completed" && (
-                <View
-                    className="
-                        absolute -top-15 -left-24
-                        w-[180%] h-40 
-                        bg-[#FDCACA]/40 
-                        -rotate-[70deg]
-                    "
+            lightColor="#1C2431"
+            darkColor="#1C2431"
+            className="rounded-[24px] m-1 overflow-hidden relative"
+            style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}
+        >
+            {/* Hero Map Image */}
+            <View className="w-full h-36 bg-gray-200">
+                <Image
+                    source={
+                        imageUrl && !imageError
+                            ? { uri: imageUrl }
+                            : require('@/assets/images/mapExample.png')
+                    }
+                    onError={() => setImageError(true)}
+                    resizeMode="cover"
+                    className="w-full h-full"
                 />
-            )}
-            <View className="">
-                <ThemedText
-                    lightColor={isActive !== "completed" ? 'white' : DefaultTheme.colors.text}
-                    darkColor={DarkTheme.colors.text}
-                    className="text-sm font-bold">
-                    {title}
-                </ThemedText>
             </View>
-            <View className="flex-row justify-between">
-                <View className="flex-1 pr-4">
 
-                    <ThemedText
-                        lightColor={isActive !== "completed" ? 'white' : DefaultTheme.colors.text}
-                        darkColor={DarkTheme.colors.text}
-                        className="text-base font-normal mt-2">
-                        Punto de partida
-                    </ThemedText>
-                    <ThemedText
-                        lightColor={isActive !== "completed" ? 'white' : DefaultTheme.colors.text}
-                        className="text-sm font-light mb-2">
-                        {startLocation}
-                    </ThemedText>
-
-                    <ThemedText
-                        lightColor={isActive !== "completed" ? 'white' : DefaultTheme.colors.text}
-                        className="text-base font-normal">
-                        Punto final
-                    </ThemedText>
-                    <ThemedText
-                        lightColor={isActive !== "completed" ? 'white' : DefaultTheme.colors.text}
-                        className="text-sm font-light">
-                        {endLocation}
-                    </ThemedText>
-
-                    {/* Driver Info */}
-                    {driver && (
-                        <View className="flex-row items-center mt-3 mb-1">
-                            <View>
-                                <Image
-                                    source={{ uri: driver.avatar || "https://via.placeholder.com/150" }}
-                                    className="w-8 h-8 rounded-full border border-gray-200"
-                                />
-                                <ThemedView
-                                    lightColor={isActive !== "completed" ? 'white' : Colors.light.tird}
-                                    darkColor={isActive !== "completed" ? 'white' : DarkTheme.colors.text}
-                                    className="absolute -bottom-1 -right-1 rounded-full px-1 justify-center items-center"
-                                    style={{ minWidth: 20 }}
-                                >
-                                    <Text className="text-[8px] font-bold text-slate-800">
-                                        {driver.rating.toFixed(1)}
-                                    </Text>
-                                </ThemedView>
-                            </View>
-                            <View className="ml-2">
-                                <Text className="text-xs font-bold text-gray-100">{driver.name}</Text>
-                                <Text className="text-[10px] text-gray-300">Conductor</Text>
-                            </View>
+            {/* Overlapping Driver Avatar */}
+            {driver && (
+                <View className="absolute left-4 top-28 z-10">
+                    <View className="relative">
+                        <Image
+                            source={{ uri: driver.avatar || "https://via.placeholder.com/150" }}
+                            className="w-14 h-14 rounded-full border-[3px] border-[#1C2431]"
+                        />
+                        {/* Status/Rating Badge */}
+                        <View className="absolute bottom-0 right-0 bg-[#10B981] rounded-full px-1 border-2 border-[#1C2431]">
+                            <Text className="text-[8px] font-bold text-white">
+                                ★ {driver.rating.toFixed(1)}
+                            </Text>
                         </View>
-                    )}
-
-                    <View className="my-2 min-h-[32px]">
-                        {/* Passengers List */}
-                        {(passengersData.length > 0 || passengerCount > 0) && (
-                            <View className="flex-row items-center">
-                                {displayPassengers.map((p, i) => (
-                                    <View
-                                        key={p ? p.id : i}
-                                        style={{
-                                            marginLeft: i === 0 ? 0 : -12,
-                                            zIndex: 30 - i,
-                                        }}
-                                    >
-                                        {p ? (
-                                            <Image
-                                                source={{ uri: p.avatar }}
-                                                className="w-8 h-8 rounded-full border-2 border-white"
-                                            />
-                                        ) : (
-                                            <ThemedView
-                                                lightColor={Colors.light.primary}
-                                                className="w-8 h-8 rounded-full border-2 border-white opacity-80"
-                                            />
-                                        )}
-                                    </View>
-                                ))}
-                                {showExtraCount && (
-                                    <ThemedText className="ml-2 text-sm">
-                                        +{extraPassengers}
-                                    </ThemedText>
-                                )}
-                            </View>
-                        )}
                     </View>
                 </View>
-                <View className="justify-around">
-                    <View className="w-44 h-28">
-                        <Image
-                            source={
-                                imageUrl && !imageError
-                                    ? { uri: imageUrl }
-                                    : require('@/assets/images/mapExample.png')
-                            }
-                            onError={() => setImageError(true)}
-                            resizeMode="cover"
-                            className="w-full h-full rounded-2xl" />
+            )}
+
+            {/* Card Content */}
+            <View className="pt-10 px-4 pb-4 bg-[#1C2431]">
+                {/* Title */}
+                <ThemedText
+                    lightColor="white"
+                    darkColor="white"
+                    className="text-lg font-bold mb-1"
+                    numberOfLines={1}
+                >
+                    {title}
+                </ThemedText>
+
+
+                {/* Route Text */}
+                <ThemedText
+                    lightColor="#D1D5DB"
+                    darkColor="#D1D5DB"
+                    className="text-xs font-medium opacity-90 mb-3"
+                    numberOfLines={2}
+                >
+                    {startLocation} → {endLocation}
+                </ThemedText>
+
+                {/* Bottom Row: Action Button + Seats (right side) */}
+                <View className="flex-row justify-between items-center mt-3">
+                    {/* Action Button (Left) */}
+                    {isActive === "active" ? (
+                        <Pressable
+                            style={{ backgroundColor: Colors.light.secondary }}
+                            className="rounded-xl py-2 px-6 items-center justify-center"
+                            onPress={() => router.push(routeScreen)}
+                        >
+                            <Text className="text-xs font-bold text-[#1C2431]">Ver</Text>
+                        </Pressable>
+                    ) : isActive === "pending" ? (
+                        <Pressable
+                            style={{ backgroundColor: Colors.light.secondary }}
+                            className="rounded-xl py-2 px-6 items-center justify-center"
+                            onPress={user?.driver_mode ? handleStartTrip : () => router.push(routeScreen)}
+                        >
+                            <Text className="text-xs font-bold text-[#1C2431]">
+                                {user?.driver_mode ? "Iniciar" : "Ver"}
+                            </Text>
+                        </Pressable>
+                    ) : null}
+
+                    {/* Seat Icons (Bottom Right) */}
+                    <View className="flex-row space-x-1">
+                        {[0, 1, 2, 3].map((index) => {
+                            const occupiedCount = passengersData.length > 0 ? passengersData.length : passengerCount;
+                            const isOccupied = index < occupiedCount;
+                            return (
+                                <MaterialCommunityIcons
+                                    key={index}
+                                    name="car-seat"
+                                    size={20}
+                                    color={isOccupied ? "#10B981" : "#6B7280"}
+                                />
+                            );
+                        })}
                     </View>
-                    {isActive === "active" ?
-                        (
-                            <Pressable
-                                style={{ backgroundColor: Colors.light.primary }}
-                                className="rounded-full p-2 mt-4"
-                                onPress={() => router.push(routeScreen)}
-                            >
-                                <Text className="text-lg text-center text-white">
-                                    {"Ver"}
-                                </Text>
-                            </Pressable>
-                        )
-                        : isActive === "pending" ?
-                            (
-                                <Pressable
-                                    style={{ backgroundColor: Colors.light.primary }}
-                                    className="rounded-full p-2 mt-4"
-                                    onPress={user?.driver_mode ? handleStartTrip : () => router.push(routeScreen)}
-                                >
-                                    <Text className="text-lg text-center text-white">
-                                        {user?.driver_mode ? "Iniciar" : "Ver"}
-                                    </Text>
-                                </Pressable>
-                            )
-                            :
-                            (
-                                <View></View>
-                            )
-                    }
                 </View>
             </View>
         </ThemedView>

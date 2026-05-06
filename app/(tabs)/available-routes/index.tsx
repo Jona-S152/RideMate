@@ -8,10 +8,12 @@ import { Colors } from "@/constants/Colors";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { AvailableRoute, RouteData, RouteStop, SessionData, SessionStop } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
-import { ratingsService } from "@/services/ratings.service";
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useRef, useState } from "react";
-import { Animated, Easing, Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { Alert, Animated, Easing, Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { router } from "expo-router";
+import { useSession } from "@/app/context/SessionContext";
+import MasonryGrid from "@/components/common/MasonryGrid";
 
 export default function AvailableRoutesScreen() {
     const [text, setText] = useState<string>('');
@@ -23,17 +25,13 @@ export default function AvailableRoutesScreen() {
     const { user } = useAuth();
     const [routes, setRoutes] = useState<AvailableRoute[]>([]);
 
-    const primaryColor = useThemeColor({}, 'primary');
     const secondaryColor = useThemeColor({}, 'secondary');
     const tirdColor = useThemeColor({}, 'tird');
-    const backgroundColor = useThemeColor({}, 'background');
-    const textColor = useThemeColor({}, 'text');
 
     useEffect(() => {
         fetchRoutes();
     }, [user?.driver_mode]);
 
-    // Suscripción en tiempo real para pasajeros
     useEffect(() => {
         if (!user || user.driver_mode) return;
 
@@ -52,186 +50,105 @@ export default function AvailableRoutesScreen() {
         return () => {
             supabase.removeChannel(subscription);
         };
-    }, [user?.driver_mode]);
+    }, [user?.id, user?.driver_mode]);
 
     const fetchRoutes = async () => {
-        if (user === null) return;
-        setRefreshing(true);
+        try {
+            if (user?.driver_mode) {
+                const { data, error } = await supabase
+                    .from('routes')
+                    .select('*, stops(*)');
 
-        let query;
+                if (error) throw error;
+                setRoutes(data || []);
+            } else {
+                const { data, error } = await supabase
+                    .from('trip_sessions')
+                    .select(`
+                        *,
+                        driver:users!driver_id (
+                            name,
+                            avatar_profile
+                        ),
+                        routes (
+                            image_url
+                        ),
+                        trip_session_stops (
+                            *,
+                            stop:stops (*)
+                        ),
+                        passengers:passenger_trip_sessions (
+                            passenger:users!passenger_id (
+                                id,
+                                avatar_profile
+                            )
+                        )
+                    `)
+                    .eq('status', 'pending');
 
-        if (user.driver_mode) {
-            query = supabase
-                .from("routes")
-                .select(`
-                    id,
-                    start_location,
-                    end_location,
-                    start_coords,
-                    end_coords,
-                    image_url,
-                    stops (
-                        id,
-                        location,
-                        coords,
-                        stop_order
-                    )
-                `);
-        } else {
-            query = supabase
-                .from("trip_sessions")
-                .select(`
-                    id,
-                    route_id,
-                    routes (
-                        image_url
-                    ),
-                    driver_id,
-                    status,
-                    start_location,
-                    end_location,
-                    start_coords,
-                    end_coords,
-                    trip_session_stops (
-                        id,
-                        stop_id,
-                        status,
-                        visit_time
-                    ),
-                    passenger_trip_sessions (
-                        id,
-                        status,
-                        rejected
-                    )
-                `)
-                .in('status', ['pending', 'active']);
-        }
+                if (error) throw error;
 
-        const { data, error } = await query;
-        if (data) console.log("🔍 ROUTES DATA:", JSON.stringify(data[0], null, 2));
+                const formattedRoutes = data.map(session => ({
+                    ...session,
+                    driver_name: session.driver?.name,
+                    driver_avatar: session.driver?.avatar_profile,
+                    driver_rating: session.driver?.rating,
+                    passengers_data: session.passengers?.map((p: any) => ({
+                        id: p.passenger?.id,
+                        avatar: p.passenger?.avatar_profile
+                    })) || []
+                }));
 
-        if (!error && data) {
-            let validRoutes = (data as any[]).filter(route => {
-                const associatedPassengers = route.passenger_trip_sessions?.filter((p: any) =>
-                    (p.status === 'joined' || p.status === 'pending_approval') && !p.rejected
-                ) || [];
-                return associatedPassengers.length < 4;
-            });
-
-            // Si somos pasajeros, traemos info del conductor y pasajeros
-            if (!user.driver_mode && validRoutes.length > 0) {
-                const driverIds = validRoutes.map(r => r.driver_id).filter(Boolean);
-                const ratingsMap = await ratingsService.getUsersRatings(driverIds);
-
-                // Fetch driver details
-                const { data: drivers } = await supabase
-                    .from("users")
-                    .select("id, name, avatar_profile")
-                    .in("id", driverIds);
-
-                // Collect all passenger IDs across all routes
-                let allPassengerIds: string[] = [];
-                validRoutes.forEach(route => {
-                    const joined = route.passenger_trip_sessions?.filter((p: any) => p.status === 'joined') || [];
-                    joined.forEach((p: any) => allPassengerIds.push(p.passenger_id));
-                });
-
-                // Fetch all passenger avatars
-                let passengersMap: Record<string, any> = {};
-                if (allPassengerIds.length > 0) {
-                    const { data: passengersData } = await supabase
-                        .from("users")
-                        .select("id, avatar_profile")
-                        .in("id", allPassengerIds);
-
-                    passengersData?.forEach(u => {
-                        passengersMap[u.id] = u;
-                    });
-                }
-
-                validRoutes = validRoutes.map(r => {
-                    const driver = drivers?.find(d => d.id === r.driver_id);
-
-                    // Map passengers for this route
-                    const routePassengers = r.passenger_trip_sessions
-                        ?.filter((p: any) => p.status === 'joined')
-                        .map((p: any) => {
-                            const user = passengersMap[p.passenger_id];
-                            return user ? { id: user.id, avatar: user.avatar_profile } : null;
-                        })
-                        .filter(Boolean) || [];
-
-                    return {
-                        ...r,
-                        driver_name: driver?.name,
-                        driver_avatar: driver?.avatar_profile,
-                        driver_rating: ratingsMap[r.driver_id]?.rating || 0,
-                        passengers_data: routePassengers
-                    };
-                });
+                setRoutes(formattedRoutes);
             }
-
-            setRoutes(validRoutes);
-        } else if (error) {
-            console.log("ERROR ROUTES:", error);
+        } catch (error) {
+            console.error('Error fetching routes:', error);
         }
+    };
 
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await fetchRoutes();
         setRefreshing(false);
     };
-
-    const onRefresh = () => {
-        fetchRoutes();
-    };
-
 
     useEffect(() => {
         Animated.timing(slideAnim, {
             toValue: visibleFilters ? 1 : 0,
             duration: 300,
-            easing: Easing.out(Easing.ease),
+            easing: Easing.out(Easing.quad),
             useNativeDriver: true,
         }).start();
     }, [visibleFilters]);
 
-    const translateY = slideAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [-20, 0]
-    })
-
     const opacity = slideAnim.interpolate({
         inputRange: [0, 1],
         outputRange: [0, 1],
-    })
+    });
 
     const switchVisibleFilters = () => setVisibleFilters(visiblePrev => !visiblePrev);
 
-    // Identificar qué filtro usar (si no están visibles, usar 'nombreRuta' por defecto)
     const activeFilter = visibleFilters ? selectedFilter : 'nombreRuta';
 
-    // Lógica de filtrado
     const filteredRoutes = routes.filter(route => {
         if (!text) return true;
         const searchLower = text.toLowerCase();
 
         switch (activeFilter) {
             case 'puntoPartida':
-                return route.start_coords.coordinates[0].toString().toLowerCase().includes(searchLower);
+                return route.start_location.toLowerCase().includes(searchLower);
             case 'puntoFinal':
-                return route.end_coords.coordinates[0].toString().toLowerCase().includes(searchLower);
-            case 'nombreRuta':
-                // Buscamos si el origen o el destino coinciden (comportamiento por defecto)
-                return route.start_coords.coordinates[0].toString().toLowerCase().includes(searchLower) ||
-                    route.end_coords.coordinates[0].toString().toLowerCase().includes(searchLower);
+                return route.end_location.toLowerCase().includes(searchLower);
             default:
-                return route.start_coords.coordinates[0].toString().toLowerCase().includes(searchLower);
+                return route.start_location.toLowerCase().includes(searchLower) || 
+                       route.end_location.toLowerCase().includes(searchLower);
         }
     });
 
     return (
-        <View className="flex-1">
+        <View style={{ flex: 1 }}>
             <ThemedView lightColor={Colors.light.primary} darkColor={Colors.dark.primary} className="w-full px-4 py-6 rounded-bl-[40px]">
-                <ThemedText
-                    className="font-semibold text-4xl py-3">
+                <ThemedText className="font-semibold text-4xl py-3">
                     Hola, {user?.name}
                 </ThemedText>
                 <View className="flex-row items-center mb-4">
@@ -242,26 +159,20 @@ export default function AvailableRoutesScreen() {
                         onChangeText={setText} value={text}
                         className="flex-1 mr-2"
                     />
-
                     <Pressable
                         onPress={switchVisibleFilters}
-                        style={{ backgroundColor: secondaryColor }} className="rounded-full justify-center items-center w-10 h-10">
-                        <Ionicons name="filter" size={30} color="black" />
+                        style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+                        className="bg-white/20 p-3 rounded-2xl"
+                    >
+                        <Ionicons name="options-outline" size={24} color="white" />
                     </Pressable>
                 </View>
+
                 {visibleFilters && (
-                    <Animated.View
-                        style={{
-                            transform: [{ translateY }],
-                            opacity,
-                        }}>
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            className="flex-row"
-                        >
+                    <Animated.View style={{ opacity, transform: [{ translateY: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }] }}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row mb-2">
                             {[
-                                { title: "Salida", value: "puntoPartida" },
+                                { title: "Partida", value: "puntoPartida" },
                                 { title: "Destino", value: "puntoFinal" },
                                 { title: "Ruta", value: "nombreRuta" },
                             ]
@@ -279,6 +190,7 @@ export default function AvailableRoutesScreen() {
                     </Animated.View>
                 )}
             </ThemedView>
+
             <View className="flex-1 mx-4 mt-4 mb-24">
                 <ScrollView
                     showsVerticalScrollIndicator={false}
@@ -297,64 +209,54 @@ export default function AvailableRoutesScreen() {
                             </ThemedText>
                         </View>
                     ) : (
-                        filteredRoutes.map((item) => {
+                        <MasonryGrid
+                            data={filteredRoutes}
+                            keyExtractor={(item) => item.id.toString()}
+                            renderItem={(item) => {
+                                const isRouteData = (route: AvailableRoute): route is RouteData =>
+                                    (route as RouteData).stops !== undefined;
 
-                            // 🚀 USAR TIPO GUARD (Type Predicate) para acceder a las propiedades específicas
+                                const currentStops = isRouteData(item) ? item.stops : (item as SessionData).trip_session_stops;
 
-                            const isDriverMode = user?.driver_mode;
-
-                            console.log('VALIDACIÓN ITEM: ', item);
-
-                            // Función para verificar si el ítem es una RouteData
-                            const isRouteData = (route: AvailableRoute): route is RouteData => {
-                                return (route as RouteData).stops !== undefined;
-                            };
-
-                            const isSessionData = (route: AvailableRoute): route is SessionData => {
-                                return (route as SessionData).trip_session_stops !== undefined;
-                            };
-
-                            const stopsData = isDriverMode
-                                ? (item as RouteData).stops // Acceso directo para el conductor
-                                : (item as SessionData).trip_session_stops; // Acceso directo para el pasajero
-
-                            // O mejor: Basado en la estructura del ítem
-                            const currentStops = isRouteData(item) ? item.stops : (item as SessionData).trip_session_stops;
-
-
-                            return (
-                                <AvailableRouteCard
-                                    key={item.id}
-                                    trip_session_id={item.id}
-                                    routeScreen={`/(tabs)/available-routes/route-detail?id=${item.id}`}
-                                    start={item.start_location}
-                                    end={item.end_location}
-
-                                    // Aquí usamos el operador ternario para acceder a la propiedad correcta
-                                    routeId={isRouteData(item) ? item.id : (item as SessionData).route_id}
-                                    startCoords={item.start_coords}
-                                    endCoords={item.end_coords}
-
-                                    // Mapeo adaptativo:
-                                    stops={currentStops.map(stop => ({
-                                        // item.id (para RouteStop) vs item.stop_id (para SessionStop)
-                                        stop_id: (stop as RouteStop).id || (stop as SessionStop).stop_id,
-                                        status: (stop as SessionStop).status || 'pending'
-                                    }))}
-                                    driverName={(item as any).driver_name}
-                                    driverAvatar={(item as any).driver_avatar}
-                                    driverRating={(item as any).driver_rating}
-                                    passengersData={(item as any).passengers_data}
-                                    imageUrl={
-                                        isRouteData(item)
-                                            ? (item as any).image_url
-                                            : Array.isArray((item as any).routes)
-                                                ? ((item as any).routes[0] as any)?.image_url
-                                                : ((item as any).routes as any)?.image_url
-                                    }
-                                />
-                            );
-                        })
+                                return (
+                                    <AvailableRouteCard
+                                        key={item.id}
+                                        trip_session_id={item.id}
+                                        routeScreen={`/(tabs)/available-routes/route-detail?id=${item.id}`}
+                                        start={item.start_location}
+                                        end={item.end_location}
+                                        routeId={isRouteData(item) ? item.id : (item as SessionData).route_id}
+                                        startCoords={item.start_coords}
+                                        endCoords={item.end_coords}
+                                        stops={currentStops.map(stop => ({
+                                            stop_id: (stop as RouteStop).id || (stop as SessionStop).stop_id,
+                                            status: (stop as SessionStop).status || 'pending'
+                                        }))}
+                                        driverName={(item as any).driver_name}
+                                        driverAvatar={(item as any).driver_avatar}
+                                        driverRating={(item as any).driver_rating}
+                                        passengersData={(item as any).passengers_data}
+                                        isDriver={user?.driver_mode === true}
+                                        imageUrl={
+                                            isRouteData(item)
+                                                ? (item as any).image_url
+                                                : Array.isArray((item as any).routes)
+                                                    ? ((item as any).routes[0] as any)?.image_url
+                                                    : ((item as any).routes as any)?.image_url
+                                        }
+                                        onPress={() => {
+                                            router.push({
+                                                pathname: "/(tabs)/available-routes/route-preview",
+                                                params: {
+                                                    id: item.id,
+                                                    type: isRouteData(item) ? 'route' : 'session'
+                                                }
+                                            });
+                                        }}
+                                    />
+                                );
+                            }}
+                        />
                     )}
                 </ScrollView>
             </View>

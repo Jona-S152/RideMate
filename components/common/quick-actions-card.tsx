@@ -1,7 +1,7 @@
 import { Colors } from "@/constants/Colors";
 import { DarkTheme, DefaultTheme } from "@react-navigation/native";
-import { ThemedText } from "./ThemedText";
-import { ThemedView } from "./ThemedView";
+import { ThemedText } from "../ui/ThemedText";
+import { ThemedView } from "../ui/ThemedView";
 
 interface QuickActionCardProps {
     text: string

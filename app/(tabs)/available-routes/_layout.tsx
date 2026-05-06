@@ -22,6 +22,9 @@ export default function HomeStackLayout() {
       <Stack.Screen name="selection-map-screen" options={{
         headerShown: false
       }} />
+      <Stack.Screen name="route-preview" options={{
+        headerShown: false
+      }} />
     </Stack>
   );
 }

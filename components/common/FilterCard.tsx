@@ -1,6 +1,6 @@
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { Pressable } from "react-native";
-import { ThemedText } from "./ThemedText";
+import { ThemedText } from "../ui/ThemedText";
 
 interface FilterCardProps {
     title: string,

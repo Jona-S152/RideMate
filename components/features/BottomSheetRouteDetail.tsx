@@ -10,8 +10,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Image, Pressable, ScrollView, View } from "react-native";
 import { FlatList } from "react-native-gesture-handler";
 import Animated, { interpolate, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
-import { ThemedText } from "./ThemedText";
-import { ThemedView } from "./ThemedView";
+import { ThemedText } from "../ui/ThemedText";
+import { ThemedView } from "../ui/ThemedView";
 
 interface BottomSheetRouteDetailProps {
   passengers?: PassengerTripSession[];

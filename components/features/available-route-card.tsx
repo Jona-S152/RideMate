@@ -1,18 +1,15 @@
-import { useAuth } from "@/app/context/AuthContext";
-import { useSession } from "@/app/context/SessionContext";
 import { Colors } from "@/constants/Colors";
 import { Coords } from "@/interfaces/available-routes";
-import { supabase } from "@/lib/supabase";
-import { DefaultTheme } from "@react-navigation/native";
-import { Href, router } from "expo-router";
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { Href } from "expo-router";
 import { useState } from "react";
-import { Alert, Image, Pressable, Text, View } from "react-native";
-import { ThemedText } from "./ThemedText";
-import { ThemedView } from "./ThemedView";
+import { Image, Text, TouchableOpacity, View } from "react-native";
+import { ThemedText } from "../ui/ThemedText";
+import { ThemedView } from "../ui/ThemedView";
 
 interface StopData {
     stop_id: number;
-    status: string; // Por ejemplo: 'upcoming'
+    status: string;
 }
 
 interface DriverRouteCardProps {
@@ -23,7 +20,7 @@ interface DriverRouteCardProps {
     routeId: number;
     startCoords: Coords;
     endCoords: Coords;
-    stops: StopData[]; // Lista de stops con su ID y estado inicial
+    stops: StopData[];
     trip_session_id: number;
     driverName?: string;
     driverAvatar?: string;
@@ -33,283 +30,115 @@ interface DriverRouteCardProps {
         avatar: string;
     }[];
     imageUrl?: string;
+    isDriver?: boolean;
+    onPress?: () => void;
 }
 
 export default function AvailableRouteCard({
-    routeScreen,
     start,
     end,
     passengers = 0,
-    routeId,
-    startCoords,
-    endCoords,
-    stops,
-    trip_session_id,
     driverName,
     driverAvatar,
     driverRating,
     passengersData = [],
-    imageUrl
+    imageUrl,
+    isDriver = false,
+    onPress,
 }: DriverRouteCardProps) {
 
-    const { user } = useAuth();
-    const { setSessionChanged } = useSession();
-
-    const routeSelectionMap: Href = "/(tabs)/available-routes/selection-map-screen";
-
     const [imageError, setImageError] = useState(false);
-
-    const displayPassengers = passengersData.length > 0
-        ? passengersData
-        : Array(Math.min(passengers, 3)).fill(null);
-
-    const extraPassengers = passengers - (passengersData.length > 0 ? passengersData.length : 3);
-    const showExtraCount = passengersData.length > 0 ? false : (passengers > 3);
-
-    const handleJoinTrip = async () => {
-        if (!user || user.driver_mode === true) {
-            console.log("❌ Cancelando join: Usuario nulo o modo conductor activado.", { user: !!user, driverMode: user?.driver_mode });
-            return;
-        }
-        console.log("✅ Validación de usuario/modo pasó. Iniciando verificación de viaje...");
-
-        try {
-            const { data: sessionTrip, error } = await supabase
-                .from('passenger_trip_sessions')
-                .select("*")
-                .eq("passenger_id", user.id)
-                .in("status", ["joined"])
-                .maybeSingle();
-
-            console.log(sessionTrip);
-
-            if (error) {
-                console.error(error);
-                Alert.alert("Error verificando viaje");
-                return;
-            }
-
-            if (sessionTrip) {
-                Alert.alert("No se pudo solicitar el viaje.", "Ya tiene un viaje en curso");
-                return;
-            }
-
-            console.log("Intentando navegar a selección de mapa:", routeSelectionMap);
-            router.push({
-                pathname: routeSelectionMap, // Crea esta ruta
-                params: {
-                    trip_session_id: trip_session_id,
-                    start_name: start,
-                    end_name: end
-                }
-            });
-            // Insertar participación del pasajero
-            // const { error: insertError } = await supabase
-            //     .from('passenger_trip_sessions')
-            //     .insert([
-            //         {
-            //             trip_session_id: trip_session_id,
-            //             passenger_id: user.id,
-            //             status: 'joined',      // el conductor debe aceptar
-            //             rejected: false,
-            //             rejection_reason: null
-            //         }
-            //     ]);
-
-            // if (insertError) throw insertError;
-
-            // setSessionChanged(true);
-            // router.replace("/(tabs)/home");
-
-            // Si quieres redirigir:
-            // router.push(routeScreen);
-
-        } catch (error: any) {
-            console.error("Error al unirse al viaje:", error.message);
-            Alert.alert("Error", "No se pudo solicitar unirse al viaje.");
-        }
-    };
-
-    const handleStartTrip = async () => {
-        if (!user || user.driver_mode !== true) {
-            return router.push(routeScreen);
-        }
-
-        try {
-
-            const { data: session, error: sError } = await supabase
-                .from("trip_sessions")
-                .select("*")
-                .eq("driver_id", user.id)
-                .in("status", ["pending", "active"])
-                .maybeSingle();
-
-            if (sError) {
-                console.error(sError);
-                Alert.alert("Error verificando viaje");
-                return;
-            }
-
-            if (session) {
-                Alert.alert("No se pudo iniciar el viaje.", "Ya tiene un viaje en curso");
-                return;
-            }
-
-            const { data: sessionData, error: sessionError } = await supabase
-                .from('trip_sessions')
-                .insert([
-                    {
-                        route_id: routeId,
-                        driver_id: user.id,
-                        status: 'pending',
-                        start_location: start,
-                        end_location: end,
-                        start_time: new Date().toISOString(),
-                        start_coords: startCoords,
-                        end_coords: endCoords,
-                        is_active: true,
-                    },
-                ])
-                .select()
-                .single();
-
-            if (sessionError) throw sessionError;
-
-            const newTripSessionId = sessionData.id;
-
-            console.log(sessionData);
-
-            const stopsToInsert = stops.map(stop => ({
-                trip_session_id: newTripSessionId,
-                stop_id: stop.stop_id,
-                status: stop.status
-            }));
-
-            const { error: stopsError } = await supabase
-                .from('trip_session_stops')
-                .insert(stopsToInsert);
-
-            if (stopsError) throw stopsError;
-
-            setSessionChanged(true);
-            router.replace("/(tabs)/home");
-
-        } catch (error: any) {
-            console.error("Error al iniciar el viaje:", error.message);
-            Alert.alert("Error", "No se pudo iniciar el viaje. Por favor, intentalo de nuevo.");
-        }
-    }
+    const occupiedCount = passengersData.length > 0 ? passengersData.length : passengers;
 
     return (
-        <ThemedView
-            lightColor={Colors.light.historyCard.background}
-            darkColor={Colors.light.historyCard.background}
-            className="flex-1 justify-center rounded-[28px] m-2 p-5"
+        <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+                console.log("Card pressed!", start);
+                onPress?.();
+            }}
         >
-            <ThemedText
-                lightColor={Colors.light.textBlack}
-                className="text-sm font-bold"
+            <ThemedView
+                lightColor={Colors.light.historyCard.background}
+                darkColor={Colors.light.historyCard.background}
+                className="rounded-[24px] m-1 overflow-hidden relative"
+                style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}
             >
-                {start} - {end}
-            </ThemedText>
-            <View className="flex-row justify-between">
-                <View className="flex-1 pr-4">
+                {/* Hero Map Image */}
+                <View className="w-full h-36 bg-gray-700">
+                    <Image
+                        source={
+                            imageUrl && !imageError
+                                ? { uri: imageUrl }
+                                : require('@/assets/images/mapExample.png')
+                        }
+                        onError={() => setImageError(true)}
+                        resizeMode="cover"
+                        className="w-full h-full"
+                    />
+                </View>
 
-                    <ThemedText lightColor={DefaultTheme.colors.text} className="text-base font-normal mt-2">
-                        Punto de partida
-                    </ThemedText>
-                    <ThemedText lightColor={DefaultTheme.colors.text} className="text-sm font-light mb-2">
-                        {start.split(',')[0]}
-                    </ThemedText>
-
-                    <ThemedText lightColor={DefaultTheme.colors.text} className="text-base font-normal">
-                        Punto final
-                    </ThemedText>
-                    <ThemedText lightColor={DefaultTheme.colors.text} className="text-sm font-light">
-                        {end.split(',')[0]}
-                    </ThemedText>
-
-                    {driverName && (
-                        <View className="flex-row items-center mt-3">
+                {/* Overlapping Driver Avatar */}
+                {driverName && (
+                    <View className="absolute left-4 top-28 z-10">
+                        <View className="relative">
                             <Image
                                 source={{ uri: driverAvatar || "https://via.placeholder.com/150" }}
-                                className="w-8 h-8 rounded-full border border-gray-200"
+                                className="w-14 h-14 rounded-full border-[3px] border-[#1C2431]"
                             />
-                            <View className="ml-2">
-                                <Text className="text-xs font-bold text-gray-700">{driverName}</Text>
-                                <View className="flex-row items-center">
-                                    <Text className="text-[10px] text-gray-500">⭐ {driverRating || "0.0"}</Text>
-                                </View>
+                            <View className="absolute bottom-0 right-0 bg-[#10B981] rounded-full px-1 border-2 border-[#1C2431]">
+                                <Text className="text-[8px] font-bold text-white">
+                                    ★ {driverRating ? driverRating.toFixed(1) : "0.0"}
+                                </Text>
                             </View>
                         </View>
-                    )}
-                    {!user?.driver_mode && (
-                        <View className="my-3">
-                            <View className="flex-row items-center">
-                                {displayPassengers.map((p, i) => (
-                                    <View
-                                        key={p ? p.id : i}
-                                        style={{
-                                            marginLeft: i === 0 ? 0 : -12,
-                                            zIndex: 30 - i,
-                                        }}
-                                    >
-                                        {p ? (
-                                            <Image
-                                                source={{ uri: p.avatar }}
-                                                className="w-8 h-8 rounded-full border-2 border-white"
-                                            />
-                                        ) : (
-                                            <ThemedView
-                                                lightColor={Colors.light.primary}
-                                                className="w-8 h-8 rounded-full border-2 border-white opacity-40"
-                                            />
-                                        )}
-                                    </View>
-                                ))}
-                                {showExtraCount && (
-                                    <ThemedText className="ml-2 text-sm">
-                                        +{extraPassengers}
-                                    </ThemedText>
-                                )}
-                            </View>
-                        </View>
-                    )}
-                </View>
-
-                <View className="justify-around">
-                    <View className="w-40 h-28">
-                        <Image
-                            source={
-                                imageUrl && !imageError
-                                    ? { uri: imageUrl } // Usar la URL exacta de la base de datos
-                                    : require('@/assets/images/mapExample.png')
-                            }
-                            onError={() => setImageError(true)}
-                            resizeMode="cover"
-                            className="w-full h-full rounded-2xl"
-                        />
                     </View>
-                    <Pressable
-                        style={{ backgroundColor: Colors.light.secondary }}
-                        className="rounded-full p-2 mt-4"
-                        onPress={() => {
-                            console.log("🔘 Botón presionado. Modo conductor:", user?.driver_mode);
-                            if (user?.driver_mode) {
-                                handleStartTrip();
-                            } else {
-                                console.log("➡️ Llamando a handleJoinTrip...");
-                                handleJoinTrip();
-                            }
-                        }}
-                    >
-                        <Text className="text-lg text-center">
-                            {user?.driver_mode ? "Iniciar" : "Entrar"}
-                        </Text>
-                    </Pressable>
-                </View>
-            </View>
+                )}
 
-        </ThemedView>
+                {/* Card Content */}
+                <View className="pt-10 px-4 pb-4 bg-[#1C2431]">
+                    {/* Driver Name */}
+                    <ThemedText
+                        lightColor="white"
+                        darkColor="white"
+                        className="text-base font-bold mb-1"
+                        numberOfLines={1}
+                    >
+                        {driverName ?? "Ruta"}
+                    </ThemedText>
+
+                    {/* Route Text */}
+                    <ThemedText
+                        lightColor="#D1D5DB"
+                        darkColor="#D1D5DB"
+                        className="text-xs font-medium opacity-90 mb-2"
+                        numberOfLines={2}
+                    >
+                        {start.split(',')[0]} → {end.split(',')[0]}
+                    </ThemedText>
+
+                    {/* Bottom Row: hint + seat icons */}
+                    <View className="flex-row justify-between items-center mt-1">
+                        <Text className="text-[#6B7280] text-[10px]">
+                            {isDriver ? "Toca para iniciar" : ""}
+                        </Text>
+
+                        {/* Seat Icons — only for passengers */}
+                        {!isDriver && (
+                            <View className="flex-row" style={{ gap: 4 }}>
+                                {[0, 1, 2, 3].map((index) => (
+                                    <MaterialCommunityIcons
+                                        key={index}
+                                        name="car-seat"
+                                        size={18}
+                                        color={index < occupiedCount ? "#10B981" : "#6B7280"}
+                                    />
+                                ))}
+                            </View>
+                        )}
+                    </View>
+                </View>
+            </ThemedView>
+        </TouchableOpacity>
     );
 }
