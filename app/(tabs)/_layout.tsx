@@ -18,7 +18,7 @@ export default function TabLayout() {
     pathName.includes(route),
   ); // Colocar rutas secundarias
 
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const pathname = usePathname();
 
   if (token === undefined) return null;
@@ -76,7 +76,7 @@ export default function TabLayout() {
         options={{
           headerShown: false,
           tabBarIcon: ({ color }) => (
-            <FontAwesome5 size={28} name="route" color={color} />
+            <FontAwesome5 size={28} name={user?.driver_mode ? "plus" : "route"} color={color} />
           ),
         }}
       />

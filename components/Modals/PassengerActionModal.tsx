@@ -73,8 +73,8 @@ export default function PassengerActionModal({
                 name: userData.name,
                 avatar_profile: userData.avatar_profile,
                 pickup_location: meetingData?.location || "Punto desconocido",
-                pickup_latitude: meetingData?.coords.latitude,
-                pickup_longitude: meetingData?.coords.longitude,
+                pickup_latitude: meetingData?.coords?.coordinates?.[1],
+                pickup_longitude: meetingData?.coords?.coordinates?.[0],
                 rating: ratingInfo.rating,
             });
 
@@ -190,7 +190,7 @@ export default function PassengerActionModal({
                                 <View className="w-full h-40 rounded-xl overflow-hidden mb-4 border border-slate-200">
                                     <Mapbox.MapView
                                         style={StyleSheet.absoluteFillObject}
-                                        styleURL={Mapbox.StyleURL.Street}
+                                        styleURL={Mapbox.StyleURL.TrafficNight}
                                         scrollEnabled={false}
                                         zoomEnabled={false}
                                         pitchEnabled={false}

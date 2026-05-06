@@ -20,9 +20,8 @@ import Mapbox, {
   Camera,
   LineLayer,
   MarkerView,
-  PointAnnotation,
   ShapeSource,
-  UserLocation,
+  UserLocation
 } from "@rnmapbox/maps";
 
 // REEMPLAZA ESTO CON TU CLAVE REAL DE MAPBOX
@@ -164,11 +163,13 @@ export default function RouteDetail() {
 
     // console.log("Checking session status for ID:", id, "Status:", session.status);
 
+    /*
     if (session.status === "completed") {
       // Temporary Debug Alert to catch why it redirects on start
       // Alert.alert("DEBUG", `Session ${id} is completed. Redirecting.`);
       router.navigate("/(tabs)/home");
     }
+    */
   }, [session]);
 
   const fetchStops = async () => {
@@ -210,9 +211,9 @@ export default function RouteDetail() {
       id: 'origin',
       type: 'origin',
       location: session.start_location,
-      coords: { 
-        latitude: Number(session.start_coords?.coordinates?.[1] ?? 0), 
-        longitude: Number(session.start_coords?.coordinates?.[0] ?? 0) 
+      coords: {
+        latitude: Number(session.start_coords?.coordinates?.[1] ?? 0),
+        longitude: Number(session.start_coords?.coordinates?.[0] ?? 0)
       },
       order: 0,
     });
@@ -290,9 +291,9 @@ export default function RouteDetail() {
       id: 'destination',
       type: 'destination',
       location: session.end_location,
-      coords: { 
-        latitude: Number(session.end_coords?.coordinates?.[1] ?? 0), 
-        longitude: Number(session.end_coords?.coordinates?.[0] ?? 0) 
+      coords: {
+        latitude: Number(session.end_coords?.coordinates?.[1] ?? 0),
+        longitude: Number(session.end_coords?.coordinates?.[0] ?? 0)
       },
       order: allWaypoints.length,
     });
@@ -315,10 +316,10 @@ export default function RouteDetail() {
 
     if (nextTarget) {
       const distKm = calculateDistance(
-        driverLocation.coords.latitude,
-        driverLocation.coords.longitude,
-        nextTarget.coords.latitude,
-        nextTarget.coords.longitude
+        driverLocation.coords?.latitude ?? 0,
+        driverLocation.coords?.longitude ?? 0,
+        nextTarget.coords?.latitude ?? 0,
+        nextTarget.coords?.longitude ?? 0
       );
       setDistanceToNextPoint(formatDistance(distKm));
     } else {
@@ -577,7 +578,7 @@ export default function RouteDetail() {
 
   useEffect(() => {
     // Solo centrar automáticamente si el viaje acaba de activarse o es la primera vez que tenemos ubicación
-    if (session?.status === "active" && driverLocation && !region) {
+    if (session?.status === "active" && driverLocation?.coords && !region) {
       cameraRef.current?.setCamera({
         centerCoordinate: [driverLocation.coords.longitude, driverLocation.coords.latitude],
         zoomLevel: 15,
@@ -804,7 +805,7 @@ export default function RouteDetail() {
         {/* Mapa de Mapbox - Siempre montado */}
         <Mapbox.MapView
           ref={mapRef}
-          styleURL={Mapbox.StyleURL.Street}
+          styleURL={Mapbox.StyleURL.TrafficNight}
           style={StyleSheet.absoluteFillObject}
           localizeLabels={true}
         >
@@ -825,136 +826,136 @@ export default function RouteDetail() {
             />
           )}
 
-            {driverLocation?.coords ? (
+          {driverLocation?.coords ? (
+            <MarkerView
+              id="driver"
+              coordinate={[
+                isNaN(Number(driverLocation.coords.longitude)) ? 0 : Number(driverLocation.coords.longitude),
+                isNaN(Number(driverLocation.coords.latitude)) ? 0 : Number(driverLocation.coords.latitude)
+              ]}
+              anchor={{ x: 0.5, y: 0.5 }}
+            >
+              <View style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="car-sport" size={30} color="#000D3A" />
+              </View>
+            </MarkerView>
+          ) : null}
+
+
+
+          {/* Dibuja la Ruta */}
+          {sessionLoaded && routeGeoJSON && (
+            <ShapeSource id="routeSource" shape={routeGeoJSON}>
+              <LineLayer
+                id="routeLine"
+                style={{
+                  lineColor: "#00E5FF",
+                  lineWidth: 6,
+                  lineJoin: "round",
+                  lineCap: "round",
+                }}
+              />
+            </ShapeSource>
+          )}
+
+          {sessionLoaded && session?.start_coords?.coordinates ? (() => {
+            const lng = Number(session.start_coords.coordinates[0]);
+            const lat = Number(session.start_coords.coordinates[1]);
+            if (isNaN(lng) || isNaN(lat) || (lng === 0 && lat === 0)) return null;
+
+            return (
               <MarkerView
-                id="driver"
-                coordinate={[
-                  isNaN(Number(driverLocation.coords.longitude)) ? 0 : Number(driverLocation.coords.longitude),
-                  isNaN(Number(driverLocation.coords.latitude)) ? 0 : Number(driverLocation.coords.latitude)
-                ]}
-                anchor={{ x: 0.5, y: 0.5 }}
+                id="start-point"
+                coordinate={[lng, lat]}
+                anchor={{ x: 0.5, y: 1 }}
               >
-                <View style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="car-sport" size={30} color="#000D3A" />
+                <View style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
+                  <View className="items-center">
+                    <View className="bg-white p-1 rounded-full shadow-md">
+                      <Ionicons name="flag" size={24} color="#22c55e" />
+                    </View>
+                    {/* <Text className="bg-white/80 px-1 text-[8px] font-bold">Inicio</Text> */}
+                  </View>
                 </View>
               </MarkerView>
-            ) : null}
+            );
+          })() : null}
 
+          {/* Marcadores para las Paradas */}
+          {sessionLoaded && stopsData?.map((stop, index) => {
+            const coords = stop.coords as any;
+            const lng = Number(coords?.longitude ?? coords?.coordinates?.[0] ?? 0);
+            const lat = Number(coords?.latitude ?? coords?.coordinates?.[1] ?? 0);
 
+            if (isNaN(lng) || isNaN(lat) || (lng === 0 && lat === 0)) return null;
 
-            {/* Dibuja la Ruta */}
-            {sessionLoaded && routeGeoJSON && (
-              <ShapeSource id="routeSource" shape={routeGeoJSON}>
-                <LineLayer
-                  id="routeLine"
-                  style={{
-                    lineColor: "#FCA311",
-                    lineWidth: 6,
-                    lineJoin: "round",
-                    lineCap: "round",
-                  }}
-                />
-              </ShapeSource>
-            )}
+            return (
+              <MarkerView
+                key={`stop-${index}`}
+                id={`stop-${index}`}
+                coordinate={[lng, lat]}
+                anchor={{ x: 0.5, y: 1 }}
+              >
+                <View style={{ width: 30, height: 30, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons
+                    name="location-sharp"
+                    size={24}
+                    color={Colors.light.primary}
+                  />
+                </View>
+              </MarkerView>
+            );
+          })}
 
-            {sessionLoaded && session?.start_coords?.coordinates ? (() => {
-              const lng = Number(session.start_coords.coordinates[0]);
-              const lat = Number(session.start_coords.coordinates[1]);
-              if (isNaN(lng) || isNaN(lat) || (lng === 0 && lat === 0)) return null;
-              
-              return (
-                <MarkerView
-                  id="start-point"
-                  coordinate={[lng, lat]}
-                  anchor={{ x: 0.5, y: 1 }}
-                >
-                  <View style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
-                    <View className="items-center">
-                      <View className="bg-white p-1 rounded-full shadow-md">
-                        <Ionicons name="flag" size={24} color="#22c55e" />
-                      </View>
-                      <Text className="bg-white/80 px-1 text-[8px] font-bold">Inicio</Text>
+          {/* Meeting Point Markers */}
+          {sessionLoaded && meetingPoints?.map((mp, index) => {
+            const coords = mp.coords as any;
+            const lng = Number(coords?.longitude ?? coords?.coordinates?.[0] ?? 0);
+            const lat = Number(coords?.latitude ?? coords?.coordinates?.[1] ?? 0);
+
+            if (isNaN(lng) || isNaN(lat) || (lng === 0 && lat === 0)) return null;
+
+            return (
+              <MarkerView
+                key={`meeting-${mp.passenger_id}-${index}`}
+                id={`meeting-${mp.passenger_id}-${index}`}
+                coordinate={[lng, lat]}
+                anchor={{ x: 0.5, y: 1 }}
+              >
+                <View style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
+                  <View className="items-center">
+                    <View className="bg-[#000D3A] p-1 rounded-full shadow-md">
+                      <Ionicons name="person" size={18} color="white" />
                     </View>
+                    <Text className="bg-white/80 px-1 text-[8px] font-bold">Pasajero</Text>
                   </View>
-                </MarkerView>
-              );
-            })() : null}
+                </View>
+              </MarkerView>
+            );
+          })}
 
-            {/* Marcadores para las Paradas */}
-            {sessionLoaded && stopsData?.map((stop, index) => {
-              const coords = stop.coords as any;
-              const lng = Number(coords?.longitude ?? coords?.coordinates?.[0] ?? 0);
-              const lat = Number(coords?.latitude ?? coords?.coordinates?.[1] ?? 0);
-              
-              if (isNaN(lng) || isNaN(lat) || (lng === 0 && lat === 0)) return null;
+          {sessionLoaded && session?.end_coords?.coordinates ? (() => {
+            const lng = Number(session.end_coords.coordinates[0]);
+            const lat = Number(session.end_coords.coordinates[1]);
+            if (isNaN(lng) || isNaN(lat) || (lng === 0 && lat === 0)) return null;
 
-              return (
-                <MarkerView
-                  key={`stop-${index}`}
-                  id={`stop-${index}`}
-                  coordinate={[lng, lat]}
-                  anchor={{ x: 0.5, y: 1 }}
-                >
-                  <View style={{ width: 30, height: 30, alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons
-                      name="location-sharp"
-                      size={24}
-                      color={Colors.light.primary}
-                    />
-                  </View>
-                </MarkerView>
-              );
-            })}
-
-            {/* Meeting Point Markers */}
-            {sessionLoaded && meetingPoints?.map((mp, index) => {
-              const coords = mp.coords as any;
-              const lng = Number(coords?.longitude ?? coords?.coordinates?.[0] ?? 0);
-              const lat = Number(coords?.latitude ?? coords?.coordinates?.[1] ?? 0);
-
-              if (isNaN(lng) || isNaN(lat) || (lng === 0 && lat === 0)) return null;
-
-              return (
-                <MarkerView
-                  key={`meeting-${mp.passenger_id}-${index}`}
-                  id={`meeting-${mp.passenger_id}-${index}`}
-                  coordinate={[lng, lat]}
-                  anchor={{ x: 0.5, y: 1 }}
-                >
-                  <View style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
-                    <View className="items-center">
-                      <View className="bg-[#000D3A] p-1 rounded-full shadow-md">
-                        <Ionicons name="person" size={18} color="white" />
-                      </View>
-                      <Text className="bg-white/80 px-1 text-[8px] font-bold">Pasajero</Text>
+            return (
+              <MarkerView
+                id="end-point"
+                coordinate={[lng, lat]}
+                anchor={{ x: 0.5, y: 1 }}
+              >
+                <View style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
+                  <View className="items-center">
+                    <View className="bg-white p-1 rounded-full shadow-md">
+                      <Ionicons name="location" size={24} color="#ef4444" />
                     </View>
+                    {/* <Text className="bg-white/80 px-1 text-[8px] font-bold">Destino</Text> */}
                   </View>
-                </MarkerView>
-              );
-            })}
-
-            {sessionLoaded && session?.end_coords?.coordinates ? (() => {
-              const lng = Number(session.end_coords.coordinates[0]);
-              const lat = Number(session.end_coords.coordinates[1]);
-              if (isNaN(lng) || isNaN(lat) || (lng === 0 && lat === 0)) return null;
-
-              return (
-                <MarkerView
-                  id="end-point"
-                  coordinate={[lng, lat]}
-                  anchor={{ x: 0.5, y: 1 }}
-                >
-                  <View style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
-                    <View className="items-center">
-                      <View className="bg-white p-1 rounded-full shadow-md">
-                        <Ionicons name="location" size={24} color="#ef4444" />
-                      </View>
-                      <Text className="bg-white/80 px-1 text-[8px] font-bold">Destino</Text>
-                    </View>
-                  </View>
-                </MarkerView>
-              );
-            })() : null}
+                </View>
+              </MarkerView>
+            );
+          })() : null}
         </Mapbox.MapView>
 
         {/* Overlay de Carga */}
@@ -981,66 +982,66 @@ export default function RouteDetail() {
           </Pressable>
         </View>
 
-          {/* Botón para Mostrar/Ocultar Paradas */}
-          <View
-            pointerEvents="box-none"
-            className="absolute top-8 right-[14px] z-50"
-          >
-            {/* Contenedor del degradado para el fondo del botón (solo si quieres el efecto) */}
-            <View className="absolute inset-0 flex-row w-40 h-12 rounded-full overflow-hidden">
-              <LinearGradient
-                colors={[Colors.light.secondary, "transparent", "transparent"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={{ flex: 1 }}
-              />
-            </View>
-
-            {/* Botón en sí */}
-            <Pressable
-              onPress={toggleStops}
-              className="p-2 rounded-full shadow-lg"
-            >
-              {showStops ? (
-                <AntDesign name="doubleright" size={30} color="white" />
-              ) : (
-                <AntDesign name="doubleleft" size={30} color="white" />
-              )}
-            </Pressable>
-          </View>
-
-          {/* Panel Lateral de Paradas (Animation) */}
-          <Animated.View
-            style={{
-              transform: [{ translateX: slideAnim }],
-            }}
-            className="absolute top-0 right-0 w-1/2 h-full z-40"
-          >
+        {/* Botón para Mostrar/Ocultar Paradas */}
+        <View
+          pointerEvents="box-none"
+          className="absolute top-8 right-[14px] z-50"
+        >
+          {/* Contenedor del degradado para el fondo del botón (solo si quieres el efecto) */}
+          <View className="absolute inset-0 flex-row w-40 h-12 rounded-full overflow-hidden">
             <LinearGradient
-              colors={[
-                "transparent",
-                "rgba(255,255,255,0.7)",
-                "rgba(255,255,255,0.95)",
-              ]}
-              style={{ flex: 1, paddingTop: 80, paddingHorizontal: 20 }}
+              colors={[Colors.light.secondary, "transparent", "transparent"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-            >
-              <View className="relative flex-1 overflow-hidden rounded-2xl">
-                <ScrollView showsVerticalScrollIndicator={false}>
-                  {(() => {
-                    const firstUnvisitedIndex = waypoints.findIndex(w => {
-                      if (w.type === 'origin') return false; // El inicio no cuenta como pendiente de visita una vez arrancado
-                      return !(w.status === 'completed' || w.status === 'visited' || w.status === 'dropped_off');
-                    });
+              style={{ flex: 1 }}
+            />
+          </View>
 
-                    return waypoints.map((waypoint, index) => {
-                      const isVisited = waypoint.status === 'completed' || waypoint.status === 'visited' || waypoint.status === 'dropped_off' || (waypoint.type === 'origin');
-                      const isCurrent = index === firstUnvisitedIndex;
-                      const isNext = index === firstUnvisitedIndex + 1;
+          {/* Botón en sí */}
+          <Pressable
+            onPress={toggleStops}
+            className="p-2 rounded-full shadow-lg"
+          >
+            {showStops ? (
+              <AntDesign name="doubleright" size={30} color="white" />
+            ) : (
+              <AntDesign name="doubleleft" size={30} color="white" />
+            )}
+          </Pressable>
+        </View>
 
-                      return (
-                        <View key={waypoint.id} className="flex-row mb-6">
+        {/* Panel Lateral de Paradas (Animation) */}
+        <Animated.View
+          style={{
+            transform: [{ translateX: slideAnim }],
+          }}
+          className="absolute top-0 right-0 w-1/2 h-full z-40"
+        >
+          <LinearGradient
+            colors={[
+              "transparent",
+              "rgba(255,255,255,0.7)",
+              "rgba(255,255,255,0.95)",
+            ]}
+            style={{ flex: 1, paddingTop: 80, paddingHorizontal: 20 }}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          >
+            <View className="relative flex-1 overflow-hidden rounded-2xl">
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {(() => {
+                  const firstUnvisitedIndex = waypoints.findIndex(w => {
+                    if (w.type === 'origin') return false; // El inicio no cuenta como pendiente de visita una vez arrancado
+                    return !(w.status === 'completed' || w.status === 'visited' || w.status === 'dropped_off');
+                  });
+
+                  return waypoints.map((waypoint, index) => {
+                    const isVisited = waypoint.status === 'completed' || waypoint.status === 'visited' || waypoint.status === 'dropped_off' || (waypoint.type === 'origin');
+                    const isCurrent = index === firstUnvisitedIndex;
+                    const isNext = index === firstUnvisitedIndex + 1;
+
+                    return (
+                      <View key={waypoint.id} className="flex-row mb-6">
                         {/* Progress Line */}
                         <View className="items-center w-10">
                           {/* Dot/Icon */}
@@ -1145,97 +1146,97 @@ export default function RouteDetail() {
                             </Text>
                           </View>
                         </Pressable>
-                        </View>
-                      );
-                    });
-                  })()}
-                </ScrollView>
-              </View>
-            </LinearGradient>
-          </Animated.View>
+                      </View>
+                    );
+                  });
+                })()}
+              </ScrollView>
+            </View>
+          </LinearGradient>
+        </Animated.View>
 
-          {/* Bottom Sheet */}
-          <BottomSheetRouteDetail
-            passengers={passengers}
-            users={sessionUsers}
-            session={session}
-            onFinishTrip={handleFinishTrip}
-            onLeaveTrip={handleLeaveTrip}
-            onPassengerPress={(pId) => {
-              const p = passengers.find(px => px.passenger_id === pId);
-              if (p?.status === 'pending_approval') {
-                setPassengerIdToProcess(pId);
-                setModalVisible(true);
-              } else if (p?.status === 'joined') {
-                setDropOffTitle("Finalizar viaje para pasajero");
-                setDropOffModalVisible(true);
-              }
-            }}
-            distanceRemaining={distanceToNextPoint}
-          />
+        {/* Bottom Sheet */}
+        <BottomSheetRouteDetail
+          passengers={passengers}
+          users={sessionUsers}
+          session={session}
+          onFinishTrip={handleFinishTrip}
+          onLeaveTrip={handleLeaveTrip}
+          onPassengerPress={(pId) => {
+            const p = passengers.find(px => px.passenger_id === pId);
+            if (p?.status === 'pending_approval') {
+              setPassengerIdToProcess(pId);
+              setModalVisible(true);
+            } else if (p?.status === 'joined') {
+              setDropOffTitle("Finalizar viaje para pasajero");
+              setDropOffModalVisible(true);
+            }
+          }}
+          distanceRemaining={distanceToNextPoint}
+        />
 
-          <PassengerActionModal
-            visible={modalVisible}
-            passengerId={passengerIdToProcess}
-            tripSessionId={Number(id)}
-            onClose={() => {
-              setModalVisible(false);
-              setPassengerIdToProcess(null);
-            }}
-            onActionComplete={() => {
-              fetchPassengers().then(data => {
-                if (data) setPassengers(data);
-              });
-            }}
-          />
+        <PassengerActionModal
+          visible={modalVisible}
+          passengerId={passengerIdToProcess}
+          tripSessionId={Number(id)}
+          onClose={() => {
+            setModalVisible(false);
+            setPassengerIdToProcess(null);
+          }}
+          onActionComplete={() => {
+            fetchPassengers().then(data => {
+              if (data) setPassengers(data);
+            });
+          }}
+        />
 
-          <WaypointCheckInModal
-            visible={checkInModalVisible}
-            waypoint={waypointToCheckIn}
-            onConfirm={handleWaypointCheckIn}
-            onClose={() => {
-              setCheckInModalVisible(false);
-              setWaypointToCheckIn(null);
-            }}
-          />
+        <WaypointCheckInModal
+          visible={checkInModalVisible}
+          waypoint={waypointToCheckIn}
+          onConfirm={handleWaypointCheckIn}
+          onClose={() => {
+            setCheckInModalVisible(false);
+            setWaypointToCheckIn(null);
+          }}
+        />
 
-          <PassengerDropOffModal
-            visible={dropOffModalVisible}
-            passengers={passengers}
-            users={sessionUsers}
-            title={dropOffTitle}
-            onConfirm={handleDropOffPassengers}
-            onClose={() => setDropOffModalVisible(false)}
-          />
-      <DriverRatingListModal
-        visible={driverRatingModalVisible}
-        onClose={() => {
-          setDriverRatingModalVisible(false);
-          router.replace("/(tabs)/home");
-        }}
-        passengers={sessionUsers.filter(u =>
-          passengers.some(p => p.passenger_id === u.id && (p.status === 'joined' || p.status === 'completed'))
-        )}
-        onSubmit={async (ratings) => {
-          try {
-            await ratingsService.saveMultipleRatings(
-              ratings.map(r => ({
-                trip_session_id: Number(id),
-                rater_id: user?.id || '',
-                ratee_id: r.passenger_id,
-                rating: r.rating,
-                comment: r.comment
-              }))
-            );
-            Alert.alert("Éxito", "¡Gracias por tus calificaciones!");
-          } catch (error) {
-            console.error("Error saving ratings:", error);
-            throw error;
-          }
-        }}
-      />
-    </View>
-  </GestureHandlerRootView>
+        <PassengerDropOffModal
+          visible={dropOffModalVisible}
+          passengers={passengers}
+          users={sessionUsers}
+          title={dropOffTitle}
+          onConfirm={handleDropOffPassengers}
+          onClose={() => setDropOffModalVisible(false)}
+        />
+        <DriverRatingListModal
+          visible={driverRatingModalVisible}
+          onClose={() => {
+            setDriverRatingModalVisible(false);
+            router.replace("/(tabs)/home");
+          }}
+          passengers={sessionUsers.filter(u =>
+            passengers.some(p => p.passenger_id === u.id && (p.status === 'joined' || p.status === 'completed'))
+          )}
+          onSubmit={async (ratings) => {
+            try {
+              await ratingsService.saveMultipleRatings(
+                ratings.map(r => ({
+                  trip_session_id: Number(id),
+                  rater_id: user?.id || '',
+                  ratee_id: r.passenger_id,
+                  rating: r.rating,
+                  comment: r.comment
+                }))
+              );
+              Alert.alert("Éxito", "¡Gracias por tus calificaciones!");
+            } catch (error) {
+              console.error("Error saving ratings:", error);
+              throw error;
+            }
+          }}
+        />
+      </View>
+    </GestureHandlerRootView>
   );
 }
 

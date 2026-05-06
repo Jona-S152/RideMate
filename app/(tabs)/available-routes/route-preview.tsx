@@ -238,7 +238,7 @@ export default function RoutePreviewScreen() {
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <View style={styles.container}>
-                <MapView style={styles.map} logoEnabled={false} compassEnabled={false}>
+                <MapView style={styles.map} styleURL={Mapbox.StyleURL.TrafficNight} logoEnabled={false} compassEnabled={false}>
                     <Camera
                         ref={cameraRef}
                         zoomLevel={12}
@@ -249,7 +249,7 @@ export default function RoutePreviewScreen() {
                             <LineLayer
                                 id="lineLayer"
                                 style={{
-                                    lineColor: Colors.light.secondary,
+                                    lineColor: "#00E5FF",
                                     lineWidth: 5,
                                     lineJoin: 'round',
                                     lineCap: 'round',
@@ -263,7 +263,7 @@ export default function RoutePreviewScreen() {
                                 <View className="bg-white p-1 rounded-full shadow-md">
                                     <Ionicons name="flag" size={24} color="#22c55e" />
                                 </View>
-                                <ThemedText className="bg-white/80 px-1 text-[8px] font-bold">Inicio</ThemedText>
+                                {/* <ThemedText className="bg-white/80 px-1 text-[8px] font-bold">Inicio</ThemedText> */}
                             </View>
                         </MarkerView>
                     )}
@@ -293,7 +293,7 @@ export default function RoutePreviewScreen() {
                                 <View className="bg-white p-1 rounded-full shadow-md">
                                     <Ionicons name="location" size={24} color="#ef4444" />
                                 </View>
-                                <ThemedText className="bg-white/80 px-1 text-[8px] font-bold">Fin</ThemedText>
+                                {/* <ThemedText className="bg-white/80 px-1 text-[8px] font-bold">Fin</ThemedText> */}
                             </View>
                         </MarkerView>
                     )}

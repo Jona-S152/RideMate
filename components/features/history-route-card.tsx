@@ -120,7 +120,7 @@ export default function RouteCard({
                         {/* Status/Rating Badge */}
                         <View className="absolute bottom-0 right-0 bg-[#10B981] rounded-full px-1 border-2 border-[#1C2431]">
                             <Text className="text-[8px] font-bold text-white">
-                                ★ {driver.rating.toFixed(1)}
+                                ★ {Number(driver.rating || 0).toFixed(1)}
                             </Text>
                         </View>
                     </View>

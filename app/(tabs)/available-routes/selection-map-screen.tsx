@@ -1,5 +1,4 @@
 import { useAuth } from "@/app/context/AuthContext";
-import { TripSessionStops } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import Mapbox, {
@@ -7,9 +6,8 @@ import Mapbox, {
   LineLayer,
   MapView,
   MarkerView,
-  PointAnnotation,
   ShapeSource,
-  UserLocation,
+  UserLocation
 } from "@rnmapbox/maps";
 import * as turf from "@turf/turf";
 import * as Location from "expo-location";
@@ -23,7 +21,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { ThemedText } from "@/components/ui/ThemedText";
 
 // Token recuperado de variables de entorno
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
@@ -57,7 +54,7 @@ export default function SelectionMapScreen() {
         const enabled = await Location.hasServicesEnabledAsync();
         if (!enabled) {
           Alert.alert(
-            'GPS Desactivado', 
+            'GPS Desactivado',
             'Tu ubicación está desactivada. Por favor, actívala para poder usar el mapa correctamente.',
             [{ text: 'OK' }]
           );
@@ -70,7 +67,7 @@ export default function SelectionMapScreen() {
         }
 
         const location = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
+          accuracy: Location.Accuracy.Balanced,
         });
         console.log("📍 Ubicación del usuario obtenida:", location.coords);
 
@@ -93,12 +90,12 @@ export default function SelectionMapScreen() {
         animationDuration: 1000,
       });
     } else if (sessionData?.start_coords && cameraRef.current) {
-        // Fallback: Centrar en el inicio de la ruta si no hay GPS
-        cameraRef.current.setCamera({
-            centerCoordinate: sessionData.start_coords.coordinates,
-            zoomLevel: 14,
-            animationDuration: 1000,
-        });
+      // Fallback: Centrar en el inicio de la ruta si no hay GPS
+      cameraRef.current.setCamera({
+        centerCoordinate: sessionData.start_coords.coordinates,
+        zoomLevel: 14,
+        animationDuration: 1000,
+      });
     }
   }, [initialLocation, sessionData]);
 
@@ -271,6 +268,7 @@ export default function SelectionMapScreen() {
 
       <MapView
         style={{ flex: 1 }}
+        styleURL={Mapbox.StyleURL.TrafficNight}
         onRegionDidChange={(e) => {
           if (e.geometry && e.geometry.coordinates) {
             setSelectedCoords(e.geometry.coordinates);
@@ -290,7 +288,7 @@ export default function SelectionMapScreen() {
             <LineLayer
               id="guideLine"
               style={{
-                lineColor: "#FCA311",
+                lineColor: "#00E5FF",
                 lineWidth: 5,
                 lineOpacity: 0.7,
                 lineJoin: "round",
@@ -311,7 +309,7 @@ export default function SelectionMapScreen() {
                 <View className="bg-white p-1 rounded-full shadow-md">
                   <Ionicons name="flag" size={24} color="#22c55e" />
                 </View>
-                <ThemedText className="bg-white/80 px-1 text-[8px] font-bold">Inicio</ThemedText>
+                {/* <ThemedText className="bg-white/80 px-1 text-[8px] font-bold">Inicio</ThemedText> */}
               </View>
             </MarkerView>
 
@@ -345,7 +343,7 @@ export default function SelectionMapScreen() {
                 <View className="bg-white p-1 rounded-full shadow-md">
                   <Ionicons name="location" size={24} color="#ef4444" />
                 </View>
-                <ThemedText className="bg-white/80 px-1 text-[8px] font-bold">Fin</ThemedText>
+                {/* <ThemedText className="bg-white/80 px-1 text-[8px] font-bold">Fin</ThemedText> */}
               </View>
             </MarkerView>
           </>
