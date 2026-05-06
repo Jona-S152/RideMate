@@ -1,6 +1,6 @@
 import { useAuth } from "@/app/context/AuthContext";
-import AvailableRouteCard from "@/components/available-route-card";
-import FilterCard from "@/components/FilterCard";
+import AvailableRouteCard from "@/components/features/available-route-card";
+import FilterCard from "@/components/common/FilterCard";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { ThemedView } from "@/components/ThemedView";

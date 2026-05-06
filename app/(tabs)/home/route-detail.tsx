@@ -1,4 +1,4 @@
-import BottomSheetRouteDetail from "@/components/BottomSheetRouteDetail";
+import BottomSheetRouteDetail from "@/components/features/BottomSheetRouteDetail";
 import { Colors } from "@/constants/Colors";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -30,10 +30,10 @@ Mapbox.setAccessToken(
   process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || ""
 );
 
-import DriverRatingListModal from "@/components/DriverRatingListModal";
-import PassengerActionModal from "@/components/PassengerActionModal";
-import PassengerDropOffModal from "@/components/PassengerDropOffModal";
-import WaypointCheckInModal from "@/components/WaypointCheckInModal";
+import DriverRatingListModal from "@/components/Modals/DriverRatingListModal";
+import PassengerActionModal from "@/components/Modals/PassengerActionModal";
+import PassengerDropOffModal from "@/components/Modals/PassengerDropOffModal";
+import WaypointCheckInModal from "@/components/Modals/WaypointCheckInModal";
 import { useDriverLocation, useTripRealtimeById, useTripStops } from "@/hooks/useRealTime";
 import { useTripTrackingStore } from "@/store/tripTrackinStore";
 import { calculateDistance, formatDistance } from "@/utils/geo";

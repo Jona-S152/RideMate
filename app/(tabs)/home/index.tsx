@@ -1,6 +1,6 @@
 import { useAuth } from "@/app/context/AuthContext";
 import { useSession } from "@/app/context/SessionContext";
-import RouteCard from "@/components/history-route-card";
+import RouteCard from "@/components/features/history-route-card";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";

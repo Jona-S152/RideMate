@@ -1,4 +1,4 @@
-import BottomSheetRouteDetail from "@/components/BottomSheetRouteDetail";
+import BottomSheetRouteDetail from "@/components/features/BottomSheetRouteDetail";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 export default function RouteDetail() {

@@ -1,4 +1,4 @@
-import RatingModal from "@/components/RatingModal";
+import RatingModal from "@/components/Modals/RatingModal";
 import { supabase } from "@/lib/supabase";
 import { ratingsService } from "@/services/ratings.service";
 import * as Notifications from "expo-notifications";
