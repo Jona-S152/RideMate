@@ -1,26 +1,27 @@
-import React, { useEffect, useRef, useState } from "react";
-import {
-  Animated,
-  Easing,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  View,
-} from "react-native";
-import { router, Stack } from "expo-router";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/app/context/AuthContext";
-import { Colors } from "@/constants/Colors";
-import { useThemeColor } from "@/hooks/useThemeColor";
-import { useIsFocused } from "@react-navigation/native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { ThemedView } from "@/components/ThemedView";
 import FilterCard from "@/components/common/FilterCard";
-import AvailableRouteCard from "@/components/features/available-route-card";
 import MasonryGrid from "@/components/common/MasonryGrid";
+import AvailableRouteCard from "@/components/features/available-route-card";
+import { Colors } from "@/constants/Colors";
+import { useThemeColor } from "@/hooks/useThemeColor";
 import { SessionData, SessionStop } from "@/interfaces/available-routes";
+import { supabase } from "@/lib/supabase";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { useIsFocused } from "@react-navigation/native";
+import { router } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
+import {
+    Alert,
+    Animated,
+    Easing,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    View,
+} from "react-native";
 
 export default function PassengerRoutesScreen() {
   const { user } = useAuth();
@@ -50,7 +51,7 @@ export default function PassengerRoutesScreen() {
           event: "*",
           schema: "public",
           table: "trip_sessions",
-          filter: "status=eq.pending",
+          filter: "status=in.(pending,active)",
         },
         () => {
           fetchRoutes();
@@ -87,21 +88,30 @@ export default function PassengerRoutesScreen() {
                             )
                         )
                     `)
-        .eq("status", "pending");
+        .in("status", ["pending", "active"]);
 
       if (error) throw error;
 
-      const formattedRoutes = data.map((session) => ({
-        ...session,
-        driver_name: session.driver?.name,
-        driver_avatar: session.driver?.avatar_profile,
-        driver_rating: session.driver?.rating,
-        passengers_data:
-          session.passengers?.map((p: any) => ({
-            id: p.passenger?.id,
-            avatar: p.passenger?.avatar_profile,
-          })) || [],
-      }));
+      // Filtrar rutas que tengan menos de 3 pasajeros con estado joined
+      const availableRoutes = data.filter((session) => {
+        const joinedPassengers = session.passengers?.filter((p: any) => p.status === "joined") || [];
+        return joinedPassengers.length < 4;
+      });
+
+      const formattedRoutes = availableRoutes.map((session) => {
+        const joinedPassengers = session.passengers?.filter((p: any) => p.status === "joined") || [];
+        return {
+          ...session,
+          driver_name: session.driver?.name,
+          driver_avatar: session.driver?.avatar_profile,
+          driver_rating: session.driver?.rating,
+          passengers_data:
+            joinedPassengers.map((p: any) => ({
+              id: p.passenger?.id,
+              avatar: p.passenger?.avatar_profile,
+            })) || [],
+        };
+      });
 
       setRoutes(formattedRoutes);
     } catch (error) {
@@ -113,6 +123,79 @@ export default function PassengerRoutesScreen() {
     setRefreshing(true);
     await fetchRoutes();
     setRefreshing(false);
+  };
+
+  const handleRoutePress = async (route: SessionData) => {
+    if (!user) return;
+
+    try {
+      // Verificar si el usuario ya tiene una solicitud pendiente o está unido a este viaje
+      const { data: existingRequest, error: existingError } = await supabase
+        .from('passenger_trip_sessions')
+        .select('status, rejected, rejection_reason')
+        .eq('passenger_id', user.id)
+        .eq('trip_session_id', route.id)
+        .in('status', ['joined', 'pending_approval'])
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingError) {
+        console.error("Error checking existing request:", existingError);
+        return;
+      }
+
+      console.log("Existing request for route", route.id, ":", existingRequest);
+
+      // Si existe una solicitud
+      if (existingRequest) {
+        if (existingRequest.rejected === true) {
+          // Fue rechazada, mostrar motivo y permitir reintentar
+          Alert.alert(
+            'Solicitud Anterior Rechazada',
+            existingRequest.rejection_reason
+              ? `Tu solicitud anterior fue rechazada: ${existingRequest.rejection_reason}\n\nPuedes intentar nuevamente seleccionando otro punto de encuentro.`
+              : 'Tu solicitud anterior fue rechazada. Puedes intentar nuevamente seleccionando otro punto de encuentro.'
+          );
+          // Permitir que continúe navegando
+        } else {
+          // No fue rechazada (rejected es false o null), está pendiente o activa
+          Alert.alert(
+            existingRequest.status === 'joined'
+              ? 'Ya estás en este viaje'
+              : 'Solicitud pendiente',
+            existingRequest.status === 'joined'
+              ? 'Ya estás participando en este viaje.'
+              : 'Ya has enviado una solicitud para este viaje. Espera a que el conductor la apruebe antes de intentar nuevamente.'
+          );
+          return; // Bloquear navegación
+        }
+      }
+
+      // Verificar si ya tiene un viaje activo
+      const { data: activeSession } = await supabase
+        .from('passenger_trip_sessions')
+        .select("*")
+        .eq("passenger_id", user.id)
+        .in("status", ["joined"])
+        .limit(1)
+        .maybeSingle();
+
+      if (activeSession) {
+        Alert.alert("Error", "Ya tienes un viaje en curso");
+        return;
+      }
+
+      // Si no hay solicitudes existentes o fue rechazada, permitir navegación
+      router.push({
+        pathname: "/(tabs)/available-routes/route-preview",
+        params: { id: route.id, type: "session" },
+      });
+    } catch (error) {
+      console.error("Error in handleRoutePress:", error);
+      Alert.alert("Error", "No se pudo procesar la solicitud");
+    }
   };
 
   useEffect(() => {
@@ -257,18 +340,14 @@ export default function PassengerRoutesScreen() {
                   driverAvatar={(item as any).driver_avatar}
                   driverRating={(item as any).driver_rating}
                   passengersData={(item as any).passengers_data}
+                  status={item.status}
                   isDriver={false}
                   imageUrl={
                     Array.isArray((item as any).routes)
                       ? ((item as any).routes[0] as any)?.image_url
                       : ((item as any).routes as any)?.image_url
                   }
-                  onPress={() => {
-                    router.push({
-                      pathname: "/(tabs)/available-routes/route-preview",
-                      params: { id: item.id, type: "session" },
-                    });
-                  }}
+                  onPress={() => handleRoutePress(item)}
                 />
               )}
             />

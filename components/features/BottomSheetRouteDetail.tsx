@@ -20,6 +20,8 @@ interface BottomSheetRouteDetailProps {
   onPassengerPress?: (passengerId: string) => void;
   onFinishTrip?: () => Promise<void>;
   onLeaveTrip?: () => Promise<void>;
+  onStartTrip?: () => Promise<void>;
+  onCenterDriver?: () => void;
   distanceRemaining?: string;
 }
 
@@ -30,6 +32,8 @@ export default function BottomSheetRouteDetail({
   onPassengerPress,
   onFinishTrip,
   onLeaveTrip,
+  onStartTrip,
+  onCenterDriver,
   distanceRemaining = "0Km"
 }: BottomSheetRouteDetailProps) {
   const imagenes = [
@@ -52,6 +56,17 @@ export default function BottomSheetRouteDetail({
         }
       },
       hidden: user?.driver_mode || !isActive
+    },
+    {
+      label: "Iniciar",
+      icon: "play-outline",
+      color: "#22c55e",
+      onPress: async () => {
+        if (onStartTrip) {
+          await onStartTrip();
+        }
+      },
+      hidden: !user?.driver_mode || !user?.is_driver || isActive, // solo conductores y solo si no está activo
     },
     {
       label: "Cancelar",
@@ -78,6 +93,7 @@ export default function BottomSheetRouteDetail({
   const bottomSheetRef = useRef<BottomSheet>(null);
   const [currentSnapPoint, setCurrentSnapPoint] = useState<number>(0);
   const [userData, setUserData] = useState<UserData | null>(null);
+  const [driverData, setDriverData] = useState<UserData | null>(null);
   const snapPoints = useMemo(() => ["45%"], []);
   const animatedIndex = useSharedValue(0);
 
@@ -99,9 +115,28 @@ export default function BottomSheetRouteDetail({
     }
   }
 
+  const fetchDriver = async () => {
+    if (!session?.driver_id) return;
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq('id', session.driver_id)
+      .maybeSingle();
+
+    if (data) {
+      const ratingInfo = await ratingsService.getUserRating(session.driver_id);
+      setDriverData({
+        ...(data as UserData),
+        rating: ratingInfo.rating,
+        rating_count: ratingInfo.count
+      });
+    }
+  }
+
   useEffect(() => {
     fetchUser();
-  }, []);
+    fetchDriver();
+  }, [user?.id, session?.driver_id]);
 
   const animatedContentStyle = useAnimatedStyle(() => {
     const opacity = interpolate(animatedIndex.value, [0, 1], [0, 1]);
@@ -121,15 +156,42 @@ export default function BottomSheetRouteDetail({
     // console.log("handleSheetChanges", index);
   }, []);
 
+  const RECENTER_BUTTON_SIZE = 56;
+  const RECENTER_BUTTON_MARGIN = 10;
+
   const HandleDragToResize = () => (
-    <View className="flex-row justify-between ml-7">
-      <View className="">
+    <View className="flex-row justify-between ml-7" style={{ overflow: 'visible' }}>
+      <View className="relative" style={{ width: '100%' }}>
         <ThemedText
           lightColor={Colors.light.text}
           className="font-bold text-3xl pt-4"
         >
           {session?.status === "active" ? "En curso" : session?.status === "pending" ? "pendiente" : "Completada"}
         </ThemedText>
+        {onCenterDriver ? (
+          <Pressable
+            onPress={onCenterDriver}
+            style={{
+              position: 'absolute',
+              top: -(RECENTER_BUTTON_SIZE + RECENTER_BUTTON_MARGIN),
+              right: RECENTER_BUTTON_MARGIN,
+              width: RECENTER_BUTTON_SIZE,
+              height: RECENTER_BUTTON_SIZE,
+              borderRadius: RECENTER_BUTTON_SIZE / 2,
+              backgroundColor: Colors.light.primary,
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10,
+              shadowColor: '#00000020',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 10,
+              elevation: 8,
+            }}
+          >
+            <Ionicons name="locate" size={26} color="white" />
+          </Pressable>
+        ) : null}
       </View>
       <ThemedView
         lightColor={Colors.light.secondary}
@@ -198,118 +260,18 @@ export default function BottomSheetRouteDetail({
                 </View>
               </View>
 
-              {
-                // TODO: opctional stop details section
-                // <View className="flex-row justify-between my-2">
-                //   <View className="items-start">
-                //     <ScrollView>
-                //       <View className="flex-row justify-between mb-2">
-                //         <View className="items-start">
-                //           <ThemedText
-                //             lightColor={Colors.light.text}
-                //             className="text-base"
-                //           >
-                //             Parada 1
-                //           </ThemedText>
-                //           <ThemedText
-                //             lightColor={Colors.light.text}
-                //             className="text-sm font-extralight"
-                //           >
-                //             Mall del sur
-                //           </ThemedText>
-                //         </View>
-                //         <View className="items-end">
-                //           <ThemedText
-                //             lightColor={Colors.light.text}
-                //             className="text-sm font-extralight"
-                //           >
-                //             7:30AM
-                //           </ThemedText>
-                //         </View>
-                //       </View>
-                //       {/* Parada 2 */}
-                //       <View className="flex-row justify-between mb-2">
-                //         <View className="items-start">
-                //           <ThemedText
-                //             lightColor={Colors.light.text}
-                //             className="text-base"
-                //           >
-                //             Parada 2
-                //           </ThemedText>
-                //           <ThemedText
-                //             lightColor={Colors.light.text}
-                //             className="text-sm font-extralight"
-                //           >
-                //             Mall del sur
-                //           </ThemedText>
-                //         </View>
-                //         <View className="items-end">
-                //           <ThemedText
-                //             lightColor={Colors.light.text}
-                //             className="text-sm font-extralight"
-                //           >
-                //             7:30AM
-                //           </ThemedText>
-                //         </View>
-                //       </View>
-                //       {/* Parada 3 */}
-                //       <View className="flex-row justify-between">
-                //         <View className="items-start">
-                //           <ThemedText
-                //             lightColor={Colors.light.text}
-                //             className="text-base"
-                //           >
-                //             Parada 3
-                //           </ThemedText>
-                //           <ThemedText
-                //             lightColor={Colors.light.text}
-                //             className="text-sm font-extralight"
-                //           >
-                //             Mall del sur
-                //           </ThemedText>
-                //         </View>
-                //         <View className="items-end">
-                //           <ThemedText
-                //             lightColor={Colors.light.text}
-                //             className="text-sm font-extralight"
-                //           >
-                //             7:30AM
-                //           </ThemedText>
-                //         </View>
-                //       </View>
-                //     </ScrollView>
-                //   </View>
-                //   <View className="items-end">
-                //     <ThemedText
-                //       lightColor={Colors.light.text}
-                //       className="text-base"
-                //     >
-                //       28/08/2025
-                //     </ThemedText>
-                //     <Pressable style={{ backgroundColor: Colors.light.secondary}} className="rounded-full my-8 py-1 px-2">
-                //       <ThemedText
-                //         lightColor={Colors.light.text}
-                //         className="text-base"
-                //       >
-                //         Buscar esta ruta
-                //       </ThemedText>
-                //     </Pressable>
-                //   </View>
-                // </View>
-              }
-
               <View className="flex-row mt-6">
                 <View className=" mr-4">
                   <View className="items-center">
                     <View className="w-16 h-24 rounded-full border-2 border-[#E5E5E5] overflow-hidden">
-                      <Image source={{ uri: userData?.avatar_profile }}
+                      <Image source={{ uri: driverData?.avatar_profile }}
                         resizeMode="cover"
                         className="w-full h-full"
                       />
                     </View>
                     <ThemedView lightColor={Colors.light.tird} className="absolute -bottom-3 rounded-full justify-center items-center max-w-[40px] px-2">
                       <ThemedText lightColor={Colors.light.textBlack}>
-                        {userData?.rating || "0.0"}
+                        {driverData?.rating || "0.0"}
                       </ThemedText>
                     </ThemedView>
                   </View>
@@ -317,8 +279,8 @@ export default function BottomSheetRouteDetail({
                 <View className="h-full bg-slate-300 w-[1px] mr-4 opacity-40" />
                 <FlatList
                   horizontal
-                  data={propUsers}
-                  keyExtractor={(item, index) => index.toString()}
+                  data={propUsers.filter(u => u.id !== session?.driver_id)}
+                  keyExtractor={(item) => item.id.toString()}
                   renderItem={({ item }) => {
                     const pSession = passengers?.find(
                       (p) => p.passenger_id === item.id,

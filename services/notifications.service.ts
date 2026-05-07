@@ -49,3 +49,53 @@ export async function registerDeviceToken(userId: string) {
     console.error("Error obteniendo token de expo:", error);
   }
 }
+
+export async function sendPushNotification(
+  userId: string,
+  title: string,
+  body: string,
+  data?: any
+) {
+  try {
+    // 1. Obtener el token del usuario desde la base de datos
+    const { data: tokenData, error } = await supabase
+      .from("device_tokens")
+      .select("token")
+      .eq("user_id", userId)
+      .single();
+
+    if (error || !tokenData?.token) {
+      console.warn("No se encontró token para el usuario:", userId);
+      return;
+    }
+
+    // 2. Enviar la notificación usando Expo Push API
+    const message = {
+      to: tokenData.token,
+      sound: "default",
+      title,
+      body,
+      data: data || {},
+    };
+
+    const response = await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Accept-encoding": "gzip, deflate",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(message),
+    });
+
+    const result = await response.json();
+    console.log("Notificación enviada:", result);
+
+    if (result.errors) {
+      console.error("Errores en el envío de notificación:", result.errors);
+    }
+
+  } catch (error) {
+    console.error("Error enviando notificación push:", error);
+  }
+}

@@ -15,6 +15,7 @@ import {
 import { useAuth } from "@/app/context/AuthContext";
 import { MeetingPoint, PassengerTripSession, StopData, UserData } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
+import { sendPushNotification } from "@/services/notifications.service";
 import { ratingsService } from "@/services/ratings.service";
 import Mapbox, {
   Camera,
@@ -40,6 +41,42 @@ import { calculateDistance, formatDistance } from "@/utils/geo";
 
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+const parseCoords = (coords: any) => {
+  if (!coords) {
+    console.log("parseCoords: no coords provided", coords);
+    return null;
+  }
+  if (coords.coordinates && Array.isArray(coords.coordinates) && coords.coordinates.length >= 2) {
+    const parsed = {
+      latitude: Number(coords.coordinates[1]),
+      longitude: Number(coords.coordinates[0]),
+    };
+    console.log("parseCoords: parsed GeoJSON point", coords, parsed);
+    return parsed;
+  }
+  if (coords.latitude !== undefined && coords.longitude !== undefined) {
+    const parsed = {
+      latitude: Number(coords.latitude),
+      longitude: Number(coords.longitude),
+    };
+    console.log("parseCoords: parsed lat/lng object", coords, parsed);
+    return parsed;
+  }
+  console.log("parseCoords: unsupported coords shape", coords);
+  return null;
+};
+
+const isValidCoordinatePair = (coordinate: any): coordinate is [number, number] => {
+  return (
+    Array.isArray(coordinate) &&
+    coordinate.length >= 2 &&
+    typeof Number(coordinate[0]) === "number" &&
+    typeof Number(coordinate[1]) === "number" &&
+    !Number.isNaN(Number(coordinate[0])) &&
+    !Number.isNaN(Number(coordinate[1]))
+  );
+};
 
 // Interfaz para el estado de la región
 interface MapRegion {
@@ -80,7 +117,7 @@ export default function RouteDetail() {
   const mapRef = useRef<Mapbox.MapView>(null);
   const cameraRef = useRef<Mapbox.Camera>(null);
   const [showStops, setShowStops] = useState(false);
-  const [routeGeoJSON, setRouteGeoJSON] = useState(null);
+  const [routeGeoJSON, setRouteGeoJSON] = useState<any>(null);
 
   // Animations
   const slideAnim = useRef(new Animated.Value(SCREEN_WIDTH)).current;
@@ -92,6 +129,9 @@ export default function RouteDetail() {
   const { driverLocation } = useDriverLocation(Number(id));
 
   const [region, setRegion] = useState<MapRegion | null>(null);
+  const [hasCenteredOnDriver, setHasCenteredOnDriver] = useState(false);
+  const [isCameraCenteredOnDriver, setIsCameraCenteredOnDriver] = useState(false);
+  const ignoreRegionChangeRef = useRef(false);
   const [passengers, setPassengers] = useState<PassengerTripSession[]>([]);
   const [stopsData, setStopsData] = useState<StopData[]>([]);
   const [meetingPoints, setMeetingPoints] = useState<MeetingPoint[]>([]);
@@ -174,6 +214,7 @@ export default function RouteDetail() {
 
   const fetchStops = async () => {
     try {
+      console.log("fetchStops: trip session stops", stops);
       const { data, error } = await supabase
         .from("stops")
         .select("*")
@@ -183,6 +224,11 @@ export default function RouteDetail() {
         )
         .order("stop_order", { ascending: true });
 
+      if (error) {
+        console.error("fetchStops: supabase error", error);
+        return;
+      }
+
       const formattedData = (data || []).map((stop: any) => ({
         ...stop,
         coords: {
@@ -191,9 +237,10 @@ export default function RouteDetail() {
         }
       }));
 
+      console.log("fetchStops: formattedData", formattedData);
       setStopsData(formattedData as StopData[]);
     } catch (error) {
-      console.error(error);
+      console.error("fetchStops: unexpected error", error);
     }
   };
 
@@ -204,17 +251,23 @@ export default function RouteDetail() {
   const buildWaypoints = async () => {
     if (!session) return;
 
+    console.log("buildWaypoints: session", session);
+    console.log("buildWaypoints: stopsData", stopsData);
+    console.log("buildWaypoints: meetingPoints", meetingPoints);
+
     const allWaypoints: Waypoint[] = [];
 
     // Add origin
+    const originCoords = parseCoords(session.start_coords);
+    const destinationCoords = parseCoords(session.end_coords);
+
+    console.log("buildWaypoints: originCoords", originCoords, "destinationCoords", destinationCoords);
+
     allWaypoints.push({
       id: 'origin',
       type: 'origin',
       location: session.start_location,
-      coords: {
-        latitude: Number(session.start_coords?.coordinates?.[1] ?? 0),
-        longitude: Number(session.start_coords?.coordinates?.[0] ?? 0)
-      },
+      coords: originCoords ?? { latitude: 0, longitude: 0 },
       order: 0,
     });
 
@@ -254,15 +307,19 @@ export default function RouteDetail() {
       }),
     ];
 
-    // Sort by distance from origin (same logic as route calculation)
+    console.log("buildWaypoints: combined items", combined);
+
+    const originLat = originCoords?.latitude ?? 0;
+    const originLng = originCoords?.longitude ?? 0;
+
     const sorted = combined.sort((a, b) => {
       const distA = Math.sqrt(
-        Math.pow(a.coords.longitude - session.start_coords.coordinates[0], 2) +
-        Math.pow(a.coords.latitude - session.start_coords.coordinates[1], 2),
+        Math.pow(a.coords.longitude - originLng, 2) +
+        Math.pow(a.coords.latitude - originLat, 2),
       );
       const distB = Math.sqrt(
-        Math.pow(b.coords.longitude - session.start_coords.coordinates[0], 2) +
-        Math.pow(b.coords.latitude - session.start_coords.coordinates[1], 2),
+        Math.pow(b.coords.longitude - originLng, 2) +
+        Math.pow(b.coords.latitude - originLat, 2),
       );
       return distA - distB;
     });
@@ -273,7 +330,7 @@ export default function RouteDetail() {
         id:
           item.type === 'stop'
             ? `stop-${item.id}`
-            : `meeting-${item.passenger_id}`,
+            : `meeting-${item.id}`,
         type: item.type,
         location: item.location,
         coords: { latitude: item.coords.latitude, longitude: item.coords.longitude },
@@ -291,13 +348,11 @@ export default function RouteDetail() {
       id: 'destination',
       type: 'destination',
       location: session.end_location,
-      coords: {
-        latitude: Number(session.end_coords?.coordinates?.[1] ?? 0),
-        longitude: Number(session.end_coords?.coordinates?.[0] ?? 0)
-      },
+      coords: destinationCoords ?? { latitude: 0, longitude: 0 },
       order: allWaypoints.length,
     });
 
+    console.log("buildWaypoints: final waypoints", allWaypoints);
     setWaypoints(allWaypoints);
     setSessionLoaded(true);
   };
@@ -376,6 +431,28 @@ export default function RouteDetail() {
     }
   };
 
+  const handleStartTrip = async () => {
+    if (!session || !user?.id) return;
+
+    try {
+      const { error } = await supabase
+        .from("trip_sessions")
+        .update({ status: "active" })
+        .eq("id", session.id);
+
+      if (error) throw error;
+
+      Alert.alert("Éxito", "¡Viaje iniciado!");
+      
+      // Iniciar el tracking de ubicación
+      const { startTracking } = useTripTrackingStore.getState();
+      await startTracking(Number(id), user.id);
+    } catch (error) {
+      console.error("Error starting trip:", error);
+      Alert.alert("Error", "No se pudo iniciar el viaje.");
+    }
+  };
+
   const handleFinishTrip = async () => {
     if (!session) return;
 
@@ -435,6 +512,19 @@ export default function RouteDetail() {
           style: "destructive",
           onPress: async () => {
             try {
+              // 1. Eliminar el meeting point del pasajero
+              const { error: meetingError } = await supabase
+                .from("passenger_meeting_points")
+                .delete()
+                .eq("trip_session_id", session.id)
+                .eq("passenger_id", user.id);
+
+              if (meetingError) {
+                console.error("Error deleting meeting point:", meetingError);
+                // No fallar completamente por este error
+              }
+
+              // 2. Actualizar el status del pasajero
               const { error } = await supabase
                 .from("passenger_trip_sessions")
                 .update({ status: "left" })
@@ -443,6 +533,8 @@ export default function RouteDetail() {
 
               if (error) throw error;
 
+              await fetchMeetingPoints();
+              buildWaypoints();
               router.replace("/(tabs)/available-routes");
             } catch (error) {
               console.error("Error leaving trip:", error);
@@ -466,6 +558,26 @@ export default function RouteDetail() {
 
       if (error) throw error;
 
+      // Enviar notificación push a cada pasajero completado
+      for (const passengerId of passengerIds) {
+        try {
+          await sendPushNotification(
+            passengerId,
+            "¡Viaje completado!",
+            "Tu viaje ha terminado. Por favor califica a tu conductor.",
+            {
+              type: "RATE_DRIVER",
+              trip_session_id: session.id,
+              driver_id: session.driver_id,
+              driver_name: user?.name || "tu conductor",
+            }
+          );
+        } catch (notificationError) {
+          console.error("Error enviando notificación a pasajero:", passengerId, notificationError);
+          // No fallar el proceso completo por error en notificación
+        }
+      }
+
       setDropOffModalVisible(false);
 
       // Actualizar la lista de pasajeros localmente
@@ -488,28 +600,31 @@ export default function RouteDetail() {
   // Función para obtener la ruta de Mapbox Directions
   const fetchRouteMap = async () => {
     // 1. Validar que tengamos los datos mínimos necesarios
-    if (!session || !stopsData || stopsData.length < 2) {
-      console.log("⏳ Esperando datos suficientes para trazar la ruta...", {
-        hasSession: !!session,
-        stopsCount: stopsData?.length
-      });
+    // 1. Validar que tengamos los datos mínimos necesarios (Al menos sesión y coordenadas básicas)
+    if (!session || !session.start_coords || !session.end_coords) {
+      console.log("fetchRouteMap: Esperando datos de sesión para trazar la ruta...", { session });
       return;
     }
 
     try {
       // 2. Extraer origen y destino de la sesión de forma segura (GeoJSON Point: [lng, lat])
-      const origin: [number, number] | null = session.start_coords?.coordinates
-        ? [session.start_coords.coordinates[0], session.start_coords.coordinates[1]]
+      const originPoint = parseCoords(session.start_coords);
+      const destinationPoint = parseCoords(session.end_coords);
+
+      const origin: [number, number] | null = originPoint
+        ? [originPoint.longitude, originPoint.latitude]
         : null;
 
-      const destination: [number, number] | null = session.end_coords?.coordinates
-        ? [session.end_coords.coordinates[0], session.end_coords.coordinates[1]]
+      const destination: [number, number] | null = destinationPoint
+        ? [destinationPoint.longitude, destinationPoint.latitude]
         : null;
 
       if (!origin || !destination) {
-        console.warn("⚠️ No se pudieron obtener las coordenadas de origen o destino de la sesión.", { origin, destination });
+        console.warn("fetchRouteMap: No se pudieron obtener las coordenadas de origen o destino de la sesión.", { originPoint, destinationPoint });
         return;
       }
+
+      console.log("fetchRouteMap: origin/destination", origin, destination);
 
       // 3. Procesar las paradas de la ruta
       // Nota: Si cambiaste a geometry, asegúrate de que stop.coords tenga {longitude, latitude} o usa la estructura de GeoJSON
@@ -545,13 +660,20 @@ export default function RouteDetail() {
 
       const allCoordinates: [number, number][] = [origin, ...sortedWaypoints, destination];
 
-      // 5. Validar que no haya valores indefinidos en la lista final
-      if (allCoordinates.some(c => c.includes(undefined as any) || c.includes(null as any))) {
-        console.error("❌ Hay coordenadas inválidas en la lista de ruta:", allCoordinates);
+      const validatedCoordinates = allCoordinates.map((coordinate) => {
+        if (isValidCoordinatePair(coordinate)) {
+          return coordinate;
+        }
+        const parsed = [Number(coordinate[0]), Number(coordinate[1])] as [number, number];
+        return parsed;
+      });
+
+      if (!validatedCoordinates.every(isValidCoordinatePair)) {
+        console.error("❌ Hay coordenadas inválidas en la lista de ruta:", validatedCoordinates);
         return;
       }
 
-      const coordsString = allCoordinates.map((c) => c.join(",")).join(";");
+      const coordsString = validatedCoordinates.map((c) => c.join(",")).join(";");
       const accessToken = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
 
       console.log("🗺️ Pidiendo ruta Mapbox:", coordsString);
@@ -561,31 +683,77 @@ export default function RouteDetail() {
       const response = await fetch(url);
       const data = await response.json();
 
-      if (data.routes && data.routes.length > 0) {
-        const route = data.routes[0].geometry;
-
-        setRouteGeoJSON({
-          type: "FeatureCollection",
-          features: [{ type: "Feature", geometry: route, properties: {} }],
-        } as any);
+      let geometry = null;
+      if (data.routes && data.routes.length > 0 && data.routes[0].geometry) {
+        geometry = data.routes[0].geometry;
+        console.log("fetchRouteMap: Mapbox returned geometry", geometry);
       } else {
-        console.warn("Map routes no pudo encontrar un camino exacto:", data.message || "Sin mensaje");
+        console.warn("fetchRouteMap: Mapbox no pudo encontrar un camino exacto:", data.message || "Sin mensaje");
+        geometry = {
+          type: "LineString",
+          coordinates: validatedCoordinates,
+        };
+        console.log("fetchRouteMap: fallback geometry", geometry);
+      }
+
+      if (!geometry || geometry.type !== "LineString" || !Array.isArray(geometry.coordinates)) {
+        console.error("fetchRouteMap: invalid geometry returned", geometry);
+        return;
+      }
+
+      const routeFeature = {
+        type: "FeatureCollection",
+        features: [{ type: "Feature", geometry, properties: {} }],
+      } as any;
+
+      console.log("fetchRouteMap: setting routeGeoJSON", routeFeature);
+      setRouteGeoJSON(routeFeature);
+
+      // Evita hacer zoom out a toda la ruta si ya hemos centrado en el conductor.
+      if (!hasCenteredOnDriver && (!driverLocation?.coords || session?.status !== "active")) {
+        centerMapOnRoute(validatedCoordinates);
       }
     } catch (error) {
       console.error("❌ Error al obtener la ruta de Mapbox:", error);
     }
   };
 
+  const centerMapOnRoute = (coordinates: [number, number][]) => {
+    if (!coordinates || coordinates.length === 0) return;
+
+    const latitudes = coordinates.map(([lng, lat]) => lat);
+    const longitudes = coordinates.map(([lng, lat]) => lng);
+    const minLat = Math.min(...latitudes);
+    const maxLat = Math.max(...latitudes);
+    const minLng = Math.min(...longitudes);
+    const maxLng = Math.max(...longitudes);
+
+    const centerLat = (minLat + maxLat) / 2;
+    const centerLng = (minLng + maxLng) / 2;
+
+    cameraRef.current?.setCamera({
+      centerCoordinate: [centerLng, centerLat],
+      zoomLevel: 12,
+      animationDuration: 1000,
+    });
+  };
+
   useEffect(() => {
-    // Solo centrar automáticamente si el viaje acaba de activarse o es la primera vez que tenemos ubicación
-    if (session?.status === "active" && driverLocation?.coords && !region) {
-      cameraRef.current?.setCamera({
-        centerCoordinate: [driverLocation.coords.longitude, driverLocation.coords.latitude],
-        zoomLevel: 15,
-        animationDuration: 1000,
-      });
+    if (hasCenteredOnDriver) return;
+    if (session?.status === "active" && driverLocation?.coords) {
+      const parsedDriverCoords = parseCoords(driverLocation.coords);
+      if (parsedDriverCoords) {
+        ignoreRegionChangeRef.current = true;
+        cameraRef.current?.setCamera({
+          centerCoordinate: [parsedDriverCoords.longitude, parsedDriverCoords.latitude],
+          zoomLevel: 15,
+          animationDuration: 1000,
+        });
+        setHasCenteredOnDriver(true);
+        setIsCameraCenteredOnDriver(true);
+      }
     }
-  }, [session?.status]); // Quitamos driverLocation de las dependencias para evitar el snap constante
+  }, [session?.status, driverLocation?.coords, hasCenteredOnDriver]);
 
   useEffect(() => {
     let subscriber: Location.LocationSubscription | null = null;
@@ -619,11 +787,27 @@ export default function RouteDetail() {
   }, []);
 
   useEffect(() => {
-    // Solo intentamos trazar la ruta si tenemos al menos 2 paradas
-    if (stopsData && stopsData.length >= 2) {
+    if (session && session.start_coords && session.end_coords) {
       fetchRouteMap();
     }
-  }, [stopsData, meetingPoints]);
+  }, [session, stopsData, meetingPoints]);
+
+  useEffect(() => {
+    if (!session) return;
+    if (session.status === "active" && hasCenteredOnDriver) return;
+
+    const originPoint = parseCoords(session.start_coords);
+    const destinationPoint = parseCoords(session.end_coords);
+
+    if (!originPoint || !destinationPoint) return;
+
+    if (!driverLocation?.coords || session.status !== "active") {
+      centerMapOnRoute([
+        [originPoint.longitude, originPoint.latitude],
+        [destinationPoint.longitude, destinationPoint.latitude],
+      ]);
+    }
+  }, [session, driverLocation?.coords, hasCenteredOnDriver]);
 
   const fetchPassengers = async () => {
     const { data, error } = await supabase
@@ -631,13 +815,29 @@ export default function RouteDetail() {
       .select("*")
       .eq("trip_session_id", Number(id))
       .in("status", ["joined", "pending_approval", "completed"])
-      .is("rejected", false);
+      .is("rejected", false)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false });
 
     if (error) {
       console.error("Error al obtener pasajeros:", error);
       return null;
     }
-    return data as PassengerTripSession[];
+
+    const uniqueLatestPassengers = (data || [])
+      .sort((a, b) => {
+        const aTime = new Date(a.created_at).getTime();
+        const bTime = new Date(b.created_at).getTime();
+        return bTime - aTime || b.id - a.id;
+      })
+      .reduce<PassengerTripSession[]>((acc, passenger) => {
+        if (!acc.some((p) => p.passenger_id === passenger.passenger_id)) {
+          acc.push(passenger);
+        }
+        return acc;
+      }, []);
+
+    return uniqueLatestPassengers;
   };
 
   const fetchSessionUsers = async (passengerSessions: PassengerTripSession[]) => {
@@ -746,7 +946,7 @@ export default function RouteDetail() {
 
   // Build waypoints when session, stops, or meeting points change
   useEffect(() => {
-    if (session && stopsData.length > 0) {
+    if (session) {
       buildWaypoints();
     }
   }, [session, stopsData, meetingPoints]);
@@ -779,6 +979,51 @@ export default function RouteDetail() {
     }
   };
 
+  const centerOnDriverLocation = () => {
+    if (!driverLocation?.coords) {
+      console.warn("centerOnDriverLocation: ubicación de conductor no disponible");
+      return;
+    }
+
+    const parsedDriverCoords = parseCoords(driverLocation.coords);
+    if (!parsedDriverCoords) {
+      console.warn("centerOnDriverLocation: coordenadas inválidas del conductor", driverLocation.coords);
+      return;
+    }
+
+    const lat = parsedDriverCoords.latitude;
+    const lng = parsedDriverCoords.longitude;
+
+    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
+      console.warn("centerOnDriverLocation: coordenadas inválidas del conductor", driverLocation.coords);
+      return;
+    }
+
+    if (cameraRef.current) {
+      ignoreRegionChangeRef.current = true;
+      cameraRef.current.setCamera({
+        centerCoordinate: [lng, lat],
+        zoomLevel: 15,
+        animationDuration: 500,
+      });
+      setIsCameraCenteredOnDriver(true);
+    }
+  };
+
+  const renderStartCoords = session?.start_coords ? parseCoords(session.start_coords) : null;
+  const renderEndCoords = session?.end_coords ? parseCoords(session.end_coords) : null;
+  const startMarkerCoordinate = renderStartCoords && isValidCoordinatePair([renderStartCoords.longitude, renderStartCoords.latitude])
+    ? [renderStartCoords.longitude, renderStartCoords.latitude] as [number, number]
+    : null;
+  const endMarkerCoordinate = renderEndCoords && isValidCoordinatePair([renderEndCoords.longitude, renderEndCoords.latitude])
+    ? [renderEndCoords.longitude, renderEndCoords.latitude] as [number, number]
+    : null;
+  const routeCoordinates = routeGeoJSON?.features?.[0]?.geometry?.coordinates;
+  const routeValid = Array.isArray(routeCoordinates) && routeCoordinates.length > 1 && routeCoordinates.every(isValidCoordinatePair);
+  if (session) {
+    console.log("render: startMarkerCoordinate", startMarkerCoordinate, "endMarkerCoordinate", endMarkerCoordinate, "routeValid", routeValid, "routeGeoJSON", routeGeoJSON);
+  }
+
   const toggleStops = () => {
     if (showStops) {
       setShowStops(false);
@@ -808,6 +1053,13 @@ export default function RouteDetail() {
           styleURL={Mapbox.StyleURL.TrafficNight}
           style={StyleSheet.absoluteFillObject}
           localizeLabels={true}
+          onRegionDidChange={() => {
+            if (ignoreRegionChangeRef.current) {
+              ignoreRegionChangeRef.current = false;
+              return;
+            }
+            setIsCameraCenteredOnDriver(false);
+          }}
         >
           {/* Cámara inicial */}
           <Camera
@@ -826,25 +1078,42 @@ export default function RouteDetail() {
             />
           )}
 
-          {driverLocation?.coords ? (
-            <MarkerView
-              id="driver"
-              coordinate={[
-                isNaN(Number(driverLocation.coords.longitude)) ? 0 : Number(driverLocation.coords.longitude),
-                isNaN(Number(driverLocation.coords.latitude)) ? 0 : Number(driverLocation.coords.latitude)
-              ]}
-              anchor={{ x: 0.5, y: 0.5 }}
-            >
-              <View style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="car-sport" size={30} color="#000D3A" />
-              </View>
-            </MarkerView>
-          ) : null}
+          {driverLocation?.coords ? (() => {
+            const parsedDriverCoords = parseCoords(driverLocation.coords);
+            if (!parsedDriverCoords) return null;
+            const lat = Number(parsedDriverCoords.latitude);
+            const lng = Number(parsedDriverCoords.longitude);
+            if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return null;
+            const iconName = "car-sport";
+            const iconColor = user?.driver_mode ? "white" : "#000D3A";
+            const iconBg = user?.driver_mode ? Colors.light.primary : "transparent";
+
+            return (
+              <MarkerView
+                id="driver"
+                coordinate={[lng, lat]}
+                anchor={{ x: 0.5, y: 0.5 }}
+              >
+                <View style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+                  <View style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: iconBg,
+                  }}>
+                    <Ionicons name={iconName} size={24} color={iconColor} />
+                  </View>
+                </View>
+              </MarkerView>
+            );
+          })() : null}
 
 
 
           {/* Dibuja la Ruta */}
-          {sessionLoaded && routeGeoJSON && (
+          {sessionLoaded && routeValid && routeGeoJSON && (
             <ShapeSource id="routeSource" shape={routeGeoJSON}>
               <LineLayer
                 id="routeLine"
@@ -858,15 +1127,11 @@ export default function RouteDetail() {
             </ShapeSource>
           )}
 
-          {sessionLoaded && session?.start_coords?.coordinates ? (() => {
-            const lng = Number(session.start_coords.coordinates[0]);
-            const lat = Number(session.start_coords.coordinates[1]);
-            if (isNaN(lng) || isNaN(lat) || (lng === 0 && lat === 0)) return null;
-
+          {startMarkerCoordinate ? (() => {
             return (
               <MarkerView
                 id="start-point"
-                coordinate={[lng, lat]}
+                coordinate={startMarkerCoordinate}
                 anchor={{ x: 0.5, y: 1 }}
               >
                 <View style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
@@ -882,7 +1147,7 @@ export default function RouteDetail() {
           })() : null}
 
           {/* Marcadores para las Paradas */}
-          {sessionLoaded && stopsData?.map((stop, index) => {
+          {stopsData?.map((stop, index) => {
             const coords = stop.coords as any;
             const lng = Number(coords?.longitude ?? coords?.coordinates?.[0] ?? 0);
             const lat = Number(coords?.latitude ?? coords?.coordinates?.[1] ?? 0);
@@ -908,7 +1173,7 @@ export default function RouteDetail() {
           })}
 
           {/* Meeting Point Markers */}
-          {sessionLoaded && meetingPoints?.map((mp, index) => {
+          {meetingPoints?.map((mp, index) => {
             const coords = mp.coords as any;
             const lng = Number(coords?.longitude ?? coords?.coordinates?.[0] ?? 0);
             const lat = Number(coords?.latitude ?? coords?.coordinates?.[1] ?? 0);
@@ -934,15 +1199,11 @@ export default function RouteDetail() {
             );
           })}
 
-          {sessionLoaded && session?.end_coords?.coordinates ? (() => {
-            const lng = Number(session.end_coords.coordinates[0]);
-            const lat = Number(session.end_coords.coordinates[1]);
-            if (isNaN(lng) || isNaN(lat) || (lng === 0 && lat === 0)) return null;
-
+          {endMarkerCoordinate ? (() => {
             return (
               <MarkerView
                 id="end-point"
-                coordinate={[lng, lat]}
+                coordinate={endMarkerCoordinate}
                 anchor={{ x: 0.5, y: 1 }}
               >
                 <View style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
@@ -959,7 +1220,7 @@ export default function RouteDetail() {
         </Mapbox.MapView>
 
         {/* Overlay de Carga */}
-        {!region && (
+        {!region && !user?.driver_mode && (
           <View className="absolute inset-0 bg-white/80 items-center justify-center z-[60]">
             <Text className="font-bold text-slate-500">Cargando ubicación...</Text>
           </View>
@@ -1162,6 +1423,8 @@ export default function RouteDetail() {
           session={session}
           onFinishTrip={handleFinishTrip}
           onLeaveTrip={handleLeaveTrip}
+          onStartTrip={handleStartTrip}
+          onCenterDriver={!isCameraCenteredOnDriver ? centerOnDriverLocation : undefined}
           onPassengerPress={(pId) => {
             const p = passengers.find(px => px.passenger_id === pId);
             if (p?.status === 'pending_approval') {
@@ -1183,10 +1446,11 @@ export default function RouteDetail() {
             setModalVisible(false);
             setPassengerIdToProcess(null);
           }}
-          onActionComplete={() => {
-            fetchPassengers().then(data => {
-              if (data) setPassengers(data);
-            });
+          onActionComplete={async () => {
+            const data = await fetchPassengers();
+            if (data) setPassengers(data);
+            await fetchMeetingPoints();
+            buildWaypoints();
           }}
         />
 
@@ -1214,9 +1478,10 @@ export default function RouteDetail() {
             setDriverRatingModalVisible(false);
             router.replace("/(tabs)/home");
           }}
-          passengers={sessionUsers.filter(u =>
-            passengers.some(p => p.passenger_id === u.id && (p.status === 'joined' || p.status === 'completed'))
-          )}
+          passengers={sessionUsers.filter(u => {
+            const passengerRecord = passengers.find(p => p.passenger_id === u.id);
+            return passengerRecord && (passengerRecord.status === 'joined' || passengerRecord.status === 'completed');
+          })}
           onSubmit={async (ratings) => {
             try {
               await ratingsService.saveMultipleRatings(

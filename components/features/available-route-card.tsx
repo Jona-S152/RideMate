@@ -31,6 +31,7 @@ interface DriverRouteCardProps {
     }[];
     imageUrl?: string;
     isDriver?: boolean;
+    status?: string;
     onPress?: () => void;
 }
 
@@ -44,6 +45,7 @@ export default function AvailableRouteCard({
     passengersData = [],
     imageUrl,
     isDriver = false,
+    status,
     onPress,
 }: DriverRouteCardProps) {
 
@@ -65,7 +67,7 @@ export default function AvailableRouteCard({
                 style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}
             >
                 {/* Hero Map Image */}
-                <View className="w-full h-36 bg-gray-700">
+                <View className="w-full h-36 bg-gray-700 relative">
                     <Image
                         source={
                             imageUrl && !imageError
@@ -76,6 +78,12 @@ export default function AvailableRouteCard({
                         resizeMode="cover"
                         className="w-full h-full"
                     />
+                    {/* Status Indicator */}
+                    {status === 'active' && (
+                        <View className="absolute top-2 right-2 bg-green-500 rounded-full px-2 py-1">
+                            <Text className="text-white text-xs font-bold">EN CURSO</Text>
+                        </View>
+                    )}
                 </View>
 
                 {/* Overlapping Driver Avatar */}

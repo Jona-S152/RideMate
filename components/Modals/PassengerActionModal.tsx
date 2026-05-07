@@ -92,6 +92,19 @@ export default function PassengerActionModal({
         try {
             let updateResult;
             if (status === 'rejected') {
+                // 1. Eliminar el meeting point del pasajero rechazado
+                const { error: meetingError } = await supabase
+                    .from("passenger_meeting_points")
+                    .delete()
+                    .eq("trip_session_id", tripSessionId)
+                    .eq("passenger_id", passengerId);
+
+                if (meetingError) {
+                    console.error("Error deleting meeting point:", meetingError);
+                    // No fallar completamente por este error
+                }
+
+                // 2. Actualizar el status del pasajero
                 updateResult = await supabase
                     .from("passenger_trip_sessions")
                     .update({ rejected: true })

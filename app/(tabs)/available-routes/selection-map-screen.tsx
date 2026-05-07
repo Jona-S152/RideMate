@@ -2,24 +2,24 @@ import { useAuth } from "@/app/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import Mapbox, {
-  Camera,
-  LineLayer,
-  MapView,
-  MarkerView,
-  ShapeSource,
-  UserLocation
+    Camera,
+    LineLayer,
+    MapView,
+    MarkerView,
+    ShapeSource,
+    UserLocation
 } from "@rnmapbox/maps";
 import * as turf from "@turf/turf";
 import * as Location from "expo-location";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Alert,
+    Pressable,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
 
 // Token recuperado de variables de entorno
@@ -44,6 +44,7 @@ export default function SelectionMapScreen() {
   const [distanceToRoute, setDistanceToRoute] = useState(0);
   const [sessionData, setSessionData] = useState<any>(null);
   const [stopsData, setStopsData] = useState<any[]>([]);
+  const [hasPendingRequest, setHasPendingRequest] = useState(false);
 
   const cameraRef = useRef<Mapbox.Camera>(null);
 
@@ -178,6 +179,52 @@ export default function SelectionMapScreen() {
     if (trip_session_id) fetchRoute();
   }, [trip_session_id]);
 
+  useEffect(() => {
+    const checkExistingRequest = async () => {
+      const sessionId = Number(trip_session_id);
+      if (!user?.id || !sessionId || isNaN(sessionId)) return;
+
+      const { data, error } = await supabase
+        .from('passenger_trip_sessions')
+        .select('status, rejected, rejection_reason')
+        .eq('trip_session_id', sessionId)
+        .eq('passenger_id', user.id)
+        .in('status', ['joined', 'pending_approval'])
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error verificando solicitud existente:', error);
+        return;
+      }
+
+      if (data) {
+        // Si fue rechazada, permitir reintentar
+        if (data.rejected) {
+          Alert.alert(
+            'Solicitud Rechazada',
+            data.rejection_reason 
+              ? `Tu solicitud anterior fue rechazada: ${data.rejection_reason}\n\nPuedes seleccionar un nuevo punto de encuentro para intentar nuevamente.`
+              : 'Tu solicitud anterior fue rechazada. Puedes seleccionar un nuevo punto de encuentro para intentar nuevamente.'
+          );
+          return;
+        }
+
+        // Si está pendiente (no rechazada), bloquear
+        setHasPendingRequest(true);
+        Alert.alert(
+          'Solicitud existente',
+          'Ya has enviado una solicitud para este viaje. No puedes seleccionar otro punto de encuentro.',
+          [{ text: 'OK', onPress: () => router.replace('/(tabs)/available-routes') }]
+        );
+      }
+    };
+
+    checkExistingRequest();
+  }, [trip_session_id, user?.id, router]);
+
 
   // 3. Validar Proximidad (Turf.js)
   useEffect(() => {
@@ -208,11 +255,34 @@ export default function SelectionMapScreen() {
   }, [selectedCoords, routeGeoJSON]);
 
   const confirmPoint = async () => {
-    if (!selectedCoords || !isValidSelection) return;
+    if (!selectedCoords || !isValidSelection || hasPendingRequest) return;
     setLoading(true);
 
     try {
       const sessionId = Number(trip_session_id);
+
+      const { data: existingRequest, error: existingError } = await supabase
+        .from('passenger_trip_sessions')
+        .select('status, rejected, rejection_reason')
+        .eq('trip_session_id', sessionId)
+        .eq('passenger_id', user?.id)
+        .in('status', ['joined', 'pending_approval'])
+        .limit(1)
+        .maybeSingle();
+
+      if (existingError) throw existingError;
+      
+      // Si existe una solicitud y NO fue rechazada, está pendiente
+      if (existingRequest && !existingRequest.rejected) {
+        Alert.alert('Solicitud existente', 'Ya tienes una solicitud en curso para este viaje. No puedes volver a seleccionar otro punto de encuentro.');
+        router.replace('/(tabs)/available-routes');
+        return;
+      }
+
+      // Si fue rechazada, permitir crear una nueva (no bloquear)
+      if (existingRequest && existingRequest.rejected) {
+        // Permitir continuar, será una nueva solicitud
+      }
 
       const { error: sessionError } = await supabase
         .from("passenger_trip_sessions")
@@ -241,7 +311,7 @@ export default function SelectionMapScreen() {
       if (meetingError) throw meetingError;
 
       Alert.alert("Solicitud Enviada", "Tu solicitud ha sido enviada con éxito. Espera a que el conductor la apruebe.");
-      router.replace("/(tabs)/home");
+      router.replace("/(tabs)/available-routes");
     } catch (error: any) {
       console.error(error);
       Alert.alert("Error", error.message);
@@ -365,8 +435,8 @@ export default function SelectionMapScreen() {
       <View className="absolute bottom-32 left-0 right-0 px-6">
         <Pressable
           onPress={confirmPoint}
-          disabled={loading || !isValidSelection}
-          className={`h-16 rounded-full flex-row items-center justify-center shadow-2xl ${loading || !isValidSelection ? "bg-gray-400" : "bg-[#FCA311]"
+          disabled={loading || !isValidSelection || hasPendingRequest}
+          className={`h-16 rounded-full flex-row items-center justify-center shadow-2xl ${loading || !isValidSelection || hasPendingRequest ? "bg-gray-400" : "bg-[#FCA311]"
             }`}
           style={({ pressed }) => [{ opacity: pressed ? 0.9 : 1 }]}
         >

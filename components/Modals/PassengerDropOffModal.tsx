@@ -41,7 +41,18 @@ export default function PassengerDropOffModal({
         }
     };
 
-    const joinedPassengers = passengers.filter((p) => p.status === "joined");
+    const joinedPassengers = Array.from(
+      new Map(
+        passengers
+          .filter((p) => p.status === "joined")
+          .sort((a, b) => {
+            const aTime = new Date(a.created_at).getTime();
+            const bTime = new Date(b.created_at).getTime();
+            return bTime - aTime || b.id - a.id;
+          })
+          .map((p) => [p.passenger_id, p]),
+      ).values(),
+    );
 
     return (
         <Modal

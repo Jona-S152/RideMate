@@ -8,11 +8,11 @@ import { useActiveSession } from "@/hooks/useRealTime";
 import { useEffect, useRef, useState } from "react";
 import { Animated, ScrollView, Switch, View } from "react-native";
 
+import MasonryGrid from "@/components/common/MasonryGrid";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { supabase } from "@/lib/supabase";
 import { registerDeviceToken } from "@/services/notifications.service";
 import { ratingsService } from "@/services/ratings.service";
-import MasonryGrid from "@/components/common/MasonryGrid";
 // ... imports
 
 export default function HomeScreen() {
@@ -336,7 +336,7 @@ export default function HomeScreen() {
       </ThemedView>
 
       <View className="flex-1 mx-4 mt-4">
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
           {activeSession && (
             <RouteCard
               key={`active-${activeSession.id}`}

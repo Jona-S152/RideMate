@@ -149,6 +149,7 @@ export default function RoutePreviewScreen() {
                     .select("*")
                     .eq("driver_id", user.id)
                     .in("status", ["pending", "active"])
+                    .limit(1)
                     .maybeSingle();
 
                 if (activeSession) {
@@ -186,18 +187,6 @@ export default function RoutePreviewScreen() {
                 setSessionChanged(true);
                 router.replace("/(tabs)/home");
             } else {
-                const { data: activeSession } = await supabase
-                    .from('passenger_trip_sessions')
-                    .select("*")
-                    .eq("passenger_id", user.id)
-                    .in("status", ["joined"])
-                    .maybeSingle();
-
-                if (activeSession) {
-                    Alert.alert("Error", "Ya tienes un viaje en curso");
-                    return;
-                }
-
                 router.push({
                     pathname: "/(tabs)/available-routes/selection-map-screen",
                     params: {
