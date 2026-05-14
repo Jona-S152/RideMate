@@ -2,6 +2,7 @@ import { useAuth } from "@/app/context/AuthContext";
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { supabase } from "@/lib/supabase";
+import { calculateDistance } from "@/utils/geo";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Mapbox, {
   Camera,
@@ -27,6 +28,7 @@ Mapbox.setAccessToken(MAPBOX_TOKEN);
 export default function CreateRouteScreen() {
   const { user } = useAuth();
   const cameraRef = useRef<Mapbox.Camera>(null);
+  const isSubmitting = useRef(false);
   const { activeModeP } = useLocalSearchParams();
 
   // Estados de ubicación
@@ -167,9 +169,29 @@ export default function CreateRouteScreen() {
   };
 
   const saveRoute = async () => {
-    if (!startPoint || !endPoint) return;
+    if (!startPoint || !endPoint || isSubmitting.current) return;
+    isSubmitting.current = true;
     setLoading(true);
     try {
+      // Validate proximity
+      const location = await Location.getCurrentPositionAsync({});
+      const driverLat = location.coords.latitude;
+      const driverLon = location.coords.longitude;
+      const startLat = startPoint.coords[1];
+      const startLon = startPoint.coords[0];
+
+      const distance = calculateDistance(driverLat, driverLon, startLat, startLon);
+
+      if (distance > 1.0) { // 1.0 km tolerance
+        Alert.alert(
+          "Punto de inicio lejano",
+          "El punto de inicio de la ruta está muy lejos de tu ubicación actual. Por favor, acércate al punto de partida o ajusta el inicio de la ruta para continuar."
+        );
+        isSubmitting.current = false;
+        setLoading(false);
+        return;
+      }
+
       const staticMapUrl = `https://api.mapbox.com/styles/v1/mapbox/traffic-night-v2/static/${routePolyline ? `path-5+FCA311-0.8(${encodeURIComponent(routePolyline)})` : ""},pin-s-a+2ecc71(${startPoint.coords[0]},${startPoint.coords[1]}),pin-s-b+e74c3c(${endPoint.coords[0]},${endPoint.coords[1]})/auto/600x600?padding=110,110,110,110&access_token=${MAPBOX_TOKEN}`;
 
       const { error } = await supabase.from("routes").insert([
@@ -184,10 +206,21 @@ export default function CreateRouteScreen() {
       ]);
 
       if (error) throw error;
-      Alert.alert("¡Éxito!", "Ruta creada correctamente.");
-      router.back();
+      Alert.alert(
+        "¡Éxito!",
+        "Ruta creada correctamente.",
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              router.replace("/(tabs)/available-routes");
+            }
+          }
+        ]
+      );
     } catch (error: any) {
       Alert.alert("Error", error.message);
+      isSubmitting.current = false;
     } finally {
       setLoading(false);
     }
@@ -337,17 +370,14 @@ export default function CreateRouteScreen() {
             onPress={saveRoute}
             disabled={loading}
             className="h-16 rounded-full flex-row items-center justify-center shadow-2xl"
-            style={({ pressed }) => [
-              { backgroundColor: Colors.dark.secondary },
-              { opacity: pressed ? 0.9 : 1 },
-            ]}
+            style={{ backgroundColor: Colors.dark.secondary }}
           >
             {loading ? <ActivityIndicator color={Colors.dark.primary} /> : (
               <>
-                <ThemedText className="text-primary font-black text-lg uppercase tracking-widest">
+                <ThemedText lightColor={Colors.light.text} darkColor={Colors.dark.text} className="text-lg uppercase tracking-widest">
                   Confirmar y Crear Ruta
                 </ThemedText>
-                <Ionicons name="arrow-forward" size={20} color={Colors.dark.primary} style={{ marginLeft: 10 }} />
+                <Ionicons name="arrow-forward" size={20} color={Colors.dark.text} style={{ marginLeft: 10 }} />
               </>
             )}
           </Pressable>
@@ -366,7 +396,7 @@ export default function CreateRouteScreen() {
       >
         <Ionicons name="close" size={24} color={Colors.dark.text} />
       </Pressable>
-    </View>
+    </View >
   );
 }
 

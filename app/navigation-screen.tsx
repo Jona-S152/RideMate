@@ -19,6 +19,7 @@ export default function NavigationScreen() {
     destName: string;
     startLat: string;
     startLng: string;
+    trip_session_id?: string;
   }>();
 
   const destination = {
@@ -381,7 +382,16 @@ export default function NavigationScreen() {
 
         <TouchableOpacity
           style={styles.exitButton}
-          onPress={() => router.back()}
+          onPress={() => {
+            if (params.trip_session_id) {
+              router.navigate({
+                pathname: "/(tabs)/home/route-detail",
+                params: { id: params.trip_session_id }
+              });
+            } else {
+              router.back();
+            }
+          }}
         >
           <Text style={styles.exitButtonText}>SALIR</Text>
         </TouchableOpacity>

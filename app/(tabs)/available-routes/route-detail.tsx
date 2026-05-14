@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { format, isToday, isTomorrow } from "date-fns";
 import { es } from "date-fns/locale";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import * as Location from "expo-location";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Image, Pressable, RefreshControl, ScrollView, View } from "react-native";
 
@@ -204,6 +205,35 @@ export default function RouteDetail() {
 
         try {
             setIsActionLoading(true);
+
+            // Validate driver proximity to start point
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permiso denegado', 'Se requiere acceso a la ubicación para iniciar el viaje.');
+                setIsActionLoading(false);
+                return;
+            }
+
+            const location = await Location.getCurrentPositionAsync({});
+            const driverLat = location.coords.latitude;
+            const driverLon = location.coords.longitude;
+            
+            if (routeSessions?.start_coords?.coordinates) {
+                const startLon = routeSessions.start_coords.coordinates[0];
+                const startLat = routeSessions.start_coords.coordinates[1];
+
+                const distance = calculateDistance(driverLat, driverLon, startLat, startLon);
+
+                if (distance > 1.0) { // 1.0 km de tolerancia
+                    Alert.alert(
+                        "Punto de inicio lejano",
+                        "Estás muy lejos del punto de inicio para comenzar la ruta. Por favor, acércate al punto de partida."
+                    );
+                    setIsActionLoading(false);
+                    return;
+                }
+            }
+
             const { data, error } = await supabase
                 .from('trip_sessions')
                 .update({ status: 'active' })

@@ -434,6 +434,32 @@ export default function RouteDetail() {
     if (!session || !user?.id) return;
 
     try {
+      // Validar ubicación del conductor respecto al punto de inicio
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+          Alert.alert('Permiso denegado', 'Se requiere acceso a la ubicación para iniciar el viaje.');
+          return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      const driverLat = location.coords.latitude;
+      const driverLon = location.coords.longitude;
+      
+      const startCoords = parseCoords(session.start_coords);
+      if (startCoords) {
+          const startLat = startCoords.latitude;
+          const startLon = startCoords.longitude;
+          const distance = calculateDistance(driverLat, driverLon, startLat, startLon);
+
+          if (distance > 1.0) { // 1.0 km de tolerancia
+              Alert.alert(
+                  "Punto de inicio lejano",
+                  "Estás muy lejos del punto de inicio para comenzar la ruta. Por favor, acércate al punto de partida."
+              );
+              return;
+          }
+      }
+
       const { error } = await supabase
         .from("trip_sessions")
         .update({ status: "active" })
@@ -610,7 +636,8 @@ export default function RouteDetail() {
         params: {
           destLat: nextTarget.coords.latitude.toString(),
           destLng: nextTarget.coords.longitude.toString(),
-          destName: nextTarget.location
+          destName: nextTarget.location,
+          trip_session_id: id?.toString()
         }
       });
     } else {
