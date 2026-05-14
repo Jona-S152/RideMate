@@ -232,10 +232,10 @@ export default function PassengerRoutesScreen() {
   });
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: Colors.light.background }}>
       <ThemedView
-        lightColor={Colors.light.primary}
-        darkColor={Colors.dark.primary}
+        lightColor={Colors.light.glass}
+        darkColor={Colors.dark.glass}
         className="w-full px-4 py-6 rounded-bl-[40px]"
       >
         <ThemedText className="font-semibold text-4xl py-3">

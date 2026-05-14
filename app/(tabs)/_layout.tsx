@@ -14,7 +14,7 @@ import { useAuth } from "../context/AuthContext";
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const pathName = usePathname();
-  const hideTabBar = ["edit-profile", "route-detail", "become-driver", "create-route-screen"].some((route) =>
+  const hideTabBar = ["edit-profile", "route-detail", "become-driver", "create-route-screen", "activity"].some((route) =>
     pathName.includes(route),
   ); // Colocar rutas secundarias
 
@@ -46,20 +46,22 @@ export default function TabLayout() {
             left: 20,
             right: 20,
             height: 70, // alto del tab bar
-            backgroundColor: "#000D3A",
+            backgroundColor: Colors[colorScheme ?? "light"].glassStrong,
+            borderWidth: 1,
+            borderColor: Colors[colorScheme ?? "light"].border,
             borderRadius: 35, // hace que se vea ovalado
             borderTopWidth: 0, // elimina borde feo default
             overflow: "hidden",
             elevation: 5, // sombra Android
             shadowColor: "#000", // sombra iOS
-            shadowOpacity: 0.1,
-            shadowOffset: { width: 0, height: 4 },
-            shadowRadius: 8,
+            shadowOpacity: 0.25,
+            shadowOffset: { width: 0, height: 8 },
+            shadowRadius: 16,
             paddingBottom: 10,
             paddingTop: 10,
             marginHorizontal: 20,
           },
-        tabBarInactiveTintColor: "#D1D5DB",
+        tabBarInactiveTintColor: Colors[colorScheme ?? "light"].tabIconDefault,
       }}
     >
       <Tabs.Screen

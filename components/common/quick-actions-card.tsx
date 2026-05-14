@@ -1,7 +1,6 @@
 import { Colors } from "@/constants/Colors";
-import { DarkTheme, DefaultTheme } from "@react-navigation/native";
+import GlassCard from "@/components/common/GlassCard";
 import { ThemedText } from "../ui/ThemedText";
-import { ThemedView } from "../ui/ThemedView";
 
 interface QuickActionCardProps {
     text: string
@@ -9,17 +8,29 @@ interface QuickActionCardProps {
 
 export default function QuickActionCard({ text }: QuickActionCardProps) {
     return (
-        <ThemedView 
-            lightColor={Colors.light.tint} 
-            darkColor={Colors.dark.tint}
-            className="w-48 h-48 p-1 items-center justify-center shadow-lg rounded-3xl">
+        <GlassCard
+            style={{
+                width: 192,
+                height: 192,
+                padding: 4,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 24,
+                borderWidth: 1,
+                borderColor: Colors.dark.border,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.25,
+                shadowRadius: 16,
+                elevation: 6,
+            }}>
             <ThemedText 
-                lightColor={DefaultTheme.colors.background} 
-                darkColor={DarkTheme.colors.background}
+                lightColor={Colors.dark.text} 
+                darkColor={Colors.dark.text}
                 className="text-2xl text-center"
             >
                 {text}
             </ThemedText>
-        </ThemedView>
+        </GlassCard>
     );
 }

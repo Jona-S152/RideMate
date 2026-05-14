@@ -56,7 +56,7 @@ export default function WaypointCheckInModal({
 
     const getTypeColor = () => {
         if (waypoint.type === 'stop') return 'bg-purple-500';
-        if (waypoint.type === 'meeting_point') return 'bg-[#000D3A]';
+        if (waypoint.type === 'meeting_point') return 'bg-primary';
         return 'bg-green-500';
     };
 
@@ -93,7 +93,7 @@ export default function WaypointCheckInModal({
                                 </Text>
                             )}
                             {waypoint.type === 'meeting_point' && (
-                                <Text className="text-sm font-bold text-[#000D3A] uppercase">
+                                <Text className="text-sm font-bold text-primary uppercase">
                                     Punto de Encuentro
                                 </Text>
                             )}

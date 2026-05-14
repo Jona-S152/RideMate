@@ -1,5 +1,6 @@
 import { useAuth } from "@/app/context/AuthContext";
 import { ThemedText } from "@/components/ThemedText";
+import { Colors } from "@/constants/Colors";
 import { supabase } from "@/lib/supabase";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Mapbox, {
@@ -10,14 +11,14 @@ import Mapbox, {
 } from "@rnmapbox/maps";
 import * as Location from "expo-location";
 import { router } from "expo-router";
+import { useLocalSearchParams } from "expo-router/build/hooks";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   Pressable,
   StyleSheet,
-  View,
+  View
 } from "react-native";
 
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
@@ -26,26 +27,34 @@ Mapbox.setAccessToken(MAPBOX_TOKEN);
 export default function CreateRouteScreen() {
   const { user } = useAuth();
   const cameraRef = useRef<Mapbox.Camera>(null);
+  const { activeModeP } = useLocalSearchParams();
 
   // Estados de ubicación
   const [initialLocation, setInitialLocation] = useState<number[] | null>(null);
   const [currentCoords, setCurrentCoords] = useState<number[] | null>(null);
   const [currentName, setCurrentName] = useState<string>("Buscando ubicación...");
-  
+
   // Puntos fijados
   const [startPoint, setStartPoint] = useState<{ coords: number[]; name: string } | null>(null);
   const [endPoint, setEndPoint] = useState<{ coords: number[]; name: string } | null>(null);
-  
+
   // Estados de interfaz
   const [activeMode, setActiveMode] = useState<'start' | 'end'>('start');
   const [isSelectionMode, setIsSelectionMode] = useState(true); // Controla si el marcador central es visible
-  
+
   // Geometría de la ruta
   const [routeGeometry, setRouteGeometry] = useState<any>(null);
   const [routePolyline, setRoutePolyline] = useState<string | null>(null);
-  
+
   const [loading, setLoading] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
+
+  useEffect(() => {
+    if (activeModeP === 'start')
+      setActiveMode('start');
+    else
+      setActiveMode('end');
+  }, [activeModeP]);
 
   // 1. Obtener ubicación inicial
   useEffect(() => {
@@ -128,7 +137,7 @@ export default function CreateRouteScreen() {
 
   const fixPoint = () => {
     if (!currentCoords) return;
-    
+
     if (activeMode === 'start') {
       setStartPoint({ coords: [...currentCoords], name: currentName });
       if (!endPoint) {
@@ -145,7 +154,7 @@ export default function CreateRouteScreen() {
   const handleInputPress = (mode: 'start' | 'end') => {
     setActiveMode(mode);
     setIsSelectionMode(true);
-    
+
     // Mover cámara al punto ya seleccionado si existe
     const point = mode === 'start' ? startPoint : endPoint;
     if (point) {
@@ -185,42 +194,67 @@ export default function CreateRouteScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#000D3A" }}>
+    <View style={{ flex: 1, backgroundColor: Colors.dark.background }}>
       {/* PANEL DE SELECCIÓN SUPERIOR */}
       <View className="absolute top-16 left-0 right-0 z-50 px-5">
-        <View className="bg-white p-5 rounded-[35px] shadow-2xl border border-slate-100">
+        <View
+          className="p-5 rounded-[35px] shadow-2xl"
+          style={{
+            backgroundColor: Colors.dark.glass,
+            borderColor: Colors.dark.border,
+            borderWidth: 1,
+          }}
+        >
           <View className="flex-row items-center">
             <View className="items-center mr-4">
               <View className={`w-3 h-3 rounded-full ${startPoint ? 'bg-green-500' : 'bg-slate-300'}`} />
-              <View className="w-[2px] h-10 bg-slate-100 my-1" />
+              <View className="w-[2px] h-10 my-1" style={{ backgroundColor: Colors.dark.border }} />
               <View className={`w-3 h-3 ${endPoint ? 'bg-red-500' : 'bg-slate-300'}`} />
             </View>
 
             <View className="flex-1">
-              <Pressable 
+              <Pressable
                 onPress={() => handleInputPress('start')}
-                className={`p-3 rounded-2xl mb-2 flex-row items-center ${activeMode === 'start' && isSelectionMode ? 'bg-green-50 border border-green-100' : 'bg-transparent'}`}
+                className={`p-3 rounded-2xl mb-2 flex-row items-center ${activeMode === 'start' && isSelectionMode ? '' : 'bg-transparent'}`}
+                style={
+                  activeMode === "start" && isSelectionMode
+                    ? {
+                      backgroundColor: "rgba(16,185,129,0.16)",
+                      borderColor: "rgba(16,185,129,0.4)",
+                      borderWidth: 1,
+                    }
+                    : undefined
+                }
               >
-                <ThemedText 
-                  numberOfLines={1} 
-                  className={`text-sm flex-1 ${(activeMode === 'start' && isSelectionMode) ? 'text-[#000D3A] font-bold' : 'text-slate-400'}`}
+                <ThemedText
+                  numberOfLines={1}
+                  className={`text-sm flex-1 ${(activeMode === 'start' && isSelectionMode) ? 'font-bold text-textPrimary' : 'text-textSecondary'}`}
                 >
                   {(activeMode === 'start' && isSelectionMode) ? currentName : (startPoint?.name || "Selecciona origen...")}
                 </ThemedText>
                 {startPoint && <Ionicons name="checkmark-circle" size={16} color="#10B981" />}
               </Pressable>
 
-              <Pressable 
+              <Pressable
                 onPress={() => handleInputPress('end')}
-                className={`p-3 rounded-2xl flex-row items-center ${activeMode === 'end' && isSelectionMode ? 'bg-red-50 border border-red-100' : 'bg-transparent'}`}
+                className={`p-3 rounded-2xl flex-row items-center ${activeMode === 'end' && isSelectionMode ? '' : 'bg-transparent'}`}
+                style={
+                  activeMode === "end" && isSelectionMode
+                    ? {
+                      backgroundColor: "rgba(239,68,68,0.16)",
+                      borderColor: "rgba(239,68,68,0.4)",
+                      borderWidth: 1,
+                    }
+                    : undefined
+                }
               >
-                <ThemedText 
-                  numberOfLines={1} 
-                  className={`text-sm flex-1 ${(activeMode === 'end' && isSelectionMode) ? 'text-[#000D3A] font-bold' : 'text-slate-400'}`}
+                <ThemedText
+                  numberOfLines={1}
+                  className={`text-sm flex-1 ${(activeMode === 'end' && isSelectionMode) ? 'font-bold text-textPrimary' : 'text-textSecondary'}`}
                 >
                   {(activeMode === 'end' && isSelectionMode) ? currentName : (endPoint?.name || "¿A dónde vamos?")}
                 </ThemedText>
-                {endPoint && <Ionicons name="checkmark-circle" size={16} color="#EF4444" />}
+                {endPoint && <Ionicons name="checkmark-circle" size={16} color={Colors.dark.warning} />}
               </Pressable>
             </View>
           </View>
@@ -256,7 +290,7 @@ export default function CreateRouteScreen() {
             <Mapbox.LineLayer
               id="routeLine"
               style={{
-                lineColor: "#FCA311",
+                lineColor: Colors.light.secondary,
                 lineWidth: 5,
                 lineOpacity: 0.8,
                 lineCap: "round",
@@ -276,7 +310,7 @@ export default function CreateRouteScreen() {
                 {activeMode === 'start' ? "Mover Inicio" : "Mover Destino"}
               </ThemedText>
             </View>
-            <Ionicons name="location" size={45} color={activeMode === 'start' ? "#10B981" : "#EF4444"} />
+            <Ionicons name="location" size={45} color={activeMode === "start" ? Colors.dark.success : Colors.dark.warning} />
           </View>
         </View>
       )}
@@ -302,15 +336,18 @@ export default function CreateRouteScreen() {
           <Pressable
             onPress={saveRoute}
             disabled={loading}
-            className={`h-16 rounded-full flex-row items-center justify-center shadow-2xl bg-[#FCA311]`}
-            style={({ pressed }) => [{ opacity: pressed ? 0.9 : 1 }]}
+            className="h-16 rounded-full flex-row items-center justify-center shadow-2xl"
+            style={({ pressed }) => [
+              { backgroundColor: Colors.dark.secondary },
+              { opacity: pressed ? 0.9 : 1 },
+            ]}
           >
-            {loading ? <ActivityIndicator color="#000D3A" /> : (
+            {loading ? <ActivityIndicator color={Colors.dark.primary} /> : (
               <>
-                <ThemedText className="text-[#000D3A] font-black text-lg uppercase tracking-widest">
+                <ThemedText className="text-primary font-black text-lg uppercase tracking-widest">
                   Confirmar y Crear Ruta
                 </ThemedText>
-                <Ionicons name="arrow-forward" size={20} color="#000D3A" style={{ marginLeft: 10 }} />
+                <Ionicons name="arrow-forward" size={20} color={Colors.dark.primary} style={{ marginLeft: 10 }} />
               </>
             )}
           </Pressable>
@@ -320,9 +357,14 @@ export default function CreateRouteScreen() {
       {/* Botón Cerrar */}
       <Pressable
         onPress={() => router.back()}
-        className="absolute top-14 left-6 w-10 h-10 rounded-full items-center justify-center shadow-lg z-[60] bg-white"
+        className="absolute top-14 left-6 w-10 h-10 rounded-full items-center justify-center shadow-lg z-[60]"
+        style={{
+          backgroundColor: Colors.dark.glassSoft,
+          borderColor: Colors.dark.border,
+          borderWidth: 1,
+        }}
       >
-        <Ionicons name="close" size={24} color="#000D3A" />
+        <Ionicons name="close" size={24} color={Colors.dark.text} />
       </Pressable>
     </View>
   );

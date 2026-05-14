@@ -206,8 +206,8 @@ export default function RoutePreviewScreen() {
 
     if (loading) {
         return (
-            <View className="flex-1 items-center justify-center bg-[#000A1C]">
-                <ActivityIndicator size="large" color={Colors.light.primary} />
+            <View className="flex-1 items-center justify-center" style={{ backgroundColor: Colors.dark.background }}>
+                <ActivityIndicator size="large" color={Colors.dark.secondary} />
             </View>
         );
     }
@@ -238,7 +238,7 @@ export default function RoutePreviewScreen() {
                             <LineLayer
                                 id="lineLayer"
                                 style={{
-                                    lineColor: "#00E5FF",
+                                    lineColor: Colors.dark.secondary,
                                     lineWidth: 5,
                                     lineJoin: 'round',
                                     lineCap: 'round',
@@ -249,8 +249,8 @@ export default function RoutePreviewScreen() {
                     {routeData?.start_coords && (
                         <MarkerView id="origin" coordinate={routeData.start_coords.coordinates} anchor={{ x: 0.5, y: 1 }}>
                             <View className="items-center">
-                                <View className="bg-white p-1 rounded-full shadow-md">
-                                    <Ionicons name="flag" size={24} color="#22c55e" />
+                                <View className="bg-slate-800 p-1 rounded-full shadow-md">
+                                    <Ionicons name="flag" size={24} color={Colors.light.success} />
                                 </View>
                                 {/* <ThemedText className="bg-white/80 px-1 text-[8px] font-bold">Inicio</ThemedText> */}
                             </View>
@@ -270,7 +270,7 @@ export default function RoutePreviewScreen() {
                                     <Ionicons
                                         name="location-sharp"
                                         size={24}
-                                        color={Colors.light.primary}
+                                        color={Colors.dark.secondary}
                                     />
                                 </View>
                             </MarkerView>
@@ -279,8 +279,8 @@ export default function RoutePreviewScreen() {
                     {routeData?.end_coords && (
                         <MarkerView id="destination" coordinate={routeData.end_coords.coordinates} anchor={{ x: 0.5, y: 1 }}>
                             <View className="items-center">
-                                <View className="bg-white p-1 rounded-full shadow-md">
-                                    <Ionicons name="location" size={24} color="#ef4444" />
+                                <View className="bg-slate-800 p-1 rounded-full shadow-md">
+                                    <Ionicons name="location" size={24} color={Colors.light.danger} />
                                 </View>
                                 {/* <ThemedText className="bg-white/80 px-1 text-[8px] font-bold">Fin</ThemedText> */}
                             </View>
@@ -297,18 +297,21 @@ export default function RoutePreviewScreen() {
                     index={0}
                     snapPoints={snapPoints}
                     backgroundStyle={{
-                        backgroundColor: Colors.light.primary,
+                        backgroundColor: Colors.dark.background,
                         borderTopLeftRadius: 55,
                     }}
                     handleComponent={CustomHandle}
                 >
-                    <BottomSheetScrollView contentContainerStyle={styles.scrollContent}>
+                    <BottomSheetScrollView 
+                        style={{ backgroundColor: Colors.dark.background }}
+                        contentContainerStyle={styles.scrollContent}
+                    >
                         {/* Visual Route Timeline */}
                         <View style={styles.timelineContainer}>
                             {/* Origin */}
                             <View style={styles.timelineItem}>
                                 <View style={styles.timelineLeft}>
-                                    <View style={[styles.dot, { backgroundColor: '#10B981' }]} />
+                                    <View style={[styles.dot, { backgroundColor: Colors.light.success }]} />
                                     <View style={styles.line} />
                                 </View>
                                 <View style={styles.timelineRight}>
@@ -321,7 +324,7 @@ export default function RoutePreviewScreen() {
                             {sortedStops.map((stop: any, index: number) => (
                                 <View key={`stop-list-${index}`} style={styles.timelineItem}>
                                     <View style={styles.timelineLeft}>
-                                        <View style={[styles.dotSmall, { backgroundColor: '#000D3A' }]} />
+                                        <View style={[styles.dotSmall, { backgroundColor: Colors.dark.secondary }]} />
                                         <View style={styles.line} />
                                     </View>
                                     <View style={styles.timelineRight}>
@@ -334,7 +337,7 @@ export default function RoutePreviewScreen() {
                             {/* Destination */}
                             <View style={styles.timelineItem}>
                                 <View style={styles.timelineLeft}>
-                                    <View style={[styles.dot, { backgroundColor: '#EF4444' }]} />
+                                    <View style={[styles.dot, { backgroundColor: Colors.light.danger }]} />
                                 </View>
                                 <View style={styles.timelineRight}>
                                     <ThemedText className="text-xs font-bold opacity-50 uppercase">Destino</ThemedText>
@@ -358,13 +361,13 @@ export default function RoutePreviewScreen() {
                             disabled={actionLoading}
                             style={({ pressed }) => [
                                 styles.actionButton,
-                                { backgroundColor: Colors.light.secondary, opacity: pressed || actionLoading ? 0.8 : 1 }
+                                { backgroundColor: Colors.dark.secondary, opacity: pressed || actionLoading ? 0.8 : 1 }
                             ]}
                         >
                             {actionLoading ? (
                                 <ActivityIndicator color={Colors.light.text} />
                             ) : (
-                                <ThemedText className="font-bold text-lg">
+                                <ThemedText className="font-bold text-lg text-white">
                                     {user?.driver_mode ? "Confirmar e Iniciar" : "Solicitar este Viaje"}
                                 </ThemedText>
                             )}
@@ -378,7 +381,7 @@ export default function RoutePreviewScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#000A1C' },
+    container: { flex: 1, backgroundColor: Colors.dark.background },
     map: { flex: 1 },
     backButton: {
         position: 'absolute',
@@ -387,14 +390,14 @@ const styles = StyleSheet.create({
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: Colors.light.primary,
+        backgroundColor: Colors.dark.background,
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 10,
         elevation: 5,
     },
     handleContainer: {
-        backgroundColor: Colors.light.primary,
+        backgroundColor: Colors.dark.background,
         borderTopLeftRadius: 55,
         paddingTop: 12,
         paddingBottom: 8,
@@ -402,7 +405,7 @@ const styles = StyleSheet.create({
     handleLine: {
         width: 40,
         height: 4,
-        backgroundColor: 'rgba(0,0,0,0.1)',
+        backgroundColor: 'rgba(255,255,255,0.3)',
         borderRadius: 2,
         alignSelf: 'center',
     },
@@ -449,7 +452,7 @@ const styles = StyleSheet.create({
         top: 10,
         bottom: 0,
         width: 2,
-        backgroundColor: 'rgba(0,0,0,0.1)',
+        backgroundColor: 'rgba(255,255,255,0.1)',
     },
     markerContainer: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
     marker: { padding: 5, borderRadius: 15, borderWidth: 2, borderColor: 'white' },

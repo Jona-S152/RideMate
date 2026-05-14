@@ -1,4 +1,5 @@
 import { UserData } from "@/interfaces/available-routes";
+import { Colors } from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
@@ -97,7 +98,7 @@ export default function DriverRatingListModal({
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Text style={styles.passengerRole}>Pasajero</Text>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
-                            <Ionicons name="star" size={10} color="#FCA311" />
+                            <Ionicons name="star" size={10} color={Colors.light.secondary} />
                             <Text style={{ fontSize: 10, color: '#64748b', marginLeft: 2, fontWeight: 'bold' }}>
                                 {item.rating || "0.0"}
                             </Text>
@@ -116,7 +117,7 @@ export default function DriverRatingListModal({
                         <Ionicons
                             name={item.selectedRating >= value ? "star" : "star-outline"}
                             size={32}
-                            color={item.selectedRating >= value ? "#FCA311" : "#cbd5e1"}
+                            color={item.selectedRating >= value ? Colors.light.secondary : "#cbd5e1"}
                         />
                     </Pressable>
                 ))}
@@ -263,7 +264,7 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     submitButton: {
-        backgroundColor: "#000D3A",
+        backgroundColor: "#0C162A",
         width: "100%",
         height: 56,
         borderRadius: 28,

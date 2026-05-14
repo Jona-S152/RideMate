@@ -86,10 +86,10 @@ export default function LoginScreen() {
     };
 
     return (
-        <KeyboardAwareScrollView>
+        <KeyboardAwareScrollView className="bg-background">
             <AnimatedThemedView
                 style={{ height: headerHeight }}
-                lightColor={Colors.light.primary}
+                lightColor={Colors.light.glassStrong}
                 className="w-full px-4 pt-6 rounded-bl-[40px]"
             >
                 <View className="items-center justify-center flex-1">
@@ -104,7 +104,7 @@ export default function LoginScreen() {
             </AnimatedThemedView>
             <View className="mx-6 my-8 items-center justify-center">
                 <ThemedTextInput
-                    lightColor={Colors.light.background}
+                    lightColor={Colors.light.glassSoft}
                     className="py-6 px-4 mb-4 w-full"
                     placeholder="Correo electrónico"
                     value={email}
@@ -112,7 +112,7 @@ export default function LoginScreen() {
                 />
 
                 <ThemedTextInput
-                    lightColor={Colors.light.background}
+                    lightColor={Colors.light.glassSoft}
                     className="py-6 px-4 mb-4 w-full"
                     secureTextEntry={true}
                     placeholder="Contraseña"
@@ -131,7 +131,7 @@ export default function LoginScreen() {
 
                 <View className="mt-1">
                     <Link href={'/(auth)/register'}>
-                        <Text style={{ color: Colors.light.primary }}>
+                        <Text style={{ color: Colors.light.secondary }}>
                             ¿No tienes cuenta? Crea una
                         </Text>
                     </Link>

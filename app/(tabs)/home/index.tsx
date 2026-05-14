@@ -6,13 +6,14 @@ import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { useActiveSession } from "@/hooks/useRealTime";
 import { useEffect, useRef, useState } from "react";
-import { Animated, ScrollView, Switch, View } from "react-native";
+import { Animated, Pressable, ScrollView, Switch, View } from "react-native";
 
-import MasonryGrid from "@/components/common/MasonryGrid";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { supabase } from "@/lib/supabase";
 import { registerDeviceToken } from "@/services/notifications.service";
 import { ratingsService } from "@/services/ratings.service";
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 // ... imports
 
 export default function HomeScreen() {
@@ -25,6 +26,7 @@ export default function HomeScreen() {
   const textColor = useThemeColor({}, 'text');
   const tirdColor = useThemeColor({}, 'tird');
   const secondaryColor = useThemeColor({}, 'secondary');
+  const dangerColor = useThemeColor({}, 'danger');
 
   const [isEnabled, setIsEnabled] = useState(false);
   const toggleSwitch = () => {
@@ -124,7 +126,7 @@ export default function HomeScreen() {
       .select("*")
       .eq("user_id", user.id)
       .order("end_time", { ascending: false })
-      .limit(3);
+      .limit(1);
 
     if (error) {
       console.error("Error fetching route history: ", error);
@@ -261,14 +263,28 @@ export default function HomeScreen() {
     fetchSessionDetails();
   }, [activeSession]);
 
+  function handleInputPress(activeMode: string): void {
+    console.log('Modo activo: ', activeMode);
+    router.push({
+      pathname: "/(tabs)/available-routes/create-route-screen",
+      params: {
+        activeModeP: activeMode,
+      }
+    })
+  }
+
   return (
-    <View className="flex-1">
+    <View className="flex-1"
+      style={{
+        backgroundColor: Colors.dark.background,
+      }}
+    >
       <ThemedView
-        lightColor={Colors.light.primary}
-        darkColor={Colors.dark.primary}
-        className="w-full rounded-bl-[40px]"
+        lightColor={Colors.light.secondary}
+        darkColor={Colors.dark.secondary}
+        className="flex-col mx-4 mt-12 mb-4 rounded-2xl"
       >
-        <View className="flex-row justify-between px-8 pt-16">
+        <View className="flex-row justify-between mx-4 mt-4">
           <View>
             <ThemedText
               className="font-semibold text-4xl"
@@ -278,106 +294,191 @@ export default function HomeScreen() {
             <ThemedText
               className="font-light text-sm"
             >
-              ¿Que ruta quieres tomar?
+              ¿A dónde vamos hoy?
             </ThemedText>
           </View>
           {user?.is_driver && (
-            <Switch
-              trackColor={{ false: tirdColor, true: tirdColor }}
-              thumbColor={
-                isEnabled ? secondaryColor : primaryColor // Dynamic colors
-              }
-              ios_backgroundColor={textColor}
-              value={isEnabled}
-              onValueChange={toggleSwitch}
-            ></Switch>
+            <View className="justify-center items-center">
+              <Switch
+                trackColor={{ false: tirdColor, true: tirdColor }}
+                thumbColor={
+                  isEnabled ? dangerColor : primaryColor // Dynamic colors
+                }
+                ios_backgroundColor={textColor}
+                value={isEnabled}
+                onValueChange={toggleSwitch}
+              ></Switch>
+            </View>
           )}
         </View>
-        <View className="flex-row justify-between mx-8">
-          <View className="flex-col gap-4 mt-4">
+        <View className="flex-col m-4">
+          <Pressable
+            onPress={() => handleInputPress('start')}
+            className={`p-3 rounded-t-2xl flex-row items-center`}
+            style={{
+              backgroundColor: Colors.dark.background,
+              borderBottomColor: Colors.dark.primary,
+              borderBottomWidth: 1,
+            }}
+          >
+            {<Ionicons name="location-sharp" size={18} color="#2563EB" />}
             <ThemedText
-              className="font-light text-base"
+              numberOfLines={1}
+              className={`text-base flex-1 text-textSecondary ml-2`}
             >
-              {`Te has unido a ${history.length} ruta${history.length > 1 ? "s" : ""}`}
+              {"Ubicación actual"}
             </ThemedText>
+          </Pressable>
+
+          <Pressable
+            onPress={() => handleInputPress('end')}
+            className={`p-3 rounded-b-2xl flex-row items-center`}
+            style={{
+              backgroundColor: Colors.dark.background,
+              // borderBottomColor: Colors.dark.background,
+              // borderBottomWidth: 1,
+            }}
+          >
+            {<Ionicons name="location-sharp" size={18} color="#EF4444" />}
             <ThemedText
-              className="font-light text-base"
+              numberOfLines={1}
+              className={`text-base flex-1 text-textSecondary ml-2`}
             >
-              Has ahorrado $20
+              {"¿A dónde vas?"}
             </ThemedText>
-            <ThemedText
-              className="font-light text-base"
-            >
-              Conociste +1 estudiante
-            </ThemedText>
-          </View>
-          <View className="relative">
-            <View className="w-full h-[270px]" />
-            <Animated.Image
-              source={require("@/assets/images/studentWalk.png")}
-              resizeMode="contain"
-              className="h-64 absolute right-1"
-              style={{
-                transform: [{ translateX: slideStudent }],
-                opacity: opacityAnimStudent,
-              }}
-            />
-            <Animated.Image
-              source={require("@/assets/images/CarHome.png")}
-              resizeMode="contain"
-              className="mt-32 absolute -right-14"
-              style={{
-                transform: [{ translateX: slideCar }],
-                opacity: opacityAnimCar,
-              }}
-            />
-          </View>
+          </Pressable>
         </View>
       </ThemedView>
 
-      <View className="flex-1 mx-4 mt-4">
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-          {activeSession && (
-            <RouteCard
-              key={`active-${activeSession.id}`}
-              sessionId={activeSession.id}
-              routeId={activeSession.route_id}
-              title={`${activeSession.start_location} - ${activeSession.end_location}`}
-              isActive={activeSession.status}
-              routeScreen={`/(tabs)/home/route-detail?id=${activeSession.id}`}
-              startLocation={activeSession.start_location.split(",")[0].trim()}
-              endLocation={activeSession.end_location.split(",")[0].trim()}
-              passengerCount={passengerDetails.length}
-              driver={driverDetails}
-              passengersData={passengerDetails}
-              imageUrl={(activeSession as any).routes?.image_url}
-            />
-          )}
-          {history.length > 0 ? (
-            <MasonryGrid
-              data={history}
-              keyExtractor={(item) => `hist-${item.id}`}
-              renderItem={(item) => (
-                <RouteCard
-                  sessionId={item.id}
-                  routeId={(item as any).route_id}
-                  title={`${item.start_location} - ${item.end_location}`}
-                  isActive={"completed"}
-                  routeScreen={`/(tabs)/home/route-detail?id=${item.trip_session_id}`}
-                  startLocation={item.start_location.split(",")[0].trim()}
-                  endLocation={item.end_location.split(",")[0].trim()}
-                  passengerCount={(item as any).passengers_data?.length || 0}
-                  driver={(item as any).driver_details}
-                  passengersData={(item as any).passengers_data}
-                  imageUrl={(item as any).image_url}
-                />
-              )}
-            />
-          ) : (
-            <ThemedText className="text-center mt-10 text-gray-500">
-              No tienes rutas en tu historial.
+      <View className="flex-1 mx-4">
+        <ScrollView className="flex-col gap-4" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+          <View className="flex-row mb-2 justify-between items-center">
+            <ThemedText className="text-xl font-semibold">
+              Próximos viajes
             </ThemedText>
-          )}
+            <Pressable onPress={() => router.push('/(tabs)/profile/activity')}>
+              <ThemedText className="text-base font-semibold"
+                lightColor={Colors.light.secondary}
+                darkColor={Colors.dark.secondary}
+              >
+                Ver todos
+              </ThemedText>
+            </Pressable>
+          </View>
+          {activeSession ? (
+            <View>
+              <RouteCard
+                key={`active-${activeSession.id}`}
+                sessionId={activeSession.id}
+                routeId={activeSession.route_id}
+                title={`${activeSession.start_location} - ${activeSession.end_location}`}
+                isActive={activeSession.status}
+                routeScreen={activeSession.status == 'active' ? `/(tabs)/home/route-detail?id=${activeSession.id}` : `/(tabs)/available-routes/route-detail?id=${activeSession.route_id}&sessionId=${activeSession.id}`}
+                startLocation={activeSession.start_location.split(",")[0].trim()}
+                endLocation={activeSession.end_location.split(",")[0].trim()}
+                passengerCount={passengerDetails.length}
+                driver={driverDetails}
+                passengersData={passengerDetails}
+                imageUrl={(activeSession as any).routes?.image_url}
+              />
+            </View>
+          ) :
+            (
+              history.length > 0 ? (
+                <View>
+                  <RouteCard
+                    sessionId={history[0].id}
+                    routeId={(history[0] as any).route_id}
+                    title={`${history[0].start_location} - ${history[0].end_location}`}
+                    isActive={"completed"}
+                    routeScreen={`/(tabs)/available-routes/route-detail?id=${history[0].route_id}&sessionId=${history[0].trip_session_id}`}
+                    startLocation={history[0].start_location.split(",")[0].trim()}
+                    endLocation={history[0].end_location.split(",")[0].trim()}
+                    passengerCount={(history[0] as any).passengers_data?.length || 0}
+                    driver={(history[0] as any).driver_details}
+                    passengersData={(history[0] as any).passengers_data}
+                    imageUrl={(history[0] as any).image_url}
+                  />
+                </View>
+              )
+                : (
+                  <ThemedText className="text-center mt-10 text-textSecondary">
+                    No tienes rutas en tu historial.
+                  </ThemedText>
+                )
+            )
+          }
+
+          {/* Botones de Acción Rápidos (Crear/Buscar) */}
+          <View className="flex-row gap-2 justify-between items-center">
+            <Pressable className="flex-1 pr-1"
+              onPress={() => handleInputPress('start')}
+            >
+              <ThemedView
+                className="flex-row items-center rounded-2xl gap-x-2 py-4"
+                style={{
+                  backgroundColor: Colors.dark.primary,
+                  borderColor: Colors.dark.borderSecondary,
+                  borderWidth: 1
+                }}
+              >
+                <View>
+                  <Ionicons name="car-sport" size={30} color="#2563EB" />
+                </View>
+                <View className="flex-col">
+                  <ThemedText className="text-base font-semibold">
+                    Crear viaje
+                  </ThemedText>
+                  <ThemedText className="text-sm text-textsecondary">
+                    Como conductor
+                  </ThemedText>
+                </View>
+              </ThemedView>
+            </Pressable>
+            <Pressable
+              className="flex-1 pl-1"
+              onPress={() => router.push('/(tabs)/available-routes')}
+            >
+              <ThemedView className="flex-row items-center gap-x-2 rounded-2xl py-4"
+                style={{
+                  backgroundColor: Colors.dark.primary,
+                  borderColor: Colors.dark.borderSecondary,
+                  borderWidth: 1
+                }}
+              >
+                <View>
+                  <Ionicons name="people" size={30} color="#2563EB" />
+                </View>
+                <View className="flex-col">
+                  <ThemedText className="text-base font-semibold">
+                    Buscar viaje
+                  </ThemedText>
+                  <ThemedText className="text-sm text-textsecondary">
+                    Como pasajero
+                  </ThemedText>
+                </View>
+              </ThemedView>
+            </Pressable>
+          </View>
+
+          {/* Sección de seguridad */}
+          <View className="flex-row gap-x-2 items-center py-4 mb-4 rounded-2xl"
+            style={{
+              backgroundColor: Colors.dark.warning,
+              borderColor: Colors.dark.borderWarning,
+              borderWidth: 1
+            }}
+          >
+            <Ionicons name="shield-checkmark-outline" size={50} color="#2563EB" />
+            <View className="flex-1">
+              <ThemedText className="text-base font-bold">
+                Tu seguridad es prioridad
+              </ThemedText>
+              <ThemedText className="text-xs text-textSecondary leading-4">
+                Comparte tu viaje en tiempo real con tus contactos de confianza.
+              </ThemedText>
+            </View>
+          </View>
         </ScrollView>
       </View>
       {/* <View className="h-48 bg-fuchsia-500"/> */}

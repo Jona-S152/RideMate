@@ -122,7 +122,14 @@ export default function ActivityScreen() {
     const AnimatedThemedView = Animated.createAnimatedComponent(ThemedView);
 
     const renderTripItem = ({ item }: { item: TripHistoryItem }) => (
-        <View className="bg-white mx-4 mb-4 p-4 rounded-3xl shadow-sm border border-slate-100">
+        <View
+            className="mx-4 mb-4 p-4 rounded-3xl"
+            style={{
+                backgroundColor: Colors.dark.glassSoft,
+                borderColor: Colors.dark.border,
+                borderWidth: 1,
+            }}
+        >
             <View className="flex-row justify-between items-start mb-3">
                 <View className="flex-1">
                     <View className="flex-row items-center mb-1">
@@ -131,28 +138,28 @@ export default function ActivityScreen() {
                             {new Date(item.start_time).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
                         </ThemedText>
                     </View>
-                    <ThemedText className="font-bold text-slate-800 text-base" numberOfLines={1}>
+                    <ThemedText className="font-bold text-base" style={{ color: Colors.dark.text }} numberOfLines={1}>
                         {item.start_location.split(',')[0]}
                     </ThemedText>
                 </View>
                 <View className={`px-3 py-1 rounded-full ${item.status === 'completed' ? 'bg-green-100' : item.status === 'cancelled' ? 'bg-red-100' : 'bg-blue-50'}`}>
-                    <ThemedText className={`text-[10px] font-bold uppercase ${item.status === 'completed' ? 'text-green-600' : item.status === 'cancelled' ? 'text-red-800' : 'text-[#000D3A]'}`}>
+                    <ThemedText className={`text-[10px] font-bold uppercase ${item.status === 'completed' ? 'text-green-600' : item.status === 'cancelled' ? 'text-red-800' : 'text-primary'}`}>
                         {item.status === 'completed' ? 'Finalizado' : item.status === 'joined' ? 'En curso' : item.status}
                     </ThemedText>
                 </View>
             </View>
 
             <View className="flex-row items-center mb-3">
-                <View className="w-1 h-6 bg-slate-200 mx-2 rounded-full" />
-                <ThemedText className="text-slate-500 text-sm" numberOfLines={1}>
+                <View className="w-1 h-6 mx-2 rounded-full" style={{ backgroundColor: Colors.dark.border }} />
+                <ThemedText className="text-sm" style={{ color: Colors.dark.textSecondary }} numberOfLines={1}>
                     {item.end_location.split(',')[0]}
                 </ThemedText>
             </View>
 
-            <View className="flex-row justify-between items-center pt-3 border-t border-slate-50">
+            <View className="flex-row justify-between items-center pt-3" style={{ borderTopColor: Colors.dark.border, borderTopWidth: 1 }}>
                 <View className="flex-row items-center">
                     <Ionicons name={item.role === 'driver' ? 'people' : 'wallet'} size={18} color="#64748b" />
-                    <ThemedText className="ml-2 text-slate-600 font-medium">
+                    <ThemedText className="ml-2 font-medium" style={{ color: Colors.dark.textSecondary }}>
                         {item.role === 'driver' ? `${item.passenger_count} pasajeros` : `$${item.price}`}
                     </ThemedText>
                 </View>
@@ -162,10 +169,11 @@ export default function ActivityScreen() {
     );
 
     return (
-        <View className="flex-1 bg-slate-50">
+        <View className="flex-1" style={{ backgroundColor: Colors.dark.background }}>
             <AnimatedThemedView
                 style={{ height: headerHeight, opacity: headerOpacity }}
-                lightColor={Colors.light.primary}
+                lightColor={Colors.dark.glass}
+                darkColor={Colors.dark.glass}
                 className="w-full px-6 pt-12 rounded-bl-[40px] z-10"
             >
                 <ThemedText lightColor="white" className="text-3xl font-bold mb-6">
@@ -173,20 +181,22 @@ export default function ActivityScreen() {
                 </ThemedText>
 
                 {user?.is_driver && (
-                    <View className="flex-row bg-white/20 p-1 rounded-full mb-4">
+                    <View className="flex-row p-1 rounded-full mb-4" style={{ backgroundColor: Colors.dark.glassSoft, borderColor: Colors.dark.border, borderWidth: 1 }}>
                         <Pressable
                             onPress={() => setRole('passenger')}
-                            className={`flex-1 py-2 rounded-full items-center ${role === 'passenger' ? 'bg-white' : ''}`}
+                            className="flex-1 py-2 rounded-full items-center"
+                            style={{ backgroundColor: role === "passenger" ? Colors.dark.secondary : "transparent" }}
                         >
-                            <ThemedText className={`font-bold ${role === 'passenger' ? 'text-black' : 'text-white'}`}>
+                            <ThemedText className="font-bold" style={{ color: role === "passenger" ? Colors.dark.primary : Colors.dark.text }}>
                                 Pasajero
                             </ThemedText>
                         </Pressable>
                         <Pressable
                             onPress={() => setRole('driver')}
-                            className={`flex-1 py-2 rounded-full items-center ${role === 'driver' ? 'bg-white' : ''}`}
+                            className="flex-1 py-2 rounded-full items-center"
+                            style={{ backgroundColor: role === "driver" ? Colors.dark.secondary : "transparent" }}
                         >
-                            <ThemedText className={`font-bold ${role === 'driver' ? 'text-black' : 'text-white'}`}>
+                            <ThemedText className="font-bold" style={{ color: role === "driver" ? Colors.dark.primary : Colors.dark.text }}>
                                 Conductor
                             </ThemedText>
                         </Pressable>

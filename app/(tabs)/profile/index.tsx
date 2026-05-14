@@ -2,7 +2,6 @@ import { useAuth } from "@/app/context/AuthContext";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
-import { useThemeColor } from "@/hooks/useThemeColor";
 import { UserData } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
 import { ratingsService } from "@/services/ratings.service";
@@ -38,21 +37,11 @@ export default function ProfileScreen() {
         fetchUser();
     }, []);
 
-    const primaryColor = useThemeColor({}, 'primary');
-    const textColor = useThemeColor({}, 'text');
-    const textBlackColor = useThemeColor({}, 'textBlack');
-
-    // We want "Dark Text" in Light Mode (on light bg) and "Light Text" in Dark Mode (on dark bg)
-    // Colors.light.text is Light (for navy bg), Colors.light.textBlack is Black.
-    // Colors.dark.text is Light.
-    // So for content on "Background" (Light/Dark Page):
-    // Light Mode: textBlack (#000)
-    // Dark Mode: text (#ECEDEE)
-    const contentTextColor = useThemeColor({ light: Colors.light.textBlack, dark: Colors.dark.text }, 'text');
+    const contentTextColor = Colors.dark.text;
 
     return (
-        <ThemedView className="flex-1">
-            <ThemedView lightColor={Colors.light.primary} darkColor={Colors.dark.primary} className="w-full px-4 py-6 rounded-bl-[40px]">
+        <ThemedView lightColor={Colors.dark.background} darkColor={Colors.dark.background} className="flex-1">
+            <ThemedView lightColor={Colors.light.glass} darkColor={Colors.dark.glass} className="w-full px-4 py-6 rounded-bl-[40px]">
                 <ThemedText
                     className="text-3xl mt-6">
                     Perfil
@@ -82,9 +71,21 @@ export default function ProfileScreen() {
                     </ThemedText>
                 </View>
             </ThemedView>
-            <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+            <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-4">
                 <Link href="/(tabs)/profile/edit-profile" asChild>
-                    <Pressable className="active:bg-slate-300 w-full">
+                    <Pressable
+                        className="w-full rounded-2xl mb-3"
+                        style={({ pressed }) => [{
+                            backgroundColor: pressed ? "rgba(12,22,42,0.95)" : Colors.dark.glassSoft,
+                            borderWidth: 1,
+                            borderColor: Colors.dark.border,
+                            shadowColor: "#000",
+                            shadowOffset: { width: 0, height: 8 },
+                            shadowOpacity: 0.22,
+                            shadowRadius: 14,
+                            elevation: 6,
+                        }]}
+                    >
                         <ThemedText
                             style={{ color: contentTextColor }}
                             className="py-6 px-4">
@@ -93,7 +94,19 @@ export default function ProfileScreen() {
                     </Pressable>
                 </Link>
                 <Link href="/(tabs)/profile/activity" asChild>
-                    <Pressable className="active:bg-slate-300">
+                    <Pressable
+                        className="rounded-2xl mb-3"
+                        style={({ pressed }) => [{
+                            backgroundColor: pressed ? "rgba(12,22,42,0.95)" : Colors.dark.glassSoft,
+                            borderWidth: 1,
+                            borderColor: Colors.dark.border,
+                            shadowColor: "#000",
+                            shadowOffset: { width: 0, height: 8 },
+                            shadowOpacity: 0.22,
+                            shadowRadius: 14,
+                            elevation: 6,
+                        }]}
+                    >
                         <ThemedText
                             style={{ color: contentTextColor }}
                             className="py-6 px-4">
@@ -103,7 +116,19 @@ export default function ProfileScreen() {
                 </Link>
                 {!user?.is_driver &&
                     <Link href="/(tabs)/profile/become-driver" asChild>
-                        <Pressable className="active:bg-slate-300">
+                        <Pressable
+                            className="rounded-2xl mb-3"
+                            style={({ pressed }) => [{
+                                backgroundColor: pressed ? "rgba(12,22,42,0.95)" : Colors.dark.glassSoft,
+                                borderWidth: 1,
+                                borderColor: Colors.dark.border,
+                                shadowColor: "#000",
+                                shadowOffset: { width: 0, height: 8 },
+                                shadowOpacity: 0.22,
+                                shadowRadius: 14,
+                                elevation: 6,
+                            }]}
+                        >
                             <ThemedText
                                 style={{ color: contentTextColor }}
                                 className="py-6 px-4">
@@ -119,11 +144,19 @@ export default function ProfileScreen() {
                         Editar vehículo
                     </ThemedText>
                 </Pressable> */}
-                <Pressable className="active:bg-red-300" onPress={() => { logout() }}>
+                <Pressable
+                    onPress={() => { logout() }}
+                    className="rounded-2xl mt-2"
+                    style={({ pressed }) => [{
+                        backgroundColor: pressed ? "rgba(245,158,11,0.22)" : "rgba(245,158,11,0.12)",
+                        borderWidth: 1,
+                        borderColor: "rgba(245,158,11,0.38)",
+                    }]}
+                >
                     <ThemedText
-                        lightColor="red"
-                        darkColor="#ff6b6b"
-                        className="py-6 px-4 text-red-600">
+                        lightColor={Colors.dark.secondary}
+                        darkColor={Colors.dark.secondary}
+                        className="py-6 px-4">
                         Cerrar sesion
                     </ThemedText>
                 </Pressable>

@@ -85,7 +85,6 @@ interface MapRegion {
   latitudeDelta: number;
   longitudeDelta: number;
 }
-
 interface Waypoint {
   id: string;
   type: 'stop' | 'meeting_point' | 'origin' | 'destination';
@@ -597,6 +596,28 @@ export default function RouteDetail() {
     }
   };
 
+
+  const handleOpenNavigation = () => {
+    const nextTarget = waypoints.find(wp => {
+      if (wp.type === 'origin') return false;
+      const isCompleted = wp.status === 'completed' || wp.status === 'visited' || wp.status === 'dropped_off';
+      return !isCompleted;
+    });
+
+    if (nextTarget) {
+      router.push({
+        pathname: "/navigation-screen",
+        params: {
+          destLat: nextTarget.coords.latitude.toString(),
+          destLng: nextTarget.coords.longitude.toString(),
+          destName: nextTarget.location
+        }
+      });
+    } else {
+      Alert.alert("Info", "No hay más puntos pendientes en el viaje.");
+    }
+  };
+
   // Función para obtener la ruta de Mapbox Directions
   const fetchRouteMap = async () => {
     // 1. Validar que tengamos los datos mínimos necesarios
@@ -1085,7 +1106,7 @@ export default function RouteDetail() {
             const lng = Number(parsedDriverCoords.longitude);
             if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return null;
             const iconName = "car-sport";
-            const iconColor = user?.driver_mode ? "white" : "#000D3A";
+            const iconColor = user?.driver_mode ? "white" : Colors.light.primary;
             const iconBg = user?.driver_mode ? Colors.light.primary : "transparent";
 
             return (
@@ -1118,7 +1139,7 @@ export default function RouteDetail() {
               <LineLayer
                 id="routeLine"
                 style={{
-                  lineColor: "#00E5FF",
+                  lineColor: Colors.light.secondary,
                   lineWidth: 6,
                   lineJoin: "round",
                   lineCap: "round",
@@ -1137,7 +1158,7 @@ export default function RouteDetail() {
                 <View style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
                   <View className="items-center">
                     <View className="bg-white p-1 rounded-full shadow-md">
-                      <Ionicons name="flag" size={24} color="#22c55e" />
+                      <Ionicons name="flag" size={24} color={Colors.light.success} />
                     </View>
                     {/* <Text className="bg-white/80 px-1 text-[8px] font-bold">Inicio</Text> */}
                   </View>
@@ -1189,7 +1210,7 @@ export default function RouteDetail() {
               >
                 <View style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
                   <View className="items-center">
-                    <View className="bg-[#000D3A] p-1 rounded-full shadow-md">
+                    <View className="bg-primary p-1 rounded-full shadow-md">
                       <Ionicons name="person" size={18} color="white" />
                     </View>
                     <Text className="bg-white/80 px-1 text-[8px] font-bold">Pasajero</Text>
@@ -1209,7 +1230,7 @@ export default function RouteDetail() {
                 <View style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
                   <View className="items-center">
                     <View className="bg-white p-1 rounded-full shadow-md">
-                      <Ionicons name="location" size={24} color="#ef4444" />
+                      <Ionicons name="location" size={24} color={Colors.light.danger} />
                     </View>
                     {/* <Text className="bg-white/80 px-1 text-[8px] font-bold">Destino</Text> */}
                   </View>
@@ -1425,6 +1446,7 @@ export default function RouteDetail() {
           onLeaveTrip={handleLeaveTrip}
           onStartTrip={handleStartTrip}
           onCenterDriver={!isCameraCenteredOnDriver ? centerOnDriverLocation : undefined}
+          onNavigate={handleOpenNavigation}
           onPassengerPress={(pId) => {
             const p = passengers.find(px => px.passenger_id === pId);
             if (p?.status === 'pending_approval') {

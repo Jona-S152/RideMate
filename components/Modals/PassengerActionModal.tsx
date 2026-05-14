@@ -158,26 +158,31 @@ export default function PassengerActionModal({
             visible={visible}
             onRequestClose={onClose}
         >
-            <View className="flex-1 justify-center items-center bg-black/50 px-6">
-                <View className="bg-white w-full rounded-3xl p-6 shadow-2xl items-center relative">
+            <View
+                className="flex-1 justify-center items-center px-6"
+            >
+                <View
+                    style={{ backgroundColor: Colors.dark.primary }}
+                    className="w-full rounded-3xl p-6 shadow-2xl items-center relative border border-slate-700"
+                >
 
                     {/* Close Button */}
                     <Pressable
                         onPress={onClose}
-                        className="absolute top-4 right-4 z-10 p-2 bg-slate-100 rounded-full"
+                        className="absolute top-4 right-4 z-10 p-2 bg-slate-800 rounded-full"
                     >
-                        <Ionicons name="close" size={20} color="black" />
+                        <Ionicons name="close" size={20} color="white" />
                     </Pressable>
 
                     {loading ? (
-                        <View className="py-10">
-                            <ActivityIndicator size="large" color={Colors.light.primary} />
-                            <Text className="text-slate-500 mt-4">Cargando información...</Text>
+                        <View className="py-10 items-center">
+                            <ActivityIndicator size="large" color={Colors.dark.secondary} />
+                            <Text className="text-slate-400 mt-4">Cargando información...</Text>
                         </View>
                     ) : details ? (
                         <>
                             {/* Avatar */}
-                            <View className="w-24 h-24 rounded-full border-4 border-white shadow-lg -mt-16 mb-4">
+                            <View className="w-24 h-24 rounded-full border-4 border-slate-700 shadow-lg -mt-16 mb-4">
                                 <Image
                                     source={{ uri: details.avatar_profile }}
                                     className="w-full h-full rounded-full bg-slate-200"
@@ -185,22 +190,22 @@ export default function PassengerActionModal({
                                 />
                             </View>
 
-                            <Text className="text-xl font-bold text-slate-800 text-center mb-1">
+                            <Text className="text-xl font-bold text-white text-center mb-1">
                                 {details.name}
                             </Text>
                             <View className="flex-row items-center mb-1">
-                                <Ionicons name="star" size={14} color="#FCA311" />
-                                <Text className="text-sm font-bold text-slate-700 ml-1">
+                                <Ionicons name="star" size={14} color={Colors.dark.secondary} />
+                                <Text className="text-sm font-bold text-slate-300 ml-1">
                                     {details.rating || "0.0"}
                                 </Text>
                             </View>
-                            <Text className="text-sm font-semibold text-slate-500 mb-6 text-center">
+                            <Text className="text-sm font-semibold text-slate-400 mb-6 text-center">
                                 Quiere unirse a tu viaje
                             </Text>
 
                             {/* Mini Map */}
                             {hasCoordinates && (
-                                <View className="w-full h-40 rounded-xl overflow-hidden mb-4 border border-slate-200">
+                                <View className="w-full h-40 rounded-xl overflow-hidden mb-4 border border-slate-700">
                                     <Mapbox.MapView
                                         style={StyleSheet.absoluteFillObject}
                                         styleURL={Mapbox.StyleURL.TrafficNight}
@@ -219,7 +224,7 @@ export default function PassengerActionModal({
                                             anchor={{ x: 0.5, y: 1 }}
                                         >
                                             <View className="items-center">
-                                                <Ionicons name="location-sharp" size={32} color="#000D3A" />
+                                                <Ionicons name="location-sharp" size={32} color={Colors.dark.secondary} />
                                             </View>
                                         </MarkerView>
                                     </Mapbox.MapView>
@@ -227,13 +232,13 @@ export default function PassengerActionModal({
                             )}
 
                             {/* Info Card */}
-                            <View className="w-full bg-slate-50 p-4 rounded-xl mb-6 flex-row items-center border border-slate-100">
-                                <View className="w-10 h-10 rounded-full bg-blue-100 items-center justify-center mr-3">
-                                    <Ionicons name="location" size={20} color="#000D3A" />
+                            <View className="w-full bg-slate-800/50 p-4 rounded-xl mb-6 flex-row items-center border border-slate-700">
+                                <View className="w-10 h-10 rounded-full bg-blue-900/30 items-center justify-center mr-3">
+                                    <Ionicons name="location" size={20} color={Colors.dark.secondary} />
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="text-xs text-slate-400 font-bold uppercase">Punto de Recogida</Text>
-                                    <Text className="text-slate-800 font-medium" numberOfLines={2}>
+                                    <Text className="text-xs text-slate-500 font-bold uppercase">Punto de Recogida</Text>
+                                    <Text className="text-slate-200 font-medium" numberOfLines={2}>
                                         {details.pickup_location}
                                     </Text>
                                 </View>
@@ -244,16 +249,16 @@ export default function PassengerActionModal({
                                 <Pressable
                                     onPress={() => handleAction('rejected')}
                                     disabled={actionLoading}
-                                    className="flex-1 bg-red-100 h-12 rounded-xl items-center justify-center border border-red-200"
+                                    className="flex-1 bg-red-900/20 h-12 rounded-xl items-center justify-center border border-red-900/30"
                                 >
-                                    <Text className="text-red-600 font-bold">Rechazar</Text>
+                                    <Text className="text-red-400 font-bold">Rechazar</Text>
                                 </Pressable>
 
                                 <Pressable
                                     onPress={() => handleAction('joined')}
                                     disabled={actionLoading}
                                     className="flex-1 h-12 rounded-xl items-center justify-center"
-                                    style={{ backgroundColor: Colors.light.secondary }}
+                                    style={{ backgroundColor: Colors.dark.secondary }}
                                 >
                                     {actionLoading ? (
                                         <ActivityIndicator color="white" />

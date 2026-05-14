@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
+import { Colors } from "@/constants/Colors";
 import {
     ActivityIndicator,
     Modal,
@@ -72,14 +73,14 @@ export default function RatingModal({
 
                     <View style={styles.header}>
                         <View style={styles.iconContainer}>
-                            <Ionicons name="star" size={32} color="#FCA311" />
+                            <Ionicons name="star" size={32} color={Colors.light.secondary} />
                         </View>
                         <Text style={styles.title}>{title}</Text>
                         {userName && (
                             <View style={{ alignItems: 'center' }}>
                                 <Text style={styles.userName}>{userName}</Text>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                                    <Ionicons name="star" size={14} color="#FCA311" />
+                                    <Ionicons name="star" size={14} color={Colors.light.secondary} />
                                     <Text style={{ fontSize: 14, color: '#64748b', marginLeft: 4, fontWeight: 'bold' }}>
                                         {userRating || "0.0"}
                                     </Text>
@@ -99,7 +100,7 @@ export default function RatingModal({
                                 <Ionicons
                                     name={rating >= value ? "star" : "star-outline"}
                                     size={40}
-                                    color={rating >= value ? "#FCA311" : "#cbd5e1"}
+                                    color={rating >= value ? Colors.light.secondary : "#cbd5e1"}
                                 />
                             </Pressable>
                         ))}
@@ -208,7 +209,7 @@ const styles = StyleSheet.create({
         textAlignVertical: "top",
     },
     submitButton: {
-        backgroundColor: "#000D3A",
+        backgroundColor: Colors.light.primary,
         width: "100%",
         height: 56,
         borderRadius: 28,

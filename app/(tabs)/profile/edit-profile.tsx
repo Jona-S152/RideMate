@@ -109,18 +109,19 @@ export default function EditProfileScreen() {
     };
 
     return (
-        <KeyboardAwareScrollView className="flex-1 bg-white" bounces={false}>
+        <KeyboardAwareScrollView className="flex-1 bg-background" bounces={false}>
             <AnimatedThemedView
                 style={{ height: headerHeight }}
-                lightColor={Colors.light.primary}
+                lightColor={Colors.dark.glass}
+                darkColor={Colors.dark.glass}
                 className="w-full px-4 pt-6 rounded-bl-[40px] justify-center"
             >
                 <View className="items-center">
                     <View className="relative w-32 h-32 mb-4">
-                        <View className="bg-stone-200 rounded-full w-32 h-32 items-center justify-center overflow-hidden border-4 border-white shadow-sm">
+                        <View className="rounded-full w-32 h-32 items-center justify-center overflow-hidden border-4 shadow-sm" style={{ backgroundColor: Colors.dark.glassSoft, borderColor: Colors.dark.border }}>
                             <Ionicons name="person" size={60} color="#94a3b8" />
                         </View>
-                        <Pressable className="absolute bottom-0 right-0 bg-white p-2 rounded-full shadow-md border border-slate-100">
+                        <Pressable className="absolute bottom-0 right-0 p-2 rounded-full shadow-md border" style={{ backgroundColor: Colors.dark.glassSoft, borderColor: Colors.dark.border }}>
                             <Ionicons name="camera" size={20} color={Colors.light.primary} />
                         </Pressable>
                     </View>
@@ -136,8 +137,9 @@ export default function EditProfileScreen() {
                 <View className="mb-6">
                     <ThemedText className="text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Nombres</ThemedText>
                     <ThemedTextInput
-                        lightColor={Colors.light.background}
-                        className="py-4 px-4 rounded-full border border-slate-100"
+                        lightColor={Colors.dark.glassSoft}
+                        className="py-4 px-4 rounded-full border"
+                        style={{ borderColor: Colors.dark.border }}
                         placeholder="Tus nombres"
                         value={name}
                         onChangeText={setName}
@@ -147,8 +149,9 @@ export default function EditProfileScreen() {
                 <View className="mb-6">
                     <ThemedText className="text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Apellidos</ThemedText>
                     <ThemedTextInput
-                        lightColor={Colors.light.background}
-                        className="py-4 px-4 rounded-full border border-slate-100"
+                        lightColor={Colors.dark.glassSoft}
+                        className="py-4 px-4 rounded-full border"
+                        style={{ borderColor: Colors.dark.border }}
                         placeholder="Tus apellidos"
                         value={lastName}
                         onChangeText={setLastName}
@@ -158,8 +161,9 @@ export default function EditProfileScreen() {
                 <View className="mb-6">
                     <ThemedText className="text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Correo electrónico</ThemedText>
                     <ThemedTextInput
-                        lightColor={Colors.light.background}
-                        className="py-4 px-4 rounded-full border border-slate-100 bg-slate-50"
+                        lightColor={Colors.dark.glassSoft}
+                        className="py-4 px-4 rounded-full border"
+                        style={{ borderColor: Colors.dark.border }}
                         placeholder="correo@ejemplo.com"
                         value={email}
                         editable={false} // Recommendation: Email usually fixed or changed via special flow

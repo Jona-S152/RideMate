@@ -1,7 +1,7 @@
 import { useAuth } from "@/app/context/AuthContext";
 import { Colors } from "@/constants/Colors";
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Image, Modal, Pressable, ScrollView, Text, View, StyleSheet } from "react-native";
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 interface RoutePreviewModalProps {
     visible: boolean;
@@ -86,9 +86,9 @@ export default function RoutePreviewModal({
                             <View className="relative">
                                 <Image
                                     source={{ uri: driverAvatar || "https://via.placeholder.com/150" }}
-                                    className="w-16 h-16 rounded-full border-[3px] border-[#1C2431]"
+                                    className="w-16 h-16 rounded-full border-[3px] border-surfaceAlt"
                                 />
-                                <View className="absolute bottom-0 right-0 bg-[#10B981] rounded-full px-1 border-2 border-[#1C2431]">
+                                <View className="absolute bottom-0 right-0 bg-success rounded-full px-1 border-2 border-surfaceAlt">
                                     <Text className="text-[9px] font-bold text-white">
                                         ★ {driverRating ? driverRating.toFixed(1) : "0.0"}
                                     </Text>
@@ -96,7 +96,7 @@ export default function RoutePreviewModal({
                             </View>
                             <View className="ml-3 flex-1 pt-6">
                                 <Text className="text-white text-base font-bold">{driverName}</Text>
-                                <Text className="text-[#9CA3AF] text-xs">Conductor</Text>
+                                <Text className="text-textSecondary text-xs">Conductor</Text>
                             </View>
                         </View>
                     )}
@@ -104,23 +104,23 @@ export default function RoutePreviewModal({
                     <ScrollView className="px-5 pb-6" showsVerticalScrollIndicator={false}>
                         {/* Route Info */}
                         <View className="mt-4 mb-4">
-                            <Text className="text-[#9CA3AF] text-xs mb-2 uppercase tracking-wider">Detalles de la Ruta</Text>
+                            <Text className="text-textSecondary text-xs mb-2 uppercase tracking-wider">Detalles de la Ruta</Text>
                             <View className="flex-row items-start">
                                 <View className="items-center mr-3 mt-1">
                                     <View className="w-2.5 h-2.5 rounded-full bg-[#10B981]" />
                                     <View className="w-0.5 h-12 bg-[#374151]" />
-                                    <View className="w-2.5 h-2.5 rounded-full bg-[#EF4444]" />
+                                    <View className="w-2.5 h-2.5 rounded-full bg-[#F59E0B]" />
                                 </View>
                                 <View className="flex-1">
                                     <View>
-                                        <Text className="text-[#9CA3AF] text-[10px] mb-0.5">ORIGEN</Text>
+                                        <Text className="text-textSecondary text-[10px] mb-0.5">ORIGEN</Text>
                                         <Text className="text-white font-semibold text-sm" numberOfLines={2}>
                                             {start}
                                         </Text>
                                     </View>
                                     <View className="h-4" />
                                     <View>
-                                        <Text className="text-[#9CA3AF] text-[10px] mb-0.5">DESTINO</Text>
+                                        <Text className="text-textSecondary text-[10px] mb-0.5">DESTINO</Text>
                                         <Text className="text-white font-semibold text-sm" numberOfLines={2}>
                                             {end}
                                         </Text>
@@ -131,8 +131,8 @@ export default function RoutePreviewModal({
 
                         {/* Seats section — only for passengers */}
                         {!isDriver && (
-                            <View className="mb-5 bg-[#242C3B] p-4 rounded-2xl">
-                                <Text className="text-[#9CA3AF] text-xs mb-3 uppercase tracking-wider">Asientos disponibles</Text>
+                            <View className="mb-5 bg-surfaceAlt p-4 rounded-2xl">
+                                <Text className="text-textSecondary text-xs mb-3 uppercase tracking-wider">Asientos disponibles</Text>
                                 <View className="flex-row items-center" style={{ gap: 10 }}>
                                     <View className="flex-row" style={{ gap: 6 }}>
                                         {[0, 1, 2, 3].map((index) => {
@@ -157,13 +157,13 @@ export default function RoutePreviewModal({
                         {/* Passengers Avatars — only for passengers */}
                         {!isDriver && passengersData.length > 0 && (
                             <View className="mb-5">
-                                <Text className="text-[#9CA3AF] text-xs mb-2 uppercase tracking-wider">Pasajeros a bordo</Text>
+                                <Text className="text-textSecondary text-xs mb-2 uppercase tracking-wider">Pasajeros a bordo</Text>
                                 <View className="flex-row" style={{ gap: -10 }}>
                                     {passengersData.map((p, i) => (
                                         <Image
                                             key={p.id}
                                             source={{ uri: p.avatar }}
-                                            className="w-10 h-10 rounded-full border-2 border-[#1C2431]"
+                                            className="w-10 h-10 rounded-full border-2 border-surfaceAlt"
                                             style={{ zIndex: 30 - i }}
                                         />
                                     ))}
@@ -186,7 +186,7 @@ export default function RoutePreviewModal({
                                 }
                             }}
                         >
-                            <Text className="text-[#000A1C] font-bold text-base">
+                            <Text className="text-white font-bold text-base">
                                 {isDriver ? "Iniciar Ruta" : "Unirse a la Ruta"}
                             </Text>
                         </Pressable>
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.6)',
     },
     modalView: {
-        backgroundColor: '#1C2431',
+        backgroundColor: '#121721',
         borderTopLeftRadius: 32,
         borderTopRightRadius: 32,
         width: '100%',

@@ -49,7 +49,7 @@
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/TitleApp.png",
-        "backgroundColor": "#000D3A"
+        "backgroundColor": "#000A1C"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.anonymous.RideMate",
@@ -78,7 +78,7 @@
           "image": "./assets/images/TitleApp.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#000D3A"
+          "backgroundColor": "#000A1C"
         }
       ],
       "expo-maps"
@@ -95,7 +95,7 @@
     "splash": {
       "image": "./assets/images/TitleApp.png",
       "resizeMode": "contain",
-      "backgroundColor": "#000D3A"
+      "backgroundColor": "#000A1C"
     }
   }
 }

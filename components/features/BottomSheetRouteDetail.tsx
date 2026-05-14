@@ -22,6 +22,7 @@ interface BottomSheetRouteDetailProps {
   onLeaveTrip?: () => Promise<void>;
   onStartTrip?: () => Promise<void>;
   onCenterDriver?: () => void;
+  onNavigate?: () => void;
   distanceRemaining?: string;
 }
 
@@ -34,6 +35,7 @@ export default function BottomSheetRouteDetail({
   onLeaveTrip,
   onStartTrip,
   onCenterDriver,
+  onNavigate,
   distanceRemaining = "0Km"
 }: BottomSheetRouteDetailProps) {
   const imagenes = [
@@ -49,7 +51,7 @@ export default function BottomSheetRouteDetail({
     {
       label: "Salir",
       icon: "log-out-outline",
-      color: "#ef4444",
+      color: Colors.light.danger,
       onPress: async () => {
         if (onLeaveTrip) {
           await onLeaveTrip();
@@ -60,7 +62,7 @@ export default function BottomSheetRouteDetail({
     {
       label: "Iniciar",
       icon: "play-outline",
-      color: "#22c55e",
+      color: Colors.light.success,
       onPress: async () => {
         if (onStartTrip) {
           await onStartTrip();
@@ -71,16 +73,25 @@ export default function BottomSheetRouteDetail({
     {
       label: "Cancelar",
       icon: "close-circle-outline",
-      color: "#FCA311",
+      color: Colors.light.secondary,
       onPress: () => {
         console.log("Cancelar viaje");
       },
       hidden: isActive, // solo antes de iniciar
     },
     {
+      label: "Navegar",
+      icon: "navigate-circle-outline",
+      color: Colors.light.secondary,
+      onPress: () => {
+        if (onNavigate) onNavigate();
+      },
+      hidden: !isActive,
+    },
+    {
       label: "Finalizar",
       icon: "flag-outline",
-      color: "#22c55e",
+      color: Colors.light.success,
       onPress: async () => {
         if (onFinishTrip) {
           await onFinishTrip();
@@ -178,7 +189,7 @@ export default function BottomSheetRouteDetail({
               width: RECENTER_BUTTON_SIZE,
               height: RECENTER_BUTTON_SIZE,
               borderRadius: RECENTER_BUTTON_SIZE / 2,
-              backgroundColor: Colors.light.primary,
+              backgroundColor: Colors.dark.secondary,
               alignItems: 'center',
               justifyContent: 'center',
               zIndex: 10,
@@ -195,6 +206,7 @@ export default function BottomSheetRouteDetail({
       </View>
       <ThemedView
         lightColor={Colors.light.secondary}
+        darkColor={Colors.dark.secondary}
         className="p-4 mr-4 rounded-b-full self-end min-w-[100px] min-h-[50px] items-center justify-center">
         <ThemedText
           lightColor={Colors.light.text}
@@ -218,14 +230,16 @@ export default function BottomSheetRouteDetail({
       onChange={handleSheetChanges}
       enablePanDownToClose={false}
       backgroundStyle={{
-        backgroundColor: Colors.light.primary,
+        backgroundColor: Colors.dark.background,
         borderTopLeftRadius: 55,
         borderTopRightRadius: 0,
       }}
       handleComponent={HandleDragToResize}
     >
       <BottomSheetView>
-        <View className="px-6">
+        <View
+          className="px-6"
+        >
           {/* Visible solo cuando el bottomsheet se expande */}
           <Animated.View style={animatedContentStyle}>
             <View>
@@ -263,7 +277,7 @@ export default function BottomSheetRouteDetail({
               <View className="flex-row mt-6">
                 <View className=" mr-4">
                   <View className="items-center">
-                    <View className="w-16 h-24 rounded-full border-2 border-[#E5E5E5] overflow-hidden">
+                    <View className="w-16 h-24 rounded-full border-2 border-tird overflow-hidden">
                       <Image source={{ uri: driverData?.avatar_profile }}
                         resizeMode="cover"
                         className="w-full h-full"
@@ -303,8 +317,8 @@ export default function BottomSheetRouteDetail({
                         <View className="items-center">
                           <View
                             className={`w-16 h-24 rounded-full border-2 overflow-hidden ${isPending
-                              ? "border-[#FCA311]"
-                              : "border-[#E5E5E5]"
+                              ? "border-secondary"
+                              : "border-tird"
                               }`}
                           >
                             <Image

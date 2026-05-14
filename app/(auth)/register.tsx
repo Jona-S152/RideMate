@@ -151,9 +151,9 @@ export default function RegisterScreen() {
   };
 
   return (
-    <View className="flex-1">
+    <View className="flex-1 bg-background">
       <AnimatedThemedView
-        lightColor={Colors.light.primary}
+        lightColor={Colors.light.glassStrong}
         style={{ height: headerHeight }}
         className="w-full px-4 pt-6 rounded-bl-[40px]"
       >
@@ -170,14 +170,14 @@ export default function RegisterScreen() {
         }}
       >
         <View className="mx-5 mt-4 mb-2">
-          <Text className="text-3xl font-bold mb-6 text-primary">
+          <Text className="text-3xl font-bold mb-6 text-textPrimary">
             Crear cuenta
           </Text>
         </View>
 
         <View className="mx-5 mt-2">
           <ThemedTextInput
-            lightColor={Colors.light.background}
+            lightColor={Colors.light.glassSoft}
             className="py-6 px-4 mb-4 w-full"
             placeholder="Nombre"
             value={form.name}
@@ -185,7 +185,7 @@ export default function RegisterScreen() {
           />
 
           <ThemedTextInput
-            lightColor={Colors.light.background}
+            lightColor={Colors.light.glassSoft}
             className="py-6 px-4 mb-4 w-full"
             placeholder="Apellido"
             value={form.lastname}
@@ -193,7 +193,7 @@ export default function RegisterScreen() {
           />
 
           <ThemedTextInput
-            lightColor={Colors.light.background}
+            lightColor={Colors.light.glassSoft}
             className="py-6 px-4 mb-4 w-full"
             placeholder="Correo electrónico"
             autoCapitalize="none"
@@ -203,7 +203,7 @@ export default function RegisterScreen() {
           />
 
           <ThemedTextInput
-            lightColor={Colors.light.background}
+            lightColor={Colors.light.glassSoft}
             className="py-6 px-4 mb-4 w-full"
             placeholder="Contraseña"
             secureTextEntry
@@ -214,7 +214,7 @@ export default function RegisterScreen() {
           <Pressable
             onPress={handleRegister}
             disabled={loading}
-            className="bg-[#FCA311] py-4 rounded-full mt-4"
+            className="bg-secondary py-4 rounded-full mt-4"
           >
             {loading ? <ActivityIndicator color="white" /> : <Text className="text-center font-semibold text-white">Continuar</Text>}
           </Pressable>

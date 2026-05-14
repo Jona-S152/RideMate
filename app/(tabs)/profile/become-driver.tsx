@@ -111,14 +111,14 @@ export default function BecomeDriverScreen() {
     };
 
     return (
-        <KeyboardAwareScrollView className="flex-1 bg-white" bounces={false}>
+        <KeyboardAwareScrollView className="flex-1 bg-background" bounces={false}>
             <AnimatedThemedView
                 style={{ height: headerHeight }}
-                lightColor={Colors.light.primary}
+                lightColor={Colors.dark.glassStrong}
                 className="w-full px-4 pt-6 rounded-bl-[40px] justify-center"
             >
                 <View className="items-center">
-                    <View className="bg-white/20 p-4 rounded-full mb-4">
+                    <View className="p-4 rounded-full mb-4" style={{ backgroundColor: Colors.dark.glassSoft, borderColor: Colors.dark.border, borderWidth: 1 }}>
                         <Ionicons name="car-sport" size={60} color="white" />
                     </View>
                     <ThemedText
@@ -136,10 +136,11 @@ export default function BecomeDriverScreen() {
 
             <View className="px-6 py-8">
                 <View className="mb-6">
-                    <ThemedText className="text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Nombres</ThemedText>
+                    <ThemedText className="text-xs font-bold uppercase mb-2 ml-1" style={{ color: Colors.dark.textSecondary }}>Nombres</ThemedText>
                     <ThemedTextInput
-                        lightColor={Colors.light.background}
-                        className="py-4 px-4 rounded-full border border-slate-100"
+                        lightColor={Colors.dark.glassSoft}
+                        className="py-4 px-4 rounded-full border"
+                        style={{ borderColor: Colors.dark.border }}
                         placeholder="Tus nombres"
                         value={name}
                         onChangeText={setName}
@@ -147,10 +148,11 @@ export default function BecomeDriverScreen() {
                 </View>
 
                 <View className="mb-6">
-                    <ThemedText className="text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Apellidos</ThemedText>
+                    <ThemedText className="text-xs font-bold uppercase mb-2 ml-1" style={{ color: Colors.dark.textSecondary }}>Apellidos</ThemedText>
                     <ThemedTextInput
-                        lightColor={Colors.light.background}
-                        className="py-4 px-4 rounded-full border border-slate-100"
+                        lightColor={Colors.dark.glassSoft}
+                        className="py-4 px-4 rounded-full border"
+                        style={{ borderColor: Colors.dark.border }}
                         placeholder="Tus apellidos"
                         value={lastName}
                         onChangeText={setLastName}
@@ -158,18 +160,19 @@ export default function BecomeDriverScreen() {
                 </View>
 
                 <View className="mb-8">
-                    <ThemedText className="text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Correo electrónico</ThemedText>
+                    <ThemedText className="text-xs font-bold uppercase mb-2 ml-1" style={{ color: Colors.dark.textSecondary }}>Correo electrónico</ThemedText>
                     <ThemedTextInput
-                        lightColor={Colors.light.background}
-                        className="py-4 px-4 rounded-full border border-slate-100 bg-slate-50"
+                        lightColor={Colors.dark.glassSoft}
+                        className="py-4 px-4 rounded-full border"
+                        style={{ borderColor: Colors.dark.border }}
                         value={email}
                         editable={false}
                     />
                 </View>
 
-                <View className="bg-blue-50 p-4 rounded-2xl mb-8 flex-row items-center">
-                    <Ionicons name="information-circle" size={24} color={Colors.light.primary} />
-                    <ThemedText className="flex-1 ml-3 text-sm text-slate-600">
+                <View className="p-4 rounded-2xl mb-8 flex-row items-center" style={{ backgroundColor: Colors.dark.glassSoft, borderColor: Colors.dark.border, borderWidth: 1 }}>
+                    <Ionicons name="information-circle" size={24} color={Colors.light.secondary} />
+                    <ThemedText className="flex-1 ml-3 text-sm" style={{ color: Colors.dark.textSecondary }}>
                         Al aplicar, confirmas que tienes una licencia de conducir válida y cumples con los términos de servicio.
                     </ThemedText>
                 </View>

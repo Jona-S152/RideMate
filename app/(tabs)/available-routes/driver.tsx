@@ -39,7 +39,7 @@ export default function DriverRoutesScreen() {
   const tirdColor = useThemeColor({}, "tird");
   const separatorColor = useThemeColor({ light: "rgba(0,0,0,0.1)", dark: "rgba(255,255,255,0.2)" }, "text");
   const separatorTextColor = useThemeColor({ light: "rgba(0,0,0,0.4)", dark: "rgba(255,255,255,0.6)" }, "text");
-  const mainTitleColor = useThemeColor({ light: "#000D3A", dark: "#FFFFFF" }, "text");
+  const mainTitleColor = useThemeColor({ light: Colors.light.text, dark: Colors.dark.text }, "text");
   const isFocused = useIsFocused();
 
   useEffect(() => {
@@ -168,7 +168,7 @@ export default function DriverRoutesScreen() {
   const filteredAdminRoutes = filterRoutes(adminRoutes);
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: Colors.light.background }}>
       <ThemedView
         lightColor={Colors.light.primary}
         darkColor={Colors.dark.primary}
@@ -245,17 +245,17 @@ export default function DriverRoutesScreen() {
           {/* INPUT DE CREACIÓN DE RUTA */}
           <Pressable
             onPress={() => router.push("/(tabs)/available-routes/create-route-screen")}
-            className="bg-white mx-2 mt-4 mb-4 p-3 rounded-3xl shadow-sm flex-row items-center justify-between border border-black/5"
-            style={({ pressed }) => [{ opacity: pressed ? 0.9 : 1 }]}
+            className="mx-2 mt-4 mb-4 p-3 rounded-3xl shadow-sm flex-row items-center justify-between border border-black/5"
+            style={({ pressed }) => [{ backgroundColor: Colors.light.glassSoft }, { opacity: pressed ? 0.9 : 1 }]}
           >
             <ThemedText
-              lightColor="#000D3A"
-              darkColor="#FFFFFF"
+              lightColor={Colors.light.text}
+              darkColor={Colors.dark.text}
               className="text-lg font-medium opacity-60"
             >
               ¿A dónde quieres ir hoy?
             </ThemedText>
-            <Ionicons name="search" size={22} color="#000D3A" className="opacity-30" />
+            <Ionicons name="search" size={22} color={Colors.light.textSecondary} className="opacity-60" />
           </Pressable>
 
           {/* SECCIÓN DE MIS RUTAS */}

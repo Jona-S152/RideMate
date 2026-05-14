@@ -4,8 +4,7 @@
 export interface RouteStop {
     id: number; // Es el stop ID
     location: string;
-    latitude: number;
-    longitude: number;
+    coords: Coords;
     stop_order: number;
 }
 
@@ -36,6 +35,7 @@ export interface RouteData {
     end_coords: Coords;
     // Propiedad Única 1
     stops: RouteStop[]; 
+    image_url: string;
 }
 
 // Estructura de la tabla 'trip_sessions' (Modo Pasajero)
@@ -48,6 +48,7 @@ export interface SessionData {
     end_location: string;
     start_coords: Coords;
     end_coords: Coords;
+    created_at: Date;
     // Propiedad Única 2
     trip_session_stops: SessionStop[]; 
 }
@@ -92,6 +93,12 @@ export interface UserData {
     rating_count?: number;
 }
 
+export interface DriverInfo {
+    name: string,
+    avatar: string,
+    rating: number
+}
+
 export interface TripSessionStops {
     id: number;
     trip_session_id: number;
@@ -125,6 +132,8 @@ export interface MeetingPoint {
     coords: {latitude: number, longitude: number};
     created_at: string;
 }
+
+
 
 // 3. INTERFAZ UNIFICADA para el estado 'routes'
 // Permite que el estado sea cualquiera de los dos tipos

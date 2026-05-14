@@ -14,18 +14,20 @@ export function ThemedTextInput({
   type = 'default',
   ...rest
 }: ThemedTextProps) {
-  const backgroundColor = useThemeColor({ light: lightColor, dark: darkColor }, 'text');
+  const backgroundColor = useThemeColor({ light: lightColor, dark: darkColor }, "glassSoft");
+  const textColor = useThemeColor({}, "text");
 
   return (
     <TextInput
-      className='rounded-full p-3'
+      className="rounded-full p-3"
+      placeholderTextColor="rgba(160,174,203,0.9)"
       style={[
-        { backgroundColor },
-        type === 'default' ? styles.default : undefined,
-        type === 'title' ? styles.title : undefined,
-        type === 'defaultSemiBold' ? styles.defaultSemiBold : undefined,
-        type === 'subtitle' ? styles.subtitle : undefined,
-        type === 'link' ? styles.link : undefined,
+        { backgroundColor, color: textColor, borderWidth: 1, borderColor: "rgba(226,235,240,0.14)" },
+        type === "default" ? styles.default : undefined,
+        type === "title" ? styles.title : undefined,
+        type === "defaultSemiBold" ? styles.defaultSemiBold : undefined,
+        type === "subtitle" ? styles.subtitle : undefined,
+        type === "link" ? styles.link : undefined,
         style,
       ]}
       {...rest}
@@ -55,6 +57,6 @@ const styles = StyleSheet.create({
   link: {
     lineHeight: 30,
     fontSize: 16,
-    color: '#0a7ea4',
+    color: '#00D1FF',
   },
 });

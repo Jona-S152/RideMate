@@ -1,4 +1,5 @@
 import { useAuth } from "@/app/context/AuthContext";
+import { Colors } from "@/constants/Colors";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import Mapbox, {
@@ -321,14 +322,20 @@ export default function SelectionMapScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: "white" }}>
+    <View style={{ flex: 1, backgroundColor: Colors.dark.background }}>
       {/* Información Superior */}
       <View className="absolute top-28 left-0 right-0 z-40 px-5">
-        <View className={`p-4 rounded-3xl shadow-2xl border ${isValidSelection ? 'bg-white border-slate-100' : 'bg-red-50 border-red-200'}`}>
-          <Text className="text-slate-500 text-xs font-bold uppercase tracking-wider">
+        <View
+          className="p-4 rounded-3xl shadow-2xl border"
+          style={{
+            backgroundColor: isValidSelection ? Colors.dark.glass : "rgba(245,158,11,0.22)",
+            borderColor: isValidSelection ? Colors.dark.border : "rgba(245,158,11,0.45)",
+          }}
+        >
+          <Text className="text-xs font-bold uppercase tracking-wider" style={{ color: Colors.dark.textSecondary }}>
             {isValidSelection ? "Punto de Encuentro" : "Demasiado Lejos"}
           </Text>
-          <Text className={`text-sm mt-1 font-semibold ${isValidSelection ? 'text-slate-800' : 'text-red-600'}`}>
+          <Text className="text-sm mt-1 font-semibold" style={{ color: isValidSelection ? Colors.dark.text : Colors.dark.warning }}>
             {isValidSelection
               ? "Arrastra el mapa para ajustar"
               : `Acércate ${Math.round(distanceToRoute - 150)}m más a la ruta`}
@@ -358,7 +365,7 @@ export default function SelectionMapScreen() {
             <LineLayer
               id="guideLine"
               style={{
-                lineColor: "#00E5FF",
+                lineColor: Colors.light.secondary,
                 lineWidth: 5,
                 lineOpacity: 0.7,
                 lineJoin: "round",
@@ -376,8 +383,8 @@ export default function SelectionMapScreen() {
               anchor={{ x: 0.5, y: 1 }}
             >
               <View className="items-center">
-                <View className="bg-white p-1 rounded-full shadow-md">
-                  <Ionicons name="flag" size={24} color="#22c55e" />
+                <View className="p-1 rounded-full shadow-md" style={{ backgroundColor: Colors.dark.glassSoft, borderColor: Colors.dark.border, borderWidth: 1 }}>
+                  <Ionicons name="flag" size={24} color={Colors.light.success} />
                 </View>
                 {/* <ThemedText className="bg-white/80 px-1 text-[8px] font-bold">Inicio</ThemedText> */}
               </View>
@@ -397,7 +404,7 @@ export default function SelectionMapScreen() {
                     <Ionicons
                       name="location-sharp"
                       size={24}
-                      color="#FCA311"
+                      color={Colors.light.secondary}
                     />
                   </View>
                 </MarkerView>
@@ -410,8 +417,8 @@ export default function SelectionMapScreen() {
               anchor={{ x: 0.5, y: 1 }}
             >
               <View className="items-center">
-                <View className="bg-white p-1 rounded-full shadow-md">
-                  <Ionicons name="location" size={24} color="#ef4444" />
+                <View className="p-1 rounded-full shadow-md" style={{ backgroundColor: Colors.dark.glassSoft, borderColor: Colors.dark.border, borderWidth: 1 }}>
+                  <Ionicons name="location" size={24} color={Colors.light.warning} />
                 </View>
                 {/* <ThemedText className="bg-white/80 px-1 text-[8px] font-bold">Fin</ThemedText> */}
               </View>
@@ -422,12 +429,15 @@ export default function SelectionMapScreen() {
 
       <View pointerEvents="none" style={styles.markerFixed}>
         <View style={styles.markerContainer}>
-          <View className={`px-3 py-1 rounded-full mb-2 shadow-sm ${isValidSelection ? 'bg-slate-800' : 'bg-red-600'}`}>
+          <View
+            className="px-3 py-1 rounded-full mb-2 shadow-sm"
+            style={{ backgroundColor: isValidSelection ? Colors.dark.glassStrong : Colors.dark.warning }}
+          >
             <Text className="text-white text-[10px] font-bold">
               {isValidSelection ? "RECOGER AQUÍ" : `MUY LEJOS (${Math.round(distanceToRoute)}m)`}
             </Text>
           </View>
-          <Ionicons name="location" size={40} color={isValidSelection ? "#000D3A" : "#ef4444"} />
+          <Ionicons name="location" size={40} color={isValidSelection ? Colors.dark.primary : Colors.dark.warning} />
           <View style={styles.shadow} />
         </View>
       </View>
@@ -436,7 +446,7 @@ export default function SelectionMapScreen() {
         <Pressable
           onPress={confirmPoint}
           disabled={loading || !isValidSelection || hasPendingRequest}
-          className={`h-16 rounded-full flex-row items-center justify-center shadow-2xl ${loading || !isValidSelection || hasPendingRequest ? "bg-gray-400" : "bg-[#FCA311]"
+          className={`h-16 rounded-full flex-row items-center justify-center shadow-2xl ${loading || !isValidSelection || hasPendingRequest ? "bg-gray-400" : "bg-secondary"
             }`}
           style={({ pressed }) => [{ opacity: pressed ? 0.9 : 1 }]}
         >
@@ -452,7 +462,7 @@ export default function SelectionMapScreen() {
 
       <Pressable
         onPress={() => router.back()}
-        className="absolute top-14 left-6 w-10 h-10 rounded-full items-center justify-center shadow-md z-50 bg-[#FCA311]"
+        className="absolute top-14 left-6 w-10 h-10 rounded-full items-center justify-center shadow-md z-50 bg-secondary"
       >
         <Ionicons name="close" size={24} color="white" />
       </Pressable>

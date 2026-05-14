@@ -1,4 +1,6 @@
+import PassengerActionModal from "@/components/Modals/PassengerActionModal";
 import RatingModal from "@/components/Modals/RatingModal";
+import { Colors } from "@/constants/Colors";
 import { supabase } from "@/lib/supabase";
 import { ratingsService } from "@/services/ratings.service";
 import * as Notifications from "expo-notifications";
@@ -29,6 +31,11 @@ function MainApp() {
     driver_name: string;
   } | null>(null);
 
+  // Estados para el Modal Global de Acción de Pasajero
+  const [passengerActionModalVisible, setPassengerActionModalVisible] = useState(false);
+  const [passengerIdToProcess, setPassengerIdToProcess] = useState<string | null>(null);
+  const [tripSessionIdToProcess, setTripSessionIdToProcess] = useState<number>(0);
+
   useEffect(() => {
     // Definimos la estructura esperada de los datos de la notificación
     interface NotificationData {
@@ -44,16 +51,10 @@ function MainApp() {
         const data = response.notification.request.content.data as NotificationData;
 
         if (data.type === "NEW_PASSENGER") {
-          setTimeout(() => {
-            router.push({
-              pathname: "/(tabs)/home/route-detail",
-              params: {
-                trip_session_id: String(data.trip_session_id),
-                passenger_id: data.passenger_id,
-                autoOpenModal: "true",
-              },
-            });
-          }, 500);
+          // En lugar de redirigir, abrimos el modal globalmente
+          setPassengerIdToProcess(data.passenger_id || null);
+          setTripSessionIdToProcess(Number(data.trip_session_id));
+          setPassengerActionModalVisible(true);
         } else if (data.type === "RATE_DRIVER") {
           setRatingData({
             trip_session_id: Number(data.trip_session_id),
@@ -78,14 +79,10 @@ function MainApp() {
             return;
           }
 
-          router.push({
-            pathname: "/(tabs)/home/route-detail",
-            params: {
-              trip_session_id: String(data.trip_session_id),
-              passenger_id: data.passenger_id,
-              autoOpenModal: "true",
-            },
-          });
+          // Abrimos el modal globalmente en primer plano
+          setPassengerIdToProcess(data.passenger_id || null);
+          setTripSessionIdToProcess(Number(data.trip_session_id));
+          setPassengerActionModalVisible(true);
         } else if (data.type === "RATE_DRIVER") {
           setRatingData({
             trip_session_id: Number(data.trip_session_id),
@@ -109,6 +106,8 @@ function MainApp() {
   return (
     <>
       <Slot />
+      
+      {/* Modal Global para calificar conductor */}
       {ratingData && (
         <RatingModal
           visible={ratingModalVisible}
@@ -127,13 +126,25 @@ function MainApp() {
           }}
         />
       )}
+
+      {/* Modal Global para Aceptar/Rechazar Pasajero */}
+      <PassengerActionModal
+        visible={passengerActionModalVisible}
+        passengerId={passengerIdToProcess}
+        tripSessionId={tripSessionIdToProcess}
+        onClose={() => setPassengerActionModalVisible(false)}
+        onActionComplete={() => {
+            // Aquí se podría disparar un evento global de refresco si fuera necesario
+            console.log("Acción de pasajero completada globalmente");
+        }}
+      />
     </>
   );
 }
 
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView className="flex-1">
+    <GestureHandlerRootView className="flex-1" style={{ backgroundColor: Colors.dark.background }}>
       <AuthProvider>
         <SessionProvider>
           <MainApp />
