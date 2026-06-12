@@ -8,7 +8,9 @@ import AvailableRouteCard from "@/components/features/available-route-card";
 import { Colors } from "@/constants/Colors";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { SessionData, SessionStop } from "@/interfaces/available-routes";
+import { tripService } from "@/services/trip.service";
 import { supabase } from "@/lib/supabase";
+import { useAvailableRoutesSubscription } from "@/hooks/useRealTime";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useIsFocused } from "@react-navigation/native";
 import { router } from "expo-router";
@@ -36,84 +38,23 @@ export default function PassengerRoutesScreen() {
   const tirdColor = useThemeColor({}, "tird");
   const isFocused = useIsFocused();
 
+  useAvailableRoutesSubscription(() => {
+    fetchRoutes();
+  });
+
   useEffect(() => {
     if (isFocused && user?.driver_mode) {
       router.replace("/(tabs)/available-routes/driver");
       return;
     }
     fetchRoutes();
-
-    const subscription = supabase
-      .channel("public:trip_sessions")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "trip_sessions",
-          filter: "status=in.(pending,active)",
-        },
-        () => {
-          fetchRoutes();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(subscription);
-    };
   }, [user?.driver_mode, isFocused]);
 
   const fetchRoutes = async () => {
+    if (!user?.id) return;
     try {
-      const { data, error } = await supabase
-        .from("trip_sessions")
-        .select(`
-                        *,
-                        driver:users!driver_id (
-                            name,
-                            avatar_profile
-                        ),
-                        routes (
-                            image_url
-                        ),
-                        trip_session_stops (
-                            *,
-                            stop:stops (*)
-                        ),
-                        passengers:passenger_trip_sessions (
-                            passenger:users!passenger_id (
-                                id,
-                                avatar_profile
-                            )
-                        )
-                    `)
-        .in("status", ["pending", "active"]);
-
-      if (error) throw error;
-
-      // Filtrar rutas que tengan menos de 3 pasajeros con estado joined
-      const availableRoutes = data.filter((session) => {
-        const joinedPassengers = session.passengers?.filter((p: any) => p.status === "joined") || [];
-        return joinedPassengers.length < 4;
-      });
-
-      const formattedRoutes = availableRoutes.map((session) => {
-        const joinedPassengers = session.passengers?.filter((p: any) => p.status === "joined") || [];
-        return {
-          ...session,
-          driver_name: session.driver?.name,
-          driver_avatar: session.driver?.avatar_profile,
-          driver_rating: session.driver?.rating,
-          passengers_data:
-            joinedPassengers.map((p: any) => ({
-              id: p.passenger?.id,
-              avatar: p.passenger?.avatar_profile,
-            })) || [],
-        };
-      });
-
-      setRoutes(formattedRoutes);
+      const availableRoutes = await tripService.getPassengerRoutes(user.id);
+      setRoutes(availableRoutes);
     } catch (error) {
       console.error("Error fetching passenger routes:", error);
     }
@@ -129,60 +70,23 @@ export default function PassengerRoutesScreen() {
     if (!user) return;
 
     try {
-      // Verificar si el usuario ya tiene una solicitud pendiente o está unido a este viaje
-      const { data: existingRequest, error: existingError } = await supabase
-        .from('passenger_trip_sessions')
-        .select('status, rejected, rejection_reason')
-        .eq('passenger_id', user.id)
-        .eq('trip_session_id', route.id)
-        .in('status', ['joined', 'pending_approval'])
-        .order('created_at', { ascending: false })
-        .order('id', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (existingError) {
-        console.error("Error checking existing request:", existingError);
+      // 1. Verificar si el usuario ya está unido a este viaje en passenger_trip_sessions
+      const existingJoinStatus = await tripService.checkPassengerSessionStatus(user.id, route.id);
+      if (existingJoinStatus === 'joined') {
+        Alert.alert('Ya estás en este viaje', 'Ya estás participando en este viaje.');
         return;
       }
 
-      console.log("Existing request for route", route.id, ":", existingRequest);
-
-      // Si existe una solicitud
-      if (existingRequest) {
-        if (existingRequest.rejected === true) {
-          // Fue rechazada, mostrar motivo y permitir reintentar
-          Alert.alert(
-            'Solicitud Anterior Rechazada',
-            existingRequest.rejection_reason
-              ? `Tu solicitud anterior fue rechazada: ${existingRequest.rejection_reason}\n\nPuedes intentar nuevamente seleccionando otro punto de encuentro.`
-              : 'Tu solicitud anterior fue rechazada. Puedes intentar nuevamente seleccionando otro punto de encuentro.'
-          );
-          // Permitir que continúe navegando
-        } else {
-          // No fue rechazada (rejected es false o null), está pendiente o activa
-          Alert.alert(
-            existingRequest.status === 'joined'
-              ? 'Ya estás en este viaje'
-              : 'Solicitud pendiente',
-            existingRequest.status === 'joined'
-              ? 'Ya estás participando en este viaje.'
-              : 'Ya has enviado una solicitud para este viaje. Espera a que el conductor la apruebe antes de intentar nuevamente.'
-          );
-          return; // Bloquear navegación
-        }
+      // 2. Verificar si el usuario ya tiene una solicitud pendiente en passenger_requests
+      const pendingRequest = await tripService.checkPassengerRequestStatus(user.id, route.id);
+      if (pendingRequest?.status === 'pending') {
+        Alert.alert('Solicitud pendiente', 'Ya has enviado una solicitud para este viaje. Espera a que el conductor la apruebe.');
+        return;
       }
 
-      // Verificar si ya tiene un viaje activo
-      const { data: activeSession } = await supabase
-        .from('passenger_trip_sessions')
-        .select("*")
-        .eq("passenger_id", user.id)
-        .in("status", ["joined"])
-        .limit(1)
-        .maybeSingle();
-
-      if (activeSession) {
+      // 3. Verificar si el usuario ya tiene algún viaje activo (cualquiera con status joined)
+      const hasActiveSession = await tripService.hasActiveTripSession(user.id);
+      if (hasActiveSession) {
         Alert.alert("Error", "Ya tienes un viaje en curso");
         return;
       }

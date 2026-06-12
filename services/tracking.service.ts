@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { tripService } from './trip.service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as Location from 'expo-location';
@@ -88,8 +88,5 @@ export const stopBackgroundTracking = async (tripSessionId: number) => {
 
   await AsyncStorage.removeItem('ACTIVE_TRIP');
 
-  await supabase
-    .from('driver_locations')
-    .delete()
-    .eq('trip_session_id', tripSessionId);
+  await tripService.clearDriverLocation(tripSessionId);
 };

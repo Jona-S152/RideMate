@@ -15,6 +15,7 @@ import {
 import { useAuth } from "@/app/context/AuthContext";
 import { MeetingPoint, PassengerTripSession, StopData, UserData } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
+import { tripService } from "@/services/trip.service";
 import { sendPushNotification } from "@/services/notifications.service";
 import { ratingsService } from "@/services/ratings.service";
 import Mapbox, {
@@ -132,6 +133,7 @@ export default function RouteDetail() {
   const [isCameraCenteredOnDriver, setIsCameraCenteredOnDriver] = useState(false);
   const ignoreRegionChangeRef = useRef(false);
   const [passengers, setPassengers] = useState<PassengerTripSession[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [stopsData, setStopsData] = useState<StopData[]>([]);
   const [meetingPoints, setMeetingPoints] = useState<MeetingPoint[]>([]);
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
@@ -214,28 +216,7 @@ export default function RouteDetail() {
   const fetchStops = async () => {
     try {
       console.log("fetchStops: trip session stops", stops);
-      const { data, error } = await supabase
-        .from("stops")
-        .select("*")
-        .in(
-          "id",
-          stops.map((s) => s.stop_id),
-        )
-        .order("stop_order", { ascending: true });
-
-      if (error) {
-        console.error("fetchStops: supabase error", error);
-        return;
-      }
-
-      const formattedData = (data || []).map((stop: any) => ({
-        ...stop,
-        coords: {
-          latitude: Number(stop.coords?.coordinates?.[1] ?? stop.coords?.latitude ?? 0),
-          longitude: Number(stop.coords?.coordinates?.[0] ?? stop.coords?.longitude ?? 0),
-        }
-      }));
-
+      const formattedData = await tripService.getStops(stops.map((s) => s.stop_id));
       console.log("fetchStops: formattedData", formattedData);
       setStopsData(formattedData as StopData[]);
     } catch (error) {
@@ -270,17 +251,8 @@ export default function RouteDetail() {
       order: 0,
     });
 
-    // 4. Fetch stop statuses
-    const { data: stopStatuses } = await supabase
-      .from('trip_session_stops')
-      .select('stop_id, status, visit_time')
-      .eq('trip_session_id', Number(id));
-
-    // 5. Fetch meeting point statuses
-    const { data: meetingStatuses } = await supabase
-      .from('trip_session_meeting_points')
-      .select('passenger_id, status, visit_time')
-      .eq('trip_session_id', Number(id));
+    // 4. Fetch waypoint statuses
+    const { stopStatuses, meetingStatuses } = await tripService.getTripSessionWaypointStatuses(Number(id));
 
     // Combine stops and meeting points
     const combined = [
@@ -386,16 +358,7 @@ export default function RouteDetail() {
 
     try {
       if (waypointToCheckIn.type === 'stop') {
-        const { error } = await supabase
-          .from('trip_session_stops')
-          .update({
-            status,
-            visit_time: status === 'visited' ? new Date().toISOString() : null,
-          })
-          .eq('trip_session_id', Number(id))
-          .eq('stop_id', waypointToCheckIn.stopId);
-
-        if (error) throw error;
+        await tripService.updateStopStatus(Number(id), waypointToCheckIn.stopId!, status);
 
         // If visited a stop, show drop-off modal
         if (status === 'visited') {
@@ -403,16 +366,7 @@ export default function RouteDetail() {
           setDropOffModalVisible(true);
         }
       } else if (waypointToCheckIn.type === 'meeting_point') {
-        const { error } = await supabase
-          .from('passenger_meeting_points')
-          .update({
-            status,
-            visit_time: status === 'visited' ? new Date().toISOString() : null,
-          })
-          .eq('trip_session_id', Number(id))
-          .eq('passenger_id', waypointToCheckIn.passengerId);
-
-        if (error) throw error;
+        await tripService.updateMeetingPointStatus(Number(id), waypointToCheckIn.passengerId!, status);
       } else if (waypointToCheckIn.type === 'destination') {
         if (status === 'visited') {
           setDropOffTitle("¿Quiénes completaron el viaje?");
@@ -437,38 +391,33 @@ export default function RouteDetail() {
       // Validar ubicación del conductor respecto al punto de inicio
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-          Alert.alert('Permiso denegado', 'Se requiere acceso a la ubicación para iniciar el viaje.');
-          return;
+        Alert.alert('Permiso denegado', 'Se requiere acceso a la ubicación para iniciar el viaje.');
+        return;
       }
 
       const location = await Location.getCurrentPositionAsync({});
       const driverLat = location.coords.latitude;
       const driverLon = location.coords.longitude;
-      
+
       const startCoords = parseCoords(session.start_coords);
       if (startCoords) {
-          const startLat = startCoords.latitude;
-          const startLon = startCoords.longitude;
-          const distance = calculateDistance(driverLat, driverLon, startLat, startLon);
+        const startLat = startCoords.latitude;
+        const startLon = startCoords.longitude;
+        const distance = calculateDistance(driverLat, driverLon, startLat, startLon);
 
-          if (distance > 1.0) { // 1.0 km de tolerancia
-              Alert.alert(
-                  "Punto de inicio lejano",
-                  "Estás muy lejos del punto de inicio para comenzar la ruta. Por favor, acércate al punto de partida."
-              );
-              return;
-          }
+        if (distance > 1.0) { // 1.0 km de tolerancia
+          Alert.alert(
+            "Punto de inicio lejano",
+            "Estás muy lejos del punto de inicio para comenzar la ruta. Por favor, acércate al punto de partida."
+          );
+          return;
+        }
       }
 
-      const { error } = await supabase
-        .from("trip_sessions")
-        .update({ status: "active" })
-        .eq("id", session.id);
-
-      if (error) throw error;
+      await tripService.startTripSession(session.id);
 
       Alert.alert("Éxito", "¡Viaje iniciado!");
-      
+
       // Iniciar el tracking de ubicación
       const { startTracking } = useTripTrackingStore.getState();
       await startTracking(Number(id), user.id);
@@ -482,22 +431,7 @@ export default function RouteDetail() {
     if (!session) return;
 
     try {
-      // 1. Actualizar estado de la sesión de viaje
-      const { error: sessionError } = await supabase
-        .from("trip_sessions")
-        .update({ status: "completed" })
-        .eq("id", session.id);
-
-      if (sessionError) throw sessionError;
-
-      // 2. Actualizar pasajeros unidos a 'completed'
-      const { error: passengersError } = await supabase
-        .from("passenger_trip_sessions")
-        .update({ status: "completed" })
-        .eq("trip_session_id", session.id)
-        .eq("status", "joined");
-
-      if (passengersError) throw passengersError;
+      await tripService.finishTripSession(session.id);
 
       // 3. Detener el tracking de ubicación
       await useTripTrackingStore.getState().stopTracking();
@@ -537,26 +471,7 @@ export default function RouteDetail() {
           style: "destructive",
           onPress: async () => {
             try {
-              // 1. Eliminar el meeting point del pasajero
-              const { error: meetingError } = await supabase
-                .from("passenger_meeting_points")
-                .delete()
-                .eq("trip_session_id", session.id)
-                .eq("passenger_id", user.id);
-
-              if (meetingError) {
-                console.error("Error deleting meeting point:", meetingError);
-                // No fallar completamente por este error
-              }
-
-              // 2. Actualizar el status del pasajero
-              const { error } = await supabase
-                .from("passenger_trip_sessions")
-                .update({ status: "left" })
-                .eq("trip_session_id", session.id)
-                .eq("passenger_id", user.id);
-
-              if (error) throw error;
+              await tripService.leaveTripSession(session.id, user.id);
 
               await fetchMeetingPoints();
               buildWaypoints();
@@ -575,13 +490,7 @@ export default function RouteDetail() {
     if (!session || passengerIds.length === 0) return;
 
     try {
-      const { error } = await supabase
-        .from("passenger_trip_sessions")
-        .update({ status: "completed" })
-        .eq("trip_session_id", session.id)
-        .in("passenger_id", passengerIds);
-
-      if (error) throw error;
+      await tripService.dropOffPassengers(session.id, passengerIds);
 
       // Enviar notificación push a cada pasajero completado
       for (const passengerId of passengerIds) {
@@ -858,34 +767,22 @@ export default function RouteDetail() {
   }, [session, driverLocation?.coords, hasCenteredOnDriver]);
 
   const fetchPassengers = async () => {
-    const { data, error } = await supabase
-      .from("passenger_trip_sessions")
-      .select("*")
-      .eq("trip_session_id", Number(id))
-      .in("status", ["joined", "pending_approval", "completed"])
-      .is("rejected", false)
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false });
-
-    if (error) {
-      console.error("Error al obtener pasajeros:", error);
+    try {
+      const data = await tripService.getTripSessionPassengers(Number(id));
+      return data as PassengerTripSession[];
+    } catch (err) {
+      console.error("Error fetching passengers:", err);
       return null;
     }
+  };
 
-    const uniqueLatestPassengers = (data || [])
-      .sort((a, b) => {
-        const aTime = new Date(a.created_at).getTime();
-        const bTime = new Date(b.created_at).getTime();
-        return bTime - aTime || b.id - a.id;
-      })
-      .reduce<PassengerTripSession[]>((acc, passenger) => {
-        if (!acc.some((p) => p.passenger_id === passenger.passenger_id)) {
-          acc.push(passenger);
-        }
-        return acc;
-      }, []);
-
-    return uniqueLatestPassengers;
+  const fetchPendingRequests = async () => {
+    try {
+      const data = await tripService.getPendingRequests(Number(id));
+      setPendingRequests(data);
+    } catch (error) {
+      console.error("Error al obtener solicitudes pendientes de BD:", error);
+    }
   };
 
   const fetchSessionUsers = async (passengerSessions: PassengerTripSession[]) => {
@@ -894,50 +791,30 @@ export default function RouteDetail() {
       return [];
     }
 
-    const { data, error } = await supabase
-      .from("users")
-      .select("*")
-      .in('id', passengerSessions.map(p => p.passenger_id));
-
-    if (error) {
+    try {
+      const userData = await tripService.getSessionUsers(passengerSessions.map(p => p.passenger_id));
+      setSessionUsers(userData);
+      return userData;
+    } catch (error) {
       console.error("Error fetching session users:", error);
       return [];
     }
-
-    // Fetch ratings for all these users
-    const userIds = data.map(u => u.id);
-    const ratingsMap = await ratingsService.getUsersRatings(userIds);
-
-    const userData = data.map(u => ({
-      ...(u as UserData),
-      rating: ratingsMap[u.id]?.rating || 0,
-      rating_count: ratingsMap[u.id]?.count || 0
-    }));
-
-    setSessionUsers(userData);
-    return userData;
   };
 
   const fetchMeetingPoints = async () => {
-    const { data, error } = await supabase
-      .from("passenger_meeting_points")
-      .select("*")
-      .eq("trip_session_id", Number(id));
-
-    if (error) {
+    try {
+      const data = await tripService.getMeetingPoints(Number(id));
+      const formattedData = (data || []).map((mp: any) => ({
+        ...mp,
+        coords: {
+          latitude: Number(mp.coords?.coordinates?.[1] ?? mp.coords?.latitude ?? 0),
+          longitude: Number(mp.coords?.coordinates?.[0] ?? mp.coords?.longitude ?? 0),
+        }
+      }));
+      setMeetingPoints(formattedData as MeetingPoint[]);
+    } catch (error) {
       console.error("Error fetching meeting points:", error);
-      return;
     }
-
-    const formattedData = (data || []).map((mp: any) => ({
-      ...mp,
-      coords: {
-        latitude: Number(mp.coords?.coordinates?.[1] ?? mp.coords?.latitude ?? 0),
-        longitude: Number(mp.coords?.coordinates?.[0] ?? mp.coords?.longitude ?? 0),
-      }
-    }));
-
-    setMeetingPoints(formattedData as MeetingPoint[]);
   };
 
   useEffect(() => {
@@ -948,17 +825,18 @@ export default function RouteDetail() {
         setPassengers(data);
         fetchSessionUsers(data);
       }
+      await fetchPendingRequests();
     };
 
     loadInitialPassengers();
 
-    // 2. Suscripción en tiempo real
+    // 2. Suscripción en tiempo real a passenger_trip_sessions
     const channel = supabase
       .channel(`passengers-in-session-${id}`) // Canal único por viaje
       .on(
         "postgres_changes",
         {
-          event: "*", // Escuchamos INSERT y UPDATE (por si cambian de estado)
+          event: "*", // Escuchamos INSERT y UPDATE
           schema: "public",
           table: "passenger_trip_sessions",
           filter: `trip_session_id=eq.${id}`, // Filtramos solo para este viaje
@@ -966,7 +844,6 @@ export default function RouteDetail() {
         (payload) => {
           console.log("Cambio detectado en pasajeros:", payload);
 
-          // Opción recomendada: Refrescar la lista completa para asegurar filtros
           fetchPassengers().then((data) => {
             if (data) {
               setPassengers(data);
@@ -979,9 +856,34 @@ export default function RouteDetail() {
       )
       .subscribe();
 
-    // 3. Limpieza al desmontar el componente
+    // 3. Suscripción en tiempo real a passenger_requests
+    const channelRequests = supabase
+      .channel(`requests-in-session-${id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "passenger_requests",
+          filter: `trip_session_id=eq.${id}`,
+        },
+        (payload) => {
+          console.log("Cambio detectado en solicitudes:", payload);
+          fetchPassengers().then((data) => {
+            if (data) {
+              setPassengers(data);
+              fetchSessionUsers(data);
+            }
+          });
+          fetchPendingRequests();
+        },
+      )
+      .subscribe();
+
+    // 4. Limpieza al desmontar el componente
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(channelRequests);
     };
   }, [id]);
 
@@ -1244,6 +1146,62 @@ export default function RouteDetail() {
                   </View>
                 </View>
               </MarkerView>
+            );
+          })}
+
+          {/* Pending Requests Markers (Proposed Pickup and Destination Points) */}
+          {pendingRequests?.map((req, index) => {
+            const pickupCoords = req.pickup_point?.coordinates;
+            const destCoords = req.destination_point?.coordinates;
+
+            return (
+              <React.Fragment key={`pending-req-${req.id}-${index}`}>
+                {pickupCoords && (
+                  <MarkerView
+                    id={`pending-pickup-${req.id}`}
+                    coordinate={[pickupCoords[0], pickupCoords[1]]}
+                    anchor={{ x: 0.5, y: 1 }}
+                  >
+                    <Pressable
+                      onPress={() => {
+                        setPassengerIdToProcess(req.passenger_id);
+                        setModalVisible(true);
+                      }}
+                      style={{ width: 80, height: 60, alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <View className="items-center">
+                        <View className="bg-secondary p-1.5 rounded-full shadow-md border-2 border-white">
+                          <Ionicons name="person-add" size={16} color="white" />
+                        </View>
+                        <Text className="bg-slate-800 text-white px-1 text-[8px] font-bold rounded mt-0.5">Recogida Propuesta</Text>
+                      </View>
+                    </Pressable>
+                  </MarkerView>
+                )}
+
+                {destCoords && (
+                  <MarkerView
+                    id={`pending-dest-${req.id}`}
+                    coordinate={[destCoords[0], destCoords[1]]}
+                    anchor={{ x: 0.5, y: 1 }}
+                  >
+                    <Pressable
+                      onPress={() => {
+                        setPassengerIdToProcess(req.passenger_id);
+                        setModalVisible(true);
+                      }}
+                      style={{ width: 80, height: 60, alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <View className="items-center">
+                        <View className="bg-warning p-1.5 rounded-full shadow-md border-2 border-white">
+                          <Ionicons name="flag-outline" size={16} color="white" />
+                        </View>
+                        <Text className="bg-slate-800 text-white px-1 text-[8px] font-bold rounded mt-0.5">Destino Propuesto</Text>
+                      </View>
+                    </Pressable>
+                  </MarkerView>
+                )}
+              </React.Fragment>
             );
           })}
 

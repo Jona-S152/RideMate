@@ -8,6 +8,8 @@ import AvailableRouteCard from "@/components/features/available-route-card";
 import { Colors } from "@/constants/Colors";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { RouteData, RouteStop, UserData } from "@/interfaces/available-routes";
+import { userService } from "@/services/user.service";
+import { tripService } from "@/services/trip.service";
 import { supabase } from "@/lib/supabase";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useIsFocused } from "@react-navigation/native";
@@ -58,39 +60,20 @@ export default function DriverRoutesScreen() {
 
   const fetchUserProfile = async () => {
     if (!user?.id) return;
-    const { data } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", user.id)
-      .maybeSingle();
-    if (data) setUserProfile(data as UserData);
+    try {
+      const data = await userService.getUserProfile(user.id);
+      if (data) setUserProfile(data as UserData);
+    } catch (err) {
+      console.error("Error fetching user profile:", err);
+    }
   };
 
   const fetchRoutes = async () => {
+    if (!user?.id) return;
     try {
-      // Consulta sin alias complejos para evitar errores de relación
-      const { data, error } = await supabase
-        .from("routes")
-        .select(`
-          *,
-          users!created_by(role_id),
-          stops(*)
-        `);
-
-      if (error) throw error;
-
-      const allRoutes = data || [];
-      
-      // Separar rutas
-      const userSpecific = allRoutes.filter(r => r.created_by === user?.id);
-      const adminSpecific = allRoutes.filter(r => {
-        // Accedemos a la relación 'users' que devuelve Supabase por defecto
-        const creatorRole = Array.isArray(r.users) ? r.users[0]?.role_id : r.users?.role_id;
-        return creatorRole === 1 && r.created_by !== user?.id;
-      });
-
-      setMyRoutes(userSpecific);
-      setAdminRoutes(adminSpecific);
+      const { myRoutes, adminRoutes } = await tripService.getDriverRoutes(user.id);
+      setMyRoutes(myRoutes);
+      setAdminRoutes(adminRoutes);
     } catch (error) {
       console.error("Error fetching driver routes:", error);
     }

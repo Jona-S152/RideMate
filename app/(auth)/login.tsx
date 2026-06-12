@@ -2,12 +2,12 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
-import { supabase } from "@/lib/supabase";
+import { authService } from "@/services/auth.service";
 import { Link } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Image, Keyboard, Pressable, Text, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
-import { useAuth, User } from "../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 
 export default function LoginScreen() {
     const { login } = useAuth()
@@ -48,36 +48,11 @@ export default function LoginScreen() {
 
     const handleLogin = async (email: string, password: string) => {
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
-                email,
-                password,
-            });
-
-            if (error) throw error;
-
-            // data.user tiene info básica, pero tu campo is_driver estará en tu tabla de usuarios
-            const userId = data.user?.id;
-            if (!userId) throw new Error("No se pudo obtener el ID del usuario");
-
-            const { data: userDataRaw, error: userError } = await supabase
-                .from('users')
-                .select('id, email, is_driver, role_id, name, last_name')
-                .eq('id', data.user?.id);
-
-            if (!userDataRaw || userDataRaw.length === 0) throw new Error("Usuario no encontrado");
-
-            const userData: User = {
-                id: userDataRaw[0].id,
-                email: userDataRaw[0].email,
-                is_driver: userDataRaw[0].is_driver ?? false,
-                driver_mode: userDataRaw[0].is_driver ?? false,
-                name: userDataRaw[0].name ?? 'Usuario'
-            };
-
-
+            const { session, userRecord } = await authService.signIn(email, password);
+            
             // Llamamos a login correctamente
-            await login(data.session?.access_token ?? '', userData);
-            console.log("Sesión iniciada", userData);
+            await login(session?.access_token ?? '', userRecord);
+            console.log("Sesión iniciada", userRecord);
 
         } catch (error: any) {
             console.error("Error iniciando sesión:", error.message);

@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Location from "expo-location";
 import { createContext, useContext, useEffect, useState } from "react";
 
 export type User = {
@@ -43,6 +44,12 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
   const logout = async () => {
     try {
+      // Stop background location updates if running
+      try {
+        await Location.stopLocationUpdatesAsync('DRIVER_LOCATION_BACKGROUND');
+      } catch (e) {}
+      await AsyncStorage.removeItem("ACTIVE_TRIP");
+
       await AsyncStorage.removeItem("userToken");
       await AsyncStorage.removeItem("userInfo");
       setToken(null);

@@ -3,7 +3,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
-import { supabase } from "@/lib/supabase";
+import { userService } from "@/services/user.service";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
@@ -54,13 +54,7 @@ export default function BecomeDriverScreen() {
     const fetchUserDetails = async () => {
         if (!user?.id) return;
         try {
-            const { data, error } = await supabase
-                .from("users")
-                .select("name, last_name, email")
-                .eq("id", user.id)
-                .single();
-
-            if (error) throw error;
+            const data = await userService.getUserProfile(user.id);
             if (data) {
                 setName(data.name || "");
                 setLastName(data.last_name || "");
@@ -80,18 +74,10 @@ export default function BecomeDriverScreen() {
 
             setLoading(true);
 
-            // In a real app, this might involve more fields (license, plate, etc.)
-            // But for now, we follow the existing logic of setting is_driver = true
-            const { error } = await supabase
-                .from("users")
-                .update({
-                    is_driver: true,
-                    name: name,
-                    last_name: lastName
-                })
-                .eq("id", user.id);
-
-            if (error) throw error;
+            await userService.becomeDriver(user.id, {
+                name: name,
+                last_name: lastName
+            });
 
             await updateUser({
                 ...user,

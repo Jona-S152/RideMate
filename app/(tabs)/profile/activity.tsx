@@ -2,7 +2,7 @@ import { useAuth } from "@/app/context/AuthContext";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
-import { supabase } from "@/lib/supabase";
+import { userService } from "@/services/user.service";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Animated, Pressable, RefreshControl, View } from "react-native";
@@ -50,62 +50,8 @@ export default function ActivityScreen() {
         if (!user?.id) return;
         setLoading(true);
         try {
-            if (role === 'passenger') {
-                const { data, error } = await supabase
-                    .from('passenger_route_history')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .order('end_time', { ascending: false });
-
-                if (error) throw error;
-
-                const formatted: TripHistoryItem[] = data.map((item: any) => ({
-                    id: `h-${item.id}`, // Use the unique record ID with a prefix
-                    start_location: item.start_location,
-                    end_location: item.end_location,
-                    start_time: item.start_time,
-                    status: 'completed',
-                    price: 2,
-                    role: 'passenger'
-                }));
-                setHistory(formatted);
-            } else {
-                const { data, error } = await supabase
-                    .from('passenger_route_history')
-                    .select('*')
-                    .eq('driver_id', user.id)
-                    .order('end_time', { ascending: false });
-
-                if (error) throw error;
-
-                // Group by trip_session_id to avoid duplicate trips in driver view
-                // Use a Map to preserve insertion order (which is sorted by end_time DESC)
-                const uniqueTripsMap = new Map<number, any>();
-                data.forEach((item: any) => {
-                    if (!uniqueTripsMap.has(item.trip_session_id)) {
-                        uniqueTripsMap.set(item.trip_session_id, {
-                            ...item,
-                            p_count: 0
-                        });
-                    }
-                    if (item.user_id !== item.driver_id) {
-                        const trip = uniqueTripsMap.get(item.trip_session_id);
-                        if (trip) trip.p_count += 1;
-                    }
-                });
-
-                const formatted: TripHistoryItem[] = Array.from(uniqueTripsMap.values()).map((item: any) => ({
-                    id: `s-${item.trip_session_id}`, // Use trip_session_id with a different prefix
-                    start_location: item.start_location,
-                    end_location: item.end_location,
-                    start_time: item.start_time,
-                    status: 'completed',
-                    price: 2,
-                    passenger_count: item.p_count,
-                    role: 'driver'
-                }));
-                setHistory(formatted);
-            }
+            const data = await userService.getActivityHistory(user.id, role);
+            setHistory(data as TripHistoryItem[]);
         } catch (error: any) {
             console.error("Error fetching activity:", error.message);
         } finally {

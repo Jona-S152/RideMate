@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { tripService } from './trip.service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
@@ -19,6 +19,17 @@ TaskManager.defineTask(DRIVER_LOCATION_TASK, async ({ data, error }) => {
 
     if (!data) return;
 
+    // Check if the user is authenticated
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+        console.log('User is logged out. Stopping background location task.');
+        try {
+            await Location.stopLocationUpdatesAsync(DRIVER_LOCATION_TASK);
+        } catch (e) {}
+        await AsyncStorage.removeItem('ACTIVE_TRIP');
+        return;
+    }
+
     const raw = await AsyncStorage.getItem('ACTIVE_TRIP');
     if (!raw) return;
 
@@ -31,19 +42,17 @@ TaskManager.defineTask(DRIVER_LOCATION_TASK, async ({ data, error }) => {
     const { latitude, longitude } = location.coords;
 
     // ✅ UPSERT REAL (Usando formato geometry)
-    const { error: err } = await supabase.from('driver_locations').upsert(
-      {
-        trip_session_id: tripSessionId,
-        driver_id: driverId,
-        coords: `POINT(${longitude} ${latitude})`,
-        recorded_at: new Date().toISOString(),
-      },
-      {
-        onConflict: 'trip_session_id',
-      }
-    );
-
-    if (err) {
+    try {
+      await tripService.updateDriverLocation(tripSessionId, driverId, latitude, longitude);
+    } catch (err: any) {
         console.error('❌ Error upserting driver location:', err);
+        // If the trip session does not exist (foreign key constraint violation code 23503), stop tracking
+        if (err?.code === '23503' || String(err).includes('23503') || String(err).includes('violates foreign key constraint')) {
+            console.log('Trip session no longer exists. Stopping background tracking...');
+            try {
+                await Location.stopLocationUpdatesAsync(DRIVER_LOCATION_TASK);
+            } catch (e) {}
+            await AsyncStorage.removeItem('ACTIVE_TRIP');
+        }
     }
 });

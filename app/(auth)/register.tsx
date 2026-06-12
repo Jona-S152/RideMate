@@ -2,11 +2,11 @@ import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { useCollapsingHeader } from "@/hooks/useCollapsingHeader";
-import { supabase } from "@/lib/supabase";
+import { authService } from "@/services/auth.service";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Animated, Dimensions, Image, Keyboard, Platform, Pressable, ScrollView, Text, View } from "react-native";
-import { useAuth, User } from "../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -64,83 +64,19 @@ export default function RegisterScreen() {
     };
   }, []);
 
-  /** Helper: obtain an active session (tries getSession, then signInWithPassword) */
-  const ensureSession = async (email: string, password: string) => {
-    // try current session first
-    let { data: sessionData } = await supabase.auth.getSession();
-    if (sessionData?.session?.user) return sessionData.session;
-
-    // if not, try to sign in immediately (works if email confirmation is off)
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (signInError) {
-      // return null to allow caller to handle
-      return null;
-    }
-    // try getSession again
-    ({ data: sessionData } = await supabase.auth.getSession());
-    return sessionData.session ?? signInData.session ?? null;
-  };
-
   const handleRegister = async () => {
     setLoading(true);
 
     try {
-      // 1) Crear user en auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const { session, userRecord } = await authService.signUp({
         email: form.email.trim(),
         password: form.password,
-        // options: { emailRedirectTo: 'exp://..' } // opcional según config
+        name: form.name,
+        lastname: form.lastname
       });
 
-      if (authError) throw authError;
-
-      // 2) Obtener sesión activa (puede que signUp no haya creado sesión inmediatamente)
-      // intentamos garantizar que haya sesión y token
-      const session = await ensureSession(form.email.trim(), form.password);
-
-      if (!session?.user) {
-        // Si NO hay sesión, podemos aún intentar insertar usando authData.user.id
-        // pero si RLS requiere session (auth.uid()) el insert fallará.
-        // Mejor informar al usuario.
-        Alert.alert(
-          "Atención",
-          "No se pudo iniciar sesión automáticamente. Intenta iniciar sesión manualmente."
-        );
-        setLoading(false);
-        return;
-      }
-
-      const userId = session.user.id;
-
-      // 3) Insertar fila en public.users (asegúrate de que created_at tenga default y password no exista)
-      const { error: insertError } = await supabase.from("users").insert({
-        id: userId,
-        name: form.name || null,
-        last_name: form.lastname || null,
-        email: form.email,
-        is_driver: false,
-        role_id: 2,
-      });
-
-      if (insertError) throw insertError;
-
-      // 4) Construir objeto user para el context (puedes ajustar campos que necesites)
-      const userForContext: User = {
-        id: userId,
-        email: form.email,
-        is_driver: false,
-        driver_mode: false,
-        name: form.name
-      };
-
-      // 5) Guardar token + user en el contexto inmediatamente
-      await login(session.access_token ?? "", userForContext);
-
-      // 6) Avanzar al step opcional (pero ya está guardado en contexto)
+      // Guardar token + user en el contexto inmediatamente
+      await login(session?.access_token ?? "", userRecord);
       setLoading(false);
 
     } catch (err: any) {

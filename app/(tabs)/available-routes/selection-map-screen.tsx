@@ -1,6 +1,7 @@
 import { useAuth } from "@/app/context/AuthContext";
 import { Colors } from "@/constants/Colors";
 import { supabase } from "@/lib/supabase";
+import { tripService } from "@/services/trip.service";
 import { Ionicons } from "@expo/vector-icons";
 import Mapbox, {
     Camera,
@@ -47,7 +48,24 @@ export default function SelectionMapScreen() {
   const [stopsData, setStopsData] = useState<any[]>([]);
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
 
+  // NUEVOS ESTADOS PARA DOS PASOS
+  const [step, setStep] = useState<'pickup' | 'destination'>('pickup');
+  const [pickupCoords, setPickupCoords] = useState<number[] | null>(null);
+  const [pickupAddress, setPickupAddress] = useState<string>("");
+
   const cameraRef = useRef<Mapbox.Camera>(null);
+
+  const getPlaceName = async (coords: number[]) => {
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords[0]},${coords[1]}.json?access_token=${MAPBOX_TOKEN}&language=es`
+      );
+      const data = await response.json();
+      return data.features?.[0]?.place_name || "Ubicación en el mapa";
+    } catch {
+      return "Ubicación en el mapa";
+    }
+  };
 
   // 1. Obtener Permisos y Ubicación Inicial
   useEffect(() => {
@@ -185,14 +203,14 @@ export default function SelectionMapScreen() {
       const sessionId = Number(trip_session_id);
       if (!user?.id || !sessionId || isNaN(sessionId)) return;
 
+      // Consultamos la nueva tabla passenger_requests
       const { data, error } = await supabase
-        .from('passenger_trip_sessions')
-        .select('status, rejected, rejection_reason')
+        .from('passenger_requests')
+        .select('status, rejection_reason')
         .eq('trip_session_id', sessionId)
         .eq('passenger_id', user.id)
-        .in('status', ['joined', 'pending_approval'])
+        .in('status', ['pending', 'approved'])
         .order('created_at', { ascending: false })
-        .order('id', { ascending: false })
         .limit(1)
         .maybeSingle();
 
@@ -202,24 +220,20 @@ export default function SelectionMapScreen() {
       }
 
       if (data) {
-        // Si fue rechazada, permitir reintentar
-        if (data.rejected) {
+        if (data.status === 'approved') {
           Alert.alert(
-            'Solicitud Rechazada',
-            data.rejection_reason 
-              ? `Tu solicitud anterior fue rechazada: ${data.rejection_reason}\n\nPuedes seleccionar un nuevo punto de encuentro para intentar nuevamente.`
-              : 'Tu solicitud anterior fue rechazada. Puedes seleccionar un nuevo punto de encuentro para intentar nuevamente.'
+            'Ya estás en este viaje',
+            'Tu solicitud ha sido aprobada. Ya estás participando en este viaje.',
+            [{ text: 'OK', onPress: () => router.replace('/(tabs)/available-routes') }]
           );
-          return;
+        } else if (data.status === 'pending') {
+          setHasPendingRequest(true);
+          Alert.alert(
+            'Solicitud existente',
+            'Ya has enviado una solicitud para este viaje. Espera a que el conductor la apruebe.',
+            [{ text: 'OK', onPress: () => router.replace('/(tabs)/available-routes') }]
+          );
         }
-
-        // Si está pendiente (no rechazada), bloquear
-        setHasPendingRequest(true);
-        Alert.alert(
-          'Solicitud existente',
-          'Ya has enviado una solicitud para este viaje. No puedes seleccionar otro punto de encuentro.',
-          [{ text: 'OK', onPress: () => router.replace('/(tabs)/available-routes') }]
-        );
       }
     };
 
@@ -230,6 +244,11 @@ export default function SelectionMapScreen() {
   // 3. Validar Proximidad (Turf.js)
   useEffect(() => {
     if (!selectedCoords || !routeGeoJSON) return;
+
+    if (step === 'destination') {
+      setIsValidSelection(true);
+      return;
+    }
 
     try {
       const point = turf.point(selectedCoords);
@@ -253,71 +272,52 @@ export default function SelectionMapScreen() {
       console.error("❌ Error Turf:", e);
       setIsValidSelection(true);
     }
-  }, [selectedCoords, routeGeoJSON]);
+  }, [selectedCoords, routeGeoJSON, step]);
 
   const confirmPoint = async () => {
-    if (!selectedCoords || !isValidSelection || hasPendingRequest) return;
-    setLoading(true);
+    if (!selectedCoords || hasPendingRequest) return;
 
-    try {
-      const sessionId = Number(trip_session_id);
-
-      const { data: existingRequest, error: existingError } = await supabase
-        .from('passenger_trip_sessions')
-        .select('status, rejected, rejection_reason')
-        .eq('trip_session_id', sessionId)
-        .eq('passenger_id', user?.id)
-        .in('status', ['joined', 'pending_approval'])
-        .limit(1)
-        .maybeSingle();
-
-      if (existingError) throw existingError;
-      
-      // Si existe una solicitud y NO fue rechazada, está pendiente
-      if (existingRequest && !existingRequest.rejected) {
-        Alert.alert('Solicitud existente', 'Ya tienes una solicitud en curso para este viaje. No puedes volver a seleccionar otro punto de encuentro.');
-        router.replace('/(tabs)/available-routes');
+    if (step === 'pickup') {
+      if (!isValidSelection) {
+        Alert.alert("Selección Inválida", "El punto de encuentro debe estar a menos de 150 metros de la ruta.");
         return;
       }
-
-      // Si fue rechazada, permitir crear una nueva (no bloquear)
-      if (existingRequest && existingRequest.rejected) {
-        // Permitir continuar, será una nueva solicitud
+      setLoading(true);
+      try {
+        const address = await getPlaceName(selectedCoords);
+        setPickupCoords(selectedCoords);
+        setPickupAddress(address);
+        setStep('destination');
+        Alert.alert("Punto de Encuentro Fijado", "Ahora selecciona en el mapa tu punto de destino/bajada.");
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
       }
+    } else {
+      setLoading(true);
+      try {
+        const address = await getPlaceName(selectedCoords);
+        const destCoords = selectedCoords;
+        const sessionId = Number(trip_session_id);
 
-      const { error: sessionError } = await supabase
-        .from("passenger_trip_sessions")
-        .insert([
-          {
-            trip_session_id: sessionId,
-            status: "pending_approval",
-            passenger_id: user?.id,
-          },
-        ]);
+        await tripService.submitPassengerRequest(
+          sessionId,
+          user!.id,
+          { latitude: pickupCoords![1], longitude: pickupCoords![0] },
+          { latitude: destCoords[1], longitude: destCoords[0] },
+          pickupAddress || "Punto de Encuentro",
+          address || "Punto de Destino"
+        );
 
-      if (sessionError) throw sessionError;
-
-      const { error: meetingError } = await supabase.from("passenger_meeting_points").insert([
-        {
-          trip_session_id: sessionId,
-          passenger_id: user?.id,
-          coords: {
-            type: "Point",
-            coordinates: [selectedCoords[0], selectedCoords[1]],
-          },
-          location: start_name || "Punto Seleccionado",
-        },
-      ]);
-
-      if (meetingError) throw meetingError;
-
-      Alert.alert("Solicitud Enviada", "Tu solicitud ha sido enviada con éxito. Espera a que el conductor la apruebe.");
-      router.replace("/(tabs)/available-routes");
-    } catch (error: any) {
-      console.error(error);
-      Alert.alert("Error", error.message);
-    } finally {
-      setLoading(false);
+        Alert.alert("Solicitud Enviada", "Tu solicitud ha sido enviada con éxito. Espera a que el conductor la apruebe.");
+        router.replace("/(tabs)/available-routes");
+      } catch (error: any) {
+        console.error(error);
+        Alert.alert("Error", error.message);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -333,12 +333,14 @@ export default function SelectionMapScreen() {
           }}
         >
           <Text className="text-xs font-bold uppercase tracking-wider" style={{ color: Colors.dark.textSecondary }}>
-            {isValidSelection ? "Punto de Encuentro" : "Demasiado Lejos"}
+            {step === 'pickup' 
+              ? (isValidSelection ? "Paso 1/2: Punto de Encuentro" : "Demasiado Lejos de la Ruta")
+              : "Paso 2/2: Punto de Destino"}
           </Text>
           <Text className="text-sm mt-1 font-semibold" style={{ color: isValidSelection ? Colors.dark.text : Colors.dark.warning }}>
-            {isValidSelection
-              ? "Arrastra el mapa para ajustar"
-              : `Acércate ${Math.round(distanceToRoute - 150)}m más a la ruta`}
+            {step === 'pickup'
+              ? (isValidSelection ? "Arrastra el mapa para ajustar el encuentro" : `Acércate ${Math.round(distanceToRoute - 150)}m más a la ruta`)
+              : "Arrastra el mapa para ajustar el destino"}
           </Text>
         </View>
       </View>
@@ -386,7 +388,6 @@ export default function SelectionMapScreen() {
                 <View className="p-1 rounded-full shadow-md" style={{ backgroundColor: Colors.dark.glassSoft, borderColor: Colors.dark.border, borderWidth: 1 }}>
                   <Ionicons name="flag" size={24} color={Colors.light.success} />
                 </View>
-                {/* <ThemedText className="bg-white/80 px-1 text-[8px] font-bold">Inicio</ThemedText> */}
               </View>
             </MarkerView>
 
@@ -420,7 +421,6 @@ export default function SelectionMapScreen() {
                 <View className="p-1 rounded-full shadow-md" style={{ backgroundColor: Colors.dark.glassSoft, borderColor: Colors.dark.border, borderWidth: 1 }}>
                   <Ionicons name="location" size={24} color={Colors.light.warning} />
                 </View>
-                {/* <ThemedText className="bg-white/80 px-1 text-[8px] font-bold">Fin</ThemedText> */}
               </View>
             </MarkerView>
           </>
@@ -434,10 +434,18 @@ export default function SelectionMapScreen() {
             style={{ backgroundColor: isValidSelection ? Colors.dark.glassStrong : Colors.dark.warning }}
           >
             <Text className="text-white text-[10px] font-bold">
-              {isValidSelection ? "RECOGER AQUÍ" : `MUY LEJOS (${Math.round(distanceToRoute)}m)`}
+              {step === 'pickup' 
+                ? (isValidSelection ? "RECOGER AQUÍ" : `MUY LEJOS (${Math.round(distanceToRoute)}m)`)
+                : "BAJAR AQUÍ"}
             </Text>
           </View>
-          <Ionicons name="location" size={40} color={isValidSelection ? Colors.dark.primary : Colors.dark.warning} />
+          <Ionicons 
+            name="location" 
+            size={40} 
+            color={step === 'pickup' 
+              ? (isValidSelection ? Colors.dark.primary : Colors.dark.warning)
+              : Colors.light.secondary} 
+          />
           <View style={styles.shadow} />
         </View>
       </View>
@@ -445,26 +453,35 @@ export default function SelectionMapScreen() {
       <View className="absolute bottom-32 left-0 right-0 px-6">
         <Pressable
           onPress={confirmPoint}
-          disabled={loading || !isValidSelection || hasPendingRequest}
-          className={`h-16 rounded-full flex-row items-center justify-center shadow-2xl ${loading || !isValidSelection || hasPendingRequest ? "bg-gray-400" : "bg-secondary"
-            }`}
+          disabled={loading || (step === 'pickup' && !isValidSelection) || hasPendingRequest}
+          className={`h-16 rounded-full flex-row items-center justify-center shadow-2xl ${
+            loading || (step === 'pickup' && !isValidSelection) || hasPendingRequest 
+              ? "bg-gray-400" 
+              : step === 'pickup' ? "bg-secondary" : "bg-primary"
+          }`}
           style={({ pressed }) => [{ opacity: pressed ? 0.9 : 1 }]}
         >
           {loading ? (
             <ActivityIndicator color="white" />
           ) : (
             <Text className={`font-bold text-lg text-white`}>
-              {isValidSelection ? "Confirmar Ubicación" : "Ubicación Inválida"}
+              {step === 'pickup' ? "Fijar Punto de Encuentro" : "Confirmar e Iniciar Solicitud"}
             </Text>
           )}
         </Pressable>
       </View>
 
       <Pressable
-        onPress={() => router.back()}
+        onPress={() => {
+          if (step === 'destination') {
+            setStep('pickup');
+          } else {
+            router.back();
+          }
+        }}
         className="absolute top-14 left-6 w-10 h-10 rounded-full items-center justify-center shadow-md z-50 bg-secondary"
       >
-        <Ionicons name="close" size={24} color="white" />
+        <Ionicons name={step === 'destination' ? "arrow-back" : "close"} size={24} color="white" />
       </Pressable>
     </View>
   );

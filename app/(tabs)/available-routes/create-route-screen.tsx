@@ -1,7 +1,7 @@
 import { useAuth } from "@/app/context/AuthContext";
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
-import { supabase } from "@/lib/supabase";
+import { tripService } from "@/services/trip.service";
 import { calculateDistance } from "@/utils/geo";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Mapbox, {
@@ -194,18 +194,16 @@ export default function CreateRouteScreen() {
 
       const staticMapUrl = `https://api.mapbox.com/styles/v1/mapbox/traffic-night-v2/static/${routePolyline ? `path-5+FCA311-0.8(${encodeURIComponent(routePolyline)})` : ""},pin-s-a+2ecc71(${startPoint.coords[0]},${startPoint.coords[1]}),pin-s-b+e74c3c(${endPoint.coords[0]},${endPoint.coords[1]})/auto/600x600?padding=110,110,110,110&access_token=${MAPBOX_TOKEN}`;
 
-      const { error } = await supabase.from("routes").insert([
-        {
-          created_by: user?.id,
-          start_location: startPoint.name,
-          end_location: endPoint.name,
-          start_coords: { type: "Point", coordinates: startPoint.coords },
-          end_coords: { type: "Point", coordinates: endPoint.coords },
-          image_url: staticMapUrl
-        }
-      ]);
+      if (!user?.id) return;
 
-      if (error) throw error;
+      await tripService.createRoute(
+        user.id,
+        startPoint.name,
+        endPoint.name,
+        startPoint.coords,
+        endPoint.coords,
+        staticMapUrl
+      );
       Alert.alert(
         "¡Éxito!",
         "Ruta creada correctamente.",

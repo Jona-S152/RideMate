@@ -4,6 +4,10 @@ import { supabase } from '@/lib/supabase';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 
+// ─────────────────────────────────────────────────────────────
+// Hook: useTripRealtimeById
+// Suscribe a cambios de una sesión específica por ID.
+// ─────────────────────────────────────────────────────────────
 export const useTripRealtimeById = (sessionId: number) => {
     const [session, setSession] = useState<SessionData | null>(null);
 
@@ -18,30 +22,29 @@ export const useTripRealtimeById = (sessionId: number) => {
 
             if (error) setSession(null);
 
-            setSession(data as SessionData)
+            setSession(data as SessionData);
         } catch (error) {
             setSession(null);
         }
-    }
+    };
 
     useEffect(() => {
         refreshSession();
 
         try {
-            // 1. Suscribirse a cambios en la tabla trip_sessions
             const channel = supabase
-                .channel(`session-${sessionId}`) // Nombre único para el canal
+                .channel(`session-${sessionId}`)
                 .on(
                     'postgres_changes',
                     {
-                        event: 'UPDATE', // Solo nos interesan las actualizaciones
+                        event: 'UPDATE',
                         schema: 'public',
                         table: 'trip_sessions',
-                        filter: `id=eq.${sessionId}`, // Filtro crucial para no escuchar otros viajes
+                        filter: `id=eq.${sessionId}`,
                     },
                     (payload) => {
                         const newData = payload.new as SessionData;
-                        setSession(newData); // Actualiza el estado automáticamente
+                        setSession(newData);
                     }
                 )
                 .subscribe();
@@ -49,25 +52,32 @@ export const useTripRealtimeById = (sessionId: number) => {
             return () => {
                 supabase.removeChannel(channel);
             };
-
         } catch (error) {
-            console.error("ERROR: ", error);
+            console.error("useTripRealtimeById subscription error:", error);
         }
     }, [sessionId]);
 
     return { session };
 };
 
+// ─────────────────────────────────────────────────────────────
+// Hook: useActiveSession
+// Detecta si el usuario tiene una sesión activa.
+// Para conductores: revisa trip_sessions.
+// Para pasajeros: revisa passenger_trip_sessions (joined)
+//   y también passenger_requests (pending) para reaccionar
+//   en tiempo real cuando el conductor aprueba la solicitud.
+// ─────────────────────────────────────────────────────────────
 export const useActiveSession = (user: User | null) => {
     const [activeSession, setActiveSession] = useState<SessionData | null>(null);
     const [loading, setLoading] = useState(true);
 
-    // 1. La función de carga original adaptada
     const refreshSession = async () => {
         if (!user?.id) return;
 
         try {
             if (user.driver_mode) {
+                // Conductor: busca sesión activa propia
                 const { data } = await supabase
                     .from('trip_sessions')
                     .select("*, routes(image_url)")
@@ -76,11 +86,11 @@ export const useActiveSession = (user: User | null) => {
                     .is('end_time', null)
                     .order('start_time', { ascending: false })
                     .limit(1)
-                    .maybeSingle(); // Usamos maybeSingle para evitar errores si no hay nada
+                    .maybeSingle();
 
                 setActiveSession(data as SessionData);
             } else {
-                // Lógica de pasajero
+                // Pasajero: primero intenta encontrar una sesión aprobada (joined)
                 const { data: pSession } = await supabase
                     .from('passenger_trip_sessions')
                     .select('trip_session_id')
@@ -99,38 +109,79 @@ export const useActiveSession = (user: User | null) => {
                         .maybeSingle();
                     setActiveSession(trip as SessionData);
                 } else {
+                    // Sin sesión aprobada aún
                     setActiveSession(null);
                 }
             }
         } catch (e) {
-            console.error(e);
+            console.error("useActiveSession refresh error:", e);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
+        if (!user?.id) return;
+
         refreshSession();
 
-        // 2. CONFIGURACIÓN REALTIME
-        const channel = supabase
-            .channel('session_updates')
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'trip_sessions' },
-                () => refreshSession() // Re-ejecuta la lógica ante cualquier cambio relevante
-            )
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'passenger_trip_sessions' },
-                () => refreshSession()
-            )
-            .subscribe();
+        if (user.driver_mode) {
+            // Conductor: escucha cambios en trip_sessions filtrado por driver_id
+            const channel = supabase
+                .channel(`active-session-driver-${user.id}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'trip_sessions',
+                        filter: `driver_id=eq.${user.id}`,
+                    },
+                    () => refreshSession()
+                )
+                .subscribe();
 
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [user?.id]);
+            return () => {
+                supabase.removeChannel(channel);
+            };
+        } else {
+            // Pasajero: escucha cambios en passenger_trip_sessions y passenger_requests
+            // para detectar cuando una solicitud es aprobada o rechazada.
+            const channel = supabase
+                .channel(`active-session-passenger-${user.id}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'passenger_trip_sessions',
+                        filter: `passenger_id=eq.${user.id}`,
+                    },
+                    () => refreshSession()
+                )
+                .on(
+                    'postgres_changes',
+                    {
+                        event: 'UPDATE',
+                        schema: 'public',
+                        table: 'passenger_requests',
+                        filter: `passenger_id=eq.${user.id}`,
+                    },
+                    (payload) => {
+                        // Si la solicitud fue aprobada, refrescamos para mostrar la sesión activa
+                        const updated = payload.new as any;
+                        if (updated?.status === 'approved') {
+                            refreshSession();
+                        }
+                    }
+                )
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(channel);
+            };
+        }
+    }, [user?.id, user?.driver_mode]);
 
     useFocusEffect(
         useCallback(() => {
@@ -143,6 +194,12 @@ export const useActiveSession = (user: User | null) => {
     return { activeSession, loading, refreshSession };
 };
 
+// ─────────────────────────────────────────────────────────────
+// Hook: useTripStops
+// Obtiene y escucha cambios en las paradas de una sesión.
+// IMPORTANTE: el filtro por trip_session_id es crítico para
+// no escuchar cambios de otras sesiones.
+// ─────────────────────────────────────────────────────────────
 export const useTripStops = (tripSessionId: number) => {
     const [stops, setStops] = useState<TripSessionStops[]>([]);
 
@@ -153,13 +210,18 @@ export const useTripStops = (tripSessionId: number) => {
             const { data, error } = await supabase
                 .from("trip_session_stops")
                 .select("*")
-                .eq("trip_session_id", tripSessionId)
+                .eq("trip_session_id", tripSessionId);
 
-            setStops(data as TripSessionStops[])
+            if (error) {
+                console.error("useTripStops refresh error:", error);
+                return;
+            }
+
+            setStops(data as TripSessionStops[]);
         } catch (error) {
-            console.error(error)
+            console.error("useTripStops unexpected error:", error);
         }
-    }
+    };
 
     useEffect(() => {
         refreshStops();
@@ -168,8 +230,13 @@ export const useTripStops = (tripSessionId: number) => {
             .channel(`session-stops-${tripSessionId}`)
             .on(
                 'postgres_changes',
-                { event: '*', schema: 'public', table: 'trip_session_stops' },
-                () => refreshStops() // Re-ejecuta la lógica ante cualquier cambio relevante
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'trip_session_stops',
+                    filter: `trip_session_id=eq.${tripSessionId}`, // ← filtro esencial
+                },
+                () => refreshStops()
             )
             .subscribe();
 
@@ -179,8 +246,12 @@ export const useTripStops = (tripSessionId: number) => {
     }, [tripSessionId]);
 
     return { stops };
-}
+};
 
+// ─────────────────────────────────────────────────────────────
+// Hook: useDriverLocation
+// Escucha la ubicación del conductor en tiempo real.
+// ─────────────────────────────────────────────────────────────
 export const useDriverLocation = (tripSessionId: number) => {
     const [driverLocation, setDriverLocation] = useState<DriverLocation | null>(null);
 
@@ -194,12 +265,16 @@ export const useDriverLocation = (tripSessionId: number) => {
                 .eq("trip_session_id", tripSessionId)
                 .maybeSingle();
 
+            if (error) {
+                console.error("useDriverLocation refresh error:", error);
+                return;
+            }
+
             setDriverLocation(data as DriverLocation);
         } catch (error) {
-            console.error("ERROR: ", error);
-            return;
+            console.error("useDriverLocation unexpected error:", error);
         }
-    }
+    };
 
     useEffect(() => {
         refreshDriverLocation();
@@ -225,5 +300,33 @@ export const useDriverLocation = (tripSessionId: number) => {
         };
     }, [tripSessionId]);
 
-    return { driverLocation }
-}
+    return { driverLocation };
+};
+
+// ─────────────────────────────────────────────────────────────
+// Hook: useAvailableRoutesSubscription
+// Escucha cambios en las sesiones de viaje disponibles (pendientes o activas).
+// ─────────────────────────────────────────────────────────────
+export const useAvailableRoutesSubscription = (onUpdate: () => void) => {
+    useEffect(() => {
+        const channel = supabase
+            .channel("public:trip_sessions")
+            .on(
+                "postgres_changes",
+                {
+                    event: "*",
+                    schema: "public",
+                    table: "trip_sessions",
+                    filter: "status=in.(pending,active)",
+                },
+                () => {
+                    onUpdate();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [onUpdate]);
+};

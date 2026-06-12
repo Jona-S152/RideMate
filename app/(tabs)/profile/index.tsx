@@ -3,8 +3,8 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { UserData } from "@/interfaces/available-routes";
-import { supabase } from "@/lib/supabase";
 import { ratingsService } from "@/services/ratings.service";
+import { userService } from "@/services/user.service";
 import { Link } from "expo-router";
 import { useEffect, useState } from "react";
 import { Image, Pressable, ScrollView, View } from "react-native";
@@ -17,19 +17,18 @@ export default function ProfileScreen() {
     const fetchUser = async () => {
         if (!user?.id) return;
 
-        const { data, error } = await supabase
-            .from("users")
-            .select("*")
-            .eq('id', user.id)
-            .maybeSingle();
-
-        if (data) {
-            const ratingInfo = await ratingsService.getUserRating(user.id);
-            setUserData({
-                ...(data as UserData),
-                rating: ratingInfo.rating,
-                rating_count: ratingInfo.count
-            });
+        try {
+            const data = await userService.getUserProfile(user.id);
+            if (data) {
+                const ratingInfo = await ratingsService.getUserRating(user.id);
+                setUserData({
+                    ...(data as any as UserData),
+                    rating: ratingInfo.rating,
+                    rating_count: ratingInfo.count
+                });
+            }
+        } catch (error) {
+            console.error("Error fetching user profile:", error);
         }
     }
 
