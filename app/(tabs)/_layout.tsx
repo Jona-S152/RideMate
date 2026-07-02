@@ -14,7 +14,7 @@ import { useAuth } from "../context/AuthContext";
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const pathName = usePathname();
-  const hideTabBar = ["edit-profile", "route-detail", "become-driver", "create-route-screen", "activity"].some((route) =>
+  const hideTabBar = ["route-detail", "create-route-screen"].some((route) =>
     pathName.includes(route),
   ); // Colocar rutas secundarias
 
@@ -72,6 +72,12 @@ export default function TabLayout() {
             <Entypo size={28} name="home" color={color} />
           ),
         }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate("home", { screen: "index" });
+          },
+        })}
       />
       <Tabs.Screen
         name="available-routes"
@@ -81,6 +87,12 @@ export default function TabLayout() {
             <FontAwesome5 size={28} name={user?.driver_mode ? "plus" : "route"} color={color} />
           ),
         }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate("available-routes", { screen: "index" });
+          },
+        })}
       />
       <Tabs.Screen
         name="profile"
@@ -90,6 +102,12 @@ export default function TabLayout() {
             <MaterialCommunityIcons size={28} name="account" color={color} />
           ),
         }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate("profile", { screen: "index" });
+          },
+        })}
       />
     </Tabs>
   );

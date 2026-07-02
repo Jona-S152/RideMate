@@ -28,7 +28,7 @@ export default function HomeScreen() {
   const secondaryColor = useThemeColor({}, 'secondary');
   const dangerColor = useThemeColor({}, 'danger');
 
-  const [isEnabled, setIsEnabled] = useState(false);
+  const [isEnabled, setIsEnabled] = useState(user?.driver_mode ?? false);
   const toggleSwitch = () => {
     setIsEnabled((previousState) => !previousState);
   };
@@ -62,7 +62,13 @@ export default function HomeScreen() {
   }, [sessionChanged]);
 
   useEffect(() => {
-    if (user?.driver_mode !== isEnabled) {
+    if (user) {
+      setIsEnabled(user.driver_mode);
+    }
+  }, [user?.driver_mode]);
+
+  useEffect(() => {
+    if (user && user.driver_mode !== isEnabled) {
       updateUser({ driver_mode: isEnabled });
     }
     if (isEnabled) {
@@ -265,12 +271,16 @@ export default function HomeScreen() {
 
   function handleInputPress(activeMode: string): void {
     console.log('Modo activo: ', activeMode);
-    router.push({
-      pathname: "/(tabs)/available-routes/create-route-screen",
-      params: {
-        activeModeP: activeMode,
-      }
-    })
+    if (user?.is_driver && isEnabled) {
+      router.push({
+        pathname: "/(tabs)/available-routes/create-route-screen",
+        params: {
+          activeModeP: activeMode,
+        }
+      });
+    } else {
+      router.push("/(tabs)/available-routes");
+    }
   }
 
   return (
@@ -356,7 +366,7 @@ export default function HomeScreen() {
             <ThemedText className="text-xl font-semibold">
               Próximos viajes
             </ThemedText>
-            <Pressable onPress={() => router.push('/(tabs)/profile/activity')}>
+            <Pressable onPress={() => router.push('/activity')}>
               <ThemedText className="text-base font-semibold"
                 lightColor={Colors.light.secondary}
                 darkColor={Colors.dark.secondary}
@@ -409,32 +419,64 @@ export default function HomeScreen() {
             )
           }
 
-          {/* Botones de Acción Rápidos (Crear/Buscar) */}
+          {/* Botones de Acción Rápidos (Crear/Buscar o Favoritas/Buscar) */}
           <View className="flex-row gap-2 justify-between items-center">
-            <Pressable className="flex-1 pr-1"
-              onPress={() => handleInputPress('start')}
-            >
-              <ThemedView
-                className="flex-row items-center rounded-2xl gap-x-2 py-4"
-                style={{
-                  backgroundColor: Colors.dark.primary,
-                  borderColor: Colors.dark.borderSecondary,
-                  borderWidth: 1
-                }}
+            {/* Botón izquierdo: dinámico según modo */}
+            {user?.is_driver && isEnabled ? (
+              /* MODO CONDUCTOR: Crear viaje */
+              <Pressable className="flex-1 pr-1"
+                onPress={() => handleInputPress('start')}
               >
-                <View>
-                  <Ionicons name="car-sport" size={30} color="#2563EB" />
-                </View>
-                <View className="flex-col">
-                  <ThemedText className="text-base font-semibold">
-                    Crear viaje
-                  </ThemedText>
-                  <ThemedText className="text-sm text-textsecondary">
-                    Como conductor
-                  </ThemedText>
-                </View>
-              </ThemedView>
-            </Pressable>
+                <ThemedView
+                  className="flex-row items-center rounded-2xl gap-x-2 py-4"
+                  style={{
+                    backgroundColor: Colors.dark.primary,
+                    borderColor: Colors.dark.borderSecondary,
+                    borderWidth: 1
+                  }}
+                >
+                  <View>
+                    <Ionicons name="car-sport" size={30} color="#2563EB" />
+                  </View>
+                  <View className="flex-col">
+                    <ThemedText className="text-base font-semibold">
+                      Crear viaje
+                    </ThemedText>
+                    <ThemedText className="text-sm text-textsecondary">
+                      Como conductor
+                    </ThemedText>
+                  </View>
+                </ThemedView>
+              </Pressable>
+            ) : (
+              /* MODO PASAJERO: Rutas favoritas → redirige a actividad */
+              <Pressable className="flex-1 pr-1"
+                onPress={() => router.push('/activity')}
+              >
+                <ThemedView
+                  className="flex-row items-center rounded-2xl gap-x-2 py-4"
+                  style={{
+                    backgroundColor: Colors.dark.primary,
+                    borderColor: Colors.dark.borderSecondary,
+                    borderWidth: 1
+                  }}
+                >
+                  <View>
+                    <Ionicons name="bookmark" size={30} color="#2563EB" />
+                  </View>
+                  <View className="flex-col">
+                    <ThemedText className="text-base font-semibold">
+                      Rutas favoritas
+                    </ThemedText>
+                    <ThemedText className="text-sm text-textsecondary">
+                      Ver historial
+                    </ThemedText>
+                  </View>
+                </ThemedView>
+              </Pressable>
+            )}
+
+            {/* Botón derecho: siempre buscar viaje */}
             <Pressable
               className="flex-1 pl-1"
               onPress={() => router.push('/(tabs)/available-routes')}
@@ -460,6 +502,7 @@ export default function HomeScreen() {
               </ThemedView>
             </Pressable>
           </View>
+
 
           {/* Sección de seguridad */}
           <View className="flex-row gap-x-2 items-center py-4 mb-4 rounded-2xl"

@@ -4,7 +4,7 @@ import { Colors } from "@/constants/Colors";
 import { supabase } from "@/lib/supabase";
 import { ratingsService } from "@/services/ratings.service";
 import * as Notifications from "expo-notifications";
-import { router, Slot } from "expo-router";
+import { router, Stack } from "expo-router";
 import { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
@@ -105,7 +105,14 @@ function MainApp() {
 
   return (
     <>
-      <Slot />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="activity" />
+        <Stack.Screen name="edit-profile" />
+        <Stack.Screen name="become-driver" />
+      </Stack>
       
       {/* Modal Global para calificar conductor */}
       {ratingData && (

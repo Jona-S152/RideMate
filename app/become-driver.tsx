@@ -1,5 +1,4 @@
 import { useAuth } from "@/app/context/AuthContext";
-import ChangePasswordModal from "@/components/Modals/change-password";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { ThemedView } from "@/components/ThemedView";
@@ -11,17 +10,15 @@ import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, Keyboard, Pressable, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
-export default function EditProfileScreen() {
+export default function BecomeDriverScreen() {
     const { user, updateUser } = useAuth();
     const router = useRouter();
-    const [changePassVisibleModal, setChangePassVisibleModal] = useState<boolean>(false);
+    const [loading, setLoading] = useState(false);
 
     // Form States
     const [name, setName] = useState(user?.name || "");
     const [lastName, setLastName] = useState("");
     const [email, setEmail] = useState(user?.email || "");
-    const [loading, setLoading] = useState(false);
-    const [saving, setSaving] = useState(false);
 
     // Animation Constants
     const HEADER_EXPANDED = 300;
@@ -56,7 +53,6 @@ export default function EditProfileScreen() {
 
     const fetchUserDetails = async () => {
         if (!user?.id) return;
-        setLoading(true);
         try {
             const data = await userService.getUserProfile(user.id);
             if (data) {
@@ -66,34 +62,37 @@ export default function EditProfileScreen() {
             }
         } catch (error: any) {
             console.error("Error fetching user details:", error.message);
-        } finally {
-            setLoading(false);
         }
     };
 
-    const handleSave = async () => {
-        if (!user?.id) return;
-        setSaving(true);
+    const handleApply = async () => {
         try {
-            await userService.updateProfile(user.id, {
-                name,
-                last_name: lastName,
-                email
+            if (!user?.id) {
+                Alert.alert("Error", "Por favor inicia sesión primero.");
+                return;
+            }
+
+            setLoading(true);
+
+            await userService.becomeDriver(user.id, {
+                name: name,
+                last_name: lastName
             });
 
-            // Update Auth Context
             await updateUser({
                 ...user,
-                name: name,
-                email: email
+                is_driver: true,
+                driver_mode: true, // Auto-switch to driver mode usually
+                name: name
             });
 
-            Alert.alert("Éxito", "Perfil actualizado correctamente");
-            router.back();
+            Alert.alert("¡Felicidades!", "Ahora eres un conductor verificado.");
+            router.replace("/(tabs)/profile");
+
         } catch (error: any) {
             Alert.alert("Error", error.message);
         } finally {
-            setSaving(false);
+            setLoading(false);
         }
     };
 
@@ -101,30 +100,40 @@ export default function EditProfileScreen() {
         <KeyboardAwareScrollView className="flex-1 bg-background" bounces={false}>
             <AnimatedThemedView
                 style={{ height: headerHeight }}
-                lightColor={Colors.dark.glass}
-                darkColor={Colors.dark.glass}
-                className="w-full px-4 pt-6 rounded-bl-[40px] justify-center"
+                lightColor={Colors.dark.glassStrong}
+                className="w-full px-4 pt-6 rounded-bl-[40px] justify-center relative"
             >
+                <Pressable
+                    onPress={() => router.back()}
+                    className="absolute top-10 left-6 p-2 rounded-full z-20"
+                    style={({ pressed }) => [{
+                        backgroundColor: pressed ? "rgba(255, 255, 255, 0.15)" : "rgba(255, 255, 255, 0.05)",
+                        borderWidth: 1,
+                        borderColor: Colors.dark.border
+                    }]}
+                >
+                    <Ionicons name="arrow-back" size={24} color="white" />
+                </Pressable>
                 <View className="items-center">
-                    <View className="relative w-32 h-32 mb-4">
-                        <View className="rounded-full w-32 h-32 items-center justify-center overflow-hidden border-4 shadow-sm" style={{ backgroundColor: Colors.dark.glassSoft, borderColor: Colors.dark.border }}>
-                            <Ionicons name="person" size={60} color="#94a3b8" />
-                        </View>
-                        <Pressable className="absolute bottom-0 right-0 p-2 rounded-full shadow-md border" style={{ backgroundColor: Colors.dark.glassSoft, borderColor: Colors.dark.border }}>
-                            <Ionicons name="camera" size={20} color={Colors.light.primary} />
-                        </Pressable>
+                    <View className="p-4 rounded-full mb-4" style={{ backgroundColor: Colors.dark.glassSoft, borderColor: Colors.dark.border, borderWidth: 1 }}>
+                        <Ionicons name="car-sport" size={60} color="white" />
                     </View>
                     <ThemedText
-                        lightColor={Colors.light.text}
-                        className="text-2xl font-bold">
-                        {name || "Usuario"}
+                        lightColor="white"
+                        className="text-2xl font-bold text-center">
+                        Conviértete en Conductor
+                    </ThemedText>
+                    <ThemedText
+                        lightColor="white"
+                        className="text-sm opacity-80 text-center px-8 mt-2">
+                        Completa tus datos para empezar a compartir tus viajes
                     </ThemedText>
                 </View>
             </AnimatedThemedView>
 
             <View className="px-6 py-8">
                 <View className="mb-6">
-                    <ThemedText className="text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Nombres</ThemedText>
+                    <ThemedText className="text-xs font-bold uppercase mb-2 ml-1" style={{ color: Colors.dark.textSecondary }}>Nombres</ThemedText>
                     <ThemedTextInput
                         lightColor={Colors.dark.glassSoft}
                         className="py-4 px-4 rounded-full border"
@@ -136,7 +145,7 @@ export default function EditProfileScreen() {
                 </View>
 
                 <View className="mb-6">
-                    <ThemedText className="text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Apellidos</ThemedText>
+                    <ThemedText className="text-xs font-bold uppercase mb-2 ml-1" style={{ color: Colors.dark.textSecondary }}>Apellidos</ThemedText>
                     <ThemedTextInput
                         lightColor={Colors.dark.glassSoft}
                         className="py-4 px-4 rounded-full border"
@@ -147,52 +156,39 @@ export default function EditProfileScreen() {
                     />
                 </View>
 
-                <View className="mb-6">
-                    <ThemedText className="text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Correo electrónico</ThemedText>
+                <View className="mb-8">
+                    <ThemedText className="text-xs font-bold uppercase mb-2 ml-1" style={{ color: Colors.dark.textSecondary }}>Correo electrónico</ThemedText>
                     <ThemedTextInput
                         lightColor={Colors.dark.glassSoft}
                         className="py-4 px-4 rounded-full border"
                         style={{ borderColor: Colors.dark.border }}
-                        placeholder="correo@ejemplo.com"
                         value={email}
-                        editable={false} // Recommendation: Email usually fixed or changed via special flow
+                        editable={false}
                     />
                 </View>
 
-                <Pressable
-                    className="flex-row items-center py-4 px-2 mb-8"
-                    onPress={() => setChangePassVisibleModal(true)}
-                >
-                    <Ionicons name="lock-closed-outline" size={20} color={Colors.light.primary} />
-                    <ThemedText
-                        lightColor={Colors.light.primary}
-                        className="ml-2 font-semibold">
-                        Cambiar contraseña
+                <View className="p-4 rounded-2xl mb-8 flex-row items-center" style={{ backgroundColor: Colors.dark.glassSoft, borderColor: Colors.dark.border, borderWidth: 1 }}>
+                    <Ionicons name="information-circle" size={24} color={Colors.light.secondary} />
+                    <ThemedText className="flex-1 ml-3 text-sm" style={{ color: Colors.dark.textSecondary }}>
+                        Al aplicar, confirmas que tienes una licencia de conducir válida y cumples con los términos de servicio.
                     </ThemedText>
-                </Pressable>
+                </View>
 
                 <Pressable
                     style={{ backgroundColor: Colors.light.secondary }}
                     className="w-full py-4 rounded-full items-center shadow-lg"
-                    onPress={handleSave}
-                    disabled={saving}
+                    onPress={handleApply}
+                    disabled={loading}
                 >
-                    {saving ? (
+                    {loading ? (
                         <ActivityIndicator color="white" />
                     ) : (
                         <ThemedText className="text-white font-bold text-lg">
-                            Guardar Cambios
+                            Aplicar como Conductor
                         </ThemedText>
                     )}
                 </Pressable>
             </View>
-
-            <ChangePasswordModal
-                animationType="fade"
-                transparent={true}
-                visible={changePassVisibleModal}
-                setVisible={setChangePassVisibleModal}
-            />
         </KeyboardAwareScrollView>
     );
 }

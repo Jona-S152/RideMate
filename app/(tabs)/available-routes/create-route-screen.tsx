@@ -51,6 +51,17 @@ export default function CreateRouteScreen() {
   const [loading, setLoading] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
 
+  // Route Guard: solo conductores en modo conductor pueden acceder
+  useEffect(() => {
+    if (user && (!user.is_driver || !user.driver_mode)) {
+      Alert.alert(
+        "Acceso restringido",
+        "Solo los conductores en modo conductor pueden crear rutas.",
+        [{ text: "OK", onPress: () => router.replace("/(tabs)/home") }]
+      );
+    }
+  }, [user]);
+
   useEffect(() => {
     if (activeModeP === 'start')
       setActiveMode('start');

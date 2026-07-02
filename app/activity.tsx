@@ -4,6 +4,7 @@ import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { userService } from "@/services/user.service";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Animated, Pressable, RefreshControl, View } from "react-native";
 
@@ -122,9 +123,20 @@ export default function ActivityScreen() {
                 darkColor={Colors.dark.glass}
                 className="w-full px-6 pt-12 rounded-bl-[40px] z-10"
             >
-                <ThemedText lightColor="white" className="text-3xl font-bold mb-6">
-                    Mi Actividad
-                </ThemedText>
+                <View className="flex-row items-center gap-x-3 mb-6">
+                    <Pressable
+                        onPress={() => router.back()}
+                        className="p-2 -ml-2 rounded-full"
+                        style={({ pressed }) => [{
+                            backgroundColor: pressed ? "rgba(255, 255, 255, 0.15)" : "transparent"
+                        }]}
+                    >
+                        <Ionicons name="arrow-back" size={28} color="white" />
+                    </Pressable>
+                    <ThemedText lightColor="white" className="text-3xl font-bold">
+                        Mi Actividad
+                    </ThemedText>
+                </View>
 
                 {user?.is_driver && (
                     <View className="flex-row p-1 rounded-full mb-4" style={{ backgroundColor: Colors.dark.glassSoft, borderColor: Colors.dark.border, borderWidth: 1 }}>
