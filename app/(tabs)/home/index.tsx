@@ -366,7 +366,7 @@ export default function HomeScreen() {
             <ThemedText className="text-xl font-semibold">
               Próximos viajes
             </ThemedText>
-            <Pressable onPress={() => router.push('/activity')}>
+            <Pressable onPress={() => router.push('/(tabs)/profile/activity')}>
               <ThemedText className="text-base font-semibold"
                 lightColor={Colors.light.secondary}
                 darkColor={Colors.dark.secondary}
@@ -451,7 +451,7 @@ export default function HomeScreen() {
             ) : (
               /* MODO PASAJERO: Rutas favoritas → redirige a actividad */
               <Pressable className="flex-1 pr-1"
-                onPress={() => router.push('/activity')}
+                onPress={() => router.push('/(tabs)/profile/activity')}
               >
                 <ThemedView
                   className="flex-row items-center rounded-2xl gap-x-2 py-4"

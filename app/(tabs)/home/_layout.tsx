@@ -5,6 +5,7 @@ import { Text } from "react-native";
 export default function HomeStackLayout() {
   return (
     <Stack 
+      initialRouteName="index"
       screenOptions={{ 
         headerStyle: { backgroundColor: Colors.light.tint},
         headerTitle: "",
@@ -16,6 +17,9 @@ export default function HomeStackLayout() {
       <Stack.Screen name="route-detail" options={{
         headerShown: false,
         headerLeft: () => <Text style={{ color: Colors.light.text, fontSize: 40, paddingBottom: 10, fontWeight: 'bold' }}>Detalles de la ruta</Text>,
+      }} />
+      <Stack.Screen name="navigation-screen" options={{
+        headerShown: false,
       }} />
     </Stack>
   );

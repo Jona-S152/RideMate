@@ -395,7 +395,18 @@ export default function CreateRouteScreen() {
 
       {/* Botón Cerrar */}
       <Pressable
-        onPress={() => router.back()}
+        onPress={() => {
+          try {
+            console.log('closeeeeee');
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace("/(tabs)/available-routes");
+            }
+          } catch (error) {
+            console.error("Error al cerrar la pantalla:", error);
+          }
+        }}
         className="absolute top-14 left-6 w-10 h-10 rounded-full items-center justify-center shadow-lg z-[60]"
         style={{
           backgroundColor: Colors.dark.glassSoft,

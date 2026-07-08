@@ -89,7 +89,11 @@ export default function EditProfileScreen() {
             });
 
             Alert.alert("Éxito", "Perfil actualizado correctamente");
-            router.back();
+            if (router.canGoBack()) {
+                router.back();
+            } else {
+                router.replace("/(tabs)/profile");
+            }
         } catch (error: any) {
             Alert.alert("Error", error.message);
         } finally {
@@ -106,7 +110,13 @@ export default function EditProfileScreen() {
                 className="w-full px-4 pt-6 rounded-bl-[40px] justify-center relative"
             >
                 <Pressable
-                    onPress={() => router.back()}
+                    onPress={() => {
+                        if (router.canGoBack()) {
+                            router.back();
+                        } else {
+                            router.replace("/(tabs)/profile");
+                        }
+                    }}
                     className="absolute top-10 left-6 p-2 rounded-full z-20"
                     style={({ pressed }) => [{
                         backgroundColor: pressed ? "rgba(255, 255, 255, 0.15)" : "rgba(255, 255, 255, 0.05)",

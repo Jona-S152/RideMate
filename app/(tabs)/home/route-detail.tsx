@@ -541,7 +541,7 @@ export default function RouteDetail() {
 
     if (nextTarget) {
       router.push({
-        pathname: "/navigation-screen",
+        pathname: "/(tabs)/home/navigation-screen",
         params: {
           destLat: nextTarget.coords.latitude.toString(),
           destLng: nextTarget.coords.longitude.toString(),

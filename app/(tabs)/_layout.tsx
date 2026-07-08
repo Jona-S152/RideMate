@@ -1,4 +1,5 @@
 import { Redirect, Tabs, usePathname } from "expo-router";
+import { CommonActions } from "@react-navigation/native";
 import React from "react";
 
 import { HapticTab } from "@/components/HapticTab";
@@ -14,7 +15,7 @@ import { useAuth } from "../context/AuthContext";
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const pathName = usePathname();
-  const hideTabBar = ["route-detail", "create-route-screen"].some((route) =>
+  const hideTabBar = ["route-detail", "create-route-screen", "navigation-screen", "edit-profile", "become-driver"].some((route) =>
     pathName.includes(route),
   ); // Colocar rutas secundarias
 
@@ -32,6 +33,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      backBehavior="none"
       screenOptions={{
         tabBarShowLabel: false,
         tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
@@ -75,7 +77,12 @@ export default function TabLayout() {
         listeners={({ navigation }) => ({
           tabPress: (e) => {
             e.preventDefault();
-            navigation.navigate("home", { screen: "index" });
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [{ name: "home", state: { routes: [{ name: "index" }] } }],
+              })
+            );
           },
         })}
       />
@@ -90,7 +97,12 @@ export default function TabLayout() {
         listeners={({ navigation }) => ({
           tabPress: (e) => {
             e.preventDefault();
-            navigation.navigate("available-routes", { screen: "index" });
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [{ name: "available-routes", state: { routes: [{ name: "index" }] } }],
+              })
+            );
           },
         })}
       />
@@ -105,7 +117,12 @@ export default function TabLayout() {
         listeners={({ navigation }) => ({
           tabPress: (e) => {
             e.preventDefault();
-            navigation.navigate("profile", { screen: "index" });
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [{ name: "profile", state: { routes: [{ name: "index" }] } }],
+              })
+            );
           },
         })}
       />

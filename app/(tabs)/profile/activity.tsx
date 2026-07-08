@@ -125,7 +125,13 @@ export default function ActivityScreen() {
             >
                 <View className="flex-row items-center gap-x-3 mb-6">
                     <Pressable
-                        onPress={() => router.back()}
+                        onPress={() => {
+                            if (router.canGoBack()) {
+                                router.back();
+                            } else {
+                                router.replace("/(tabs)/profile");
+                            }
+                        }}
                         className="p-2 -ml-2 rounded-full"
                         style={({ pressed }) => [{
                             backgroundColor: pressed ? "rgba(255, 255, 255, 0.15)" : "transparent"

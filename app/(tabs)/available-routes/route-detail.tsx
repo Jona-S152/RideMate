@@ -21,7 +21,7 @@ export default function RouteDetail() {
     const params = useLocalSearchParams<{ id: string, sessionId?: string }>();
     const { user } = useAuth();
     const router = useRouter();
-    const { startTracking } = useTripTrackingStore();
+    const { startTracking, stopTracking } = useTripTrackingStore();
     const sessionId = useMemo(() => Number(params.sessionId), [params.sessionId]);
     const [driver, setDriver] = useState<DriverInfo | null>(null);
     const [passengers, setPassengers] = useState<PassengerTripSession[]>([]);
@@ -280,8 +280,18 @@ export default function RouteDetail() {
 
                             if (error) throw error;
 
+                            try {
+                                await stopTracking();
+                            } catch (trackError) {
+                                console.error("Error stopping tracking on cancel:", trackError);
+                            }
+
                             Alert.alert("Éxito", "Viaje cancelado correctamente.");
-                            router.back();
+                            if (router.canGoBack()) {
+                                router.back();
+                            } else {
+                                router.replace("/(tabs)/available-routes");
+                            }
                         } catch (error: any) {
                             console.error("Error al cancelar el viaje:", error.message);
                             Alert.alert("Error", "No se pudo cancelar el viaje.");
@@ -357,7 +367,13 @@ export default function RouteDetail() {
             >
                 {/* Botón de Atrás */}
                 <Pressable
-                    onPress={() => router.back()}
+                    onPress={() => {
+                        if (router.canGoBack()) {
+                            router.back();
+                        } else {
+                            router.replace("/(tabs)/available-routes");
+                        }
+                    }}
                     className="p-2 -ml-2" // -ml-2 para compensar el padding y que el icono alinee al borde
                 >
                     <Ionicons name="arrow-back" size={24} color="#E2EBF0" />

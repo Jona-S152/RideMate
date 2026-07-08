@@ -476,7 +476,11 @@ export default function SelectionMapScreen() {
           if (step === 'destination') {
             setStep('pickup');
           } else {
-            router.back();
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace("/(tabs)/available-routes");
+            }
           }
         }}
         className="absolute top-14 left-6 w-10 h-10 rounded-full items-center justify-center shadow-md z-50 bg-secondary"

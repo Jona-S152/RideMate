@@ -389,7 +389,11 @@ export default function NavigationScreen() {
                 params: { id: params.trip_session_id }
               });
             } else {
-              router.back();
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace("/(tabs)/home");
+              }
             }
           }}
         >

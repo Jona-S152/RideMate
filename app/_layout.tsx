@@ -109,9 +109,6 @@ function MainApp() {
         <Stack.Screen name="index" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="(auth)" />
-        <Stack.Screen name="activity" />
-        <Stack.Screen name="edit-profile" />
-        <Stack.Screen name="become-driver" />
       </Stack>
       
       {/* Modal Global para calificar conductor */}

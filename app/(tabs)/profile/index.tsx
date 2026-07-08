@@ -71,7 +71,7 @@ export default function ProfileScreen() {
                 </View>
             </ThemedView>
             <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-4">
-                <Link href="/edit-profile" asChild>
+                <Link href="/(tabs)/profile/edit-profile" asChild>
                     <Pressable
                         className="w-full rounded-2xl mb-3"
                         style={({ pressed }) => [{
@@ -92,7 +92,7 @@ export default function ProfileScreen() {
                         </ThemedText>
                     </Pressable>
                 </Link>
-                <Link href="/activity" asChild>
+                <Link href="/(tabs)/profile/activity" asChild>
                     <Pressable
                         className="rounded-2xl mb-3"
                         style={({ pressed }) => [{
@@ -114,7 +114,7 @@ export default function ProfileScreen() {
                     </Pressable>
                 </Link>
                 {!user?.is_driver &&
-                    <Link href="/become-driver" asChild>
+                    <Link href="/(tabs)/profile/become-driver" asChild>
                         <Pressable
                             className="rounded-2xl mb-3"
                             style={({ pressed }) => [{

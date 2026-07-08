@@ -288,7 +288,16 @@ export default function RoutePreviewScreen() {
                     )}
                 </MapView>
 
-                <Pressable onPress={() => router.back()} style={styles.backButton as ViewStyle}>
+                <Pressable
+                    onPress={() => {
+                        if (router.canGoBack()) {
+                            router.back();
+                        } else {
+                            router.replace("/(tabs)/available-routes");
+                        }
+                    }}
+                    style={styles.backButton as ViewStyle}
+                >
                     <Ionicons name="chevron-back" size={24} color={Colors.light.text} />
                 </Pressable>
 
