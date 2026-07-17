@@ -53,6 +53,7 @@ export default function PassengerRoutesScreen() {
     if (!user?.id) return;
     try {
       const availableRoutes = await tripService.getPassengerRoutes(user.id);
+      console.log("Fetch Passenger routes:", JSON.stringify(availableRoutes, null, 2));
       setRoutes(availableRoutes);
     } catch (error) {
       console.error("Error fetching passenger routes:", error);

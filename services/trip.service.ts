@@ -30,6 +30,7 @@ export const tripService = {
       console.error("[tripService.getPassengerRoutes] orgs error:", orgsError);
     }
 
+    console.log("ORGANIZATION MEMBERS: ", memberOrgs);
     const orgIds = memberOrgs?.map(mo => mo.organization_id) || [];
 
     // Obtener solicitudes pendientes del pasajero
@@ -76,6 +77,8 @@ export const tripService = {
       throw error;
     }
 
+    console.log("DATA DE SESIONES: ", JSON.stringify(data, null, 2));
+
     const sessionIds = (data || []).map((session: any) => session.id);
     let pendingCounts: Record<number, number> = {};
     if (sessionIds.length > 0) {
@@ -109,6 +112,8 @@ export const tripService = {
       return true;
     });
 
+    console.log("AVAILABLE ROUTES: ", JSON.stringify(availableRoutes, null, 2));
+
     const formattedRoutes = availableRoutes.map((session) => {
       const joinedPassengers = session.passengers?.filter((p: any) => p.status === "joined") || [];
       const hasPendingRequest = pendingSessionIds.includes(session.id);
@@ -128,11 +133,16 @@ export const tripService = {
       };
     });
 
+    console.log("FORMATTED ROUTES: ", JSON.stringify(formattedRoutes, null, 2));
+
     // 4. Filter by passenger's organizations
     return formattedRoutes.filter((session) => {
       if (orgIds.length === 0) return true;
       const routeObj = Array.isArray(session.routes) ? session.routes[0] : session.routes;
       const routeOrgId = routeObj?.organization_id;
+      console.log("ROUTE ORG ID: ", routeOrgId);
+      console.log("ORG IDS: ", orgIds);
+      console.log("ORG INCLUDES: ", orgIds.includes(routeOrgId));
       return orgIds.includes(routeOrgId);
     });
   },
@@ -249,6 +259,7 @@ export const tripService = {
       if (branch) {
         branchId = branch.id;
       }
+      orgId = memberOrg.organization_id;
     }
 
     // Insert route
@@ -377,6 +388,18 @@ export const tripService = {
       console.error("[tripService.finishTripSession] passengers error:", passengersError);
       throw passengersError;
     }
+  },
+
+  async omitPassengerPoints(sessionId: number, passengerId: string): Promise<boolean> {
+    // Logica para omitir mp y stops del pasajero mediante funcion rpc en supabase
+    const { data, error } = await supabase
+      .rpc('omit_passenger_points', { p_trip_session_id: sessionId, p_passenger_id: passengerId });
+    if (error) {
+      console.error("[tripService.omitPassengerPoints] error:", error);
+      throw error;
+    }
+    return data;
+    
   },
 
   /**
@@ -701,17 +724,20 @@ export const tripService = {
    * Fetches stop records by stop IDs, formatting coordinates.
    */
   async getStops(stopIds: number[]): Promise<any[]> {
+    console.warn("[tripService.getStops] stopIds:", stopIds);
     if (stopIds.length === 0) return [];
     const { data, error } = await supabase
-      .from("stops")
+      .from("passenger_stops")
       .select("*")
-      .in("id", stopIds)
-      .order("stop_order", { ascending: true });
+      .in("id", stopIds);
+      
+    console.warn("[tripService.getStops] data:", data);
 
     if (error) {
       console.error("[tripService.getStops] error:", error);
       throw error;
     }
+
 
     return (data || []).map((stop: any) => ({
       ...stop,
@@ -743,6 +769,48 @@ export const tripService = {
         longitude: Number(stop.coords?.coordinates?.[0] ?? stop.coords?.longitude ?? 0),
       }
     }));
+  },
+
+  /**
+   * Fetches active (pending or visited) session stops records by status.
+   */
+  async getActiveSessionStops(tripSessionId: number): Promise<any[]> {
+    const { data, error } = await supabase
+      .from("passenger_stops")
+      .select(`
+        *,
+        trip_session_stops!inner(status)
+        `)
+      .eq("trip_session_id", tripSessionId)
+      .in("trip_session_stops.status", ["pending", "visited"]);
+
+    if (error) {
+      console.error("[tripService.getActiveSessionStops] error:", error);
+      throw error;
+    }
+
+    return data?.map(({ trip_session_stops, ...passenger_stop }) => ({
+      ...passenger_stop,
+      coords: {
+        latitude: Number(passenger_stop.coords?.coordinates?.[1] ?? passenger_stop.coords?.latitude ?? 0),
+        longitude: Number(passenger_stop.coords?.coordinates?.[0] ?? passenger_stop.coords?.longitude ?? 0),
+      }
+    })) || [];
+  },
+
+  async getSessionRouteCoords_Locations(tripSessionId: number) {
+    const { data: trip_session, error } = await supabase
+      .from("trip_sessions")
+      .select("start_coords, end_coords, start_location, end_location")
+      .eq("id", tripSessionId)
+      .single();
+    
+    if (error) {
+      console.error("[tripService.getSessionRouteCoords_Locations] error:", error);
+      throw error;
+    }
+    
+    return trip_session;
   },
 
   /**
@@ -933,6 +1001,30 @@ export const tripService = {
 
     if (error) throw error;
     return data || [];
+  },
+
+  async getActiveMeetingPoints(tripSessionId: number) {
+    const { data, error } = await supabase
+      .from("passenger_meeting_points")
+      .select(`
+        *,
+        trip_session_meeting_points!inner(status)
+        `)
+      .eq("trip_session_id", tripSessionId)
+      .in("trip_session_meeting_points.status", ["pending", "visited"]);
+
+    if (error) {
+      console.error("[tripService.getActiveSessionStops] error:", error);
+      throw error;
+    }
+
+    return data?.map(({ trip_session_stops, ...passenger_mp }) => ({
+      ...passenger_mp,
+      coords: {
+        latitude: Number(passenger_mp.coords?.coordinates?.[1] ?? passenger_mp.coords?.latitude ?? 0),
+        longitude: Number(passenger_mp.coords?.coordinates?.[0] ?? passenger_mp.coords?.longitude ?? 0),
+      }
+    })) || [];
   },
 
   /**

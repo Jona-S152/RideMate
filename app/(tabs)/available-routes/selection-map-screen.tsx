@@ -118,28 +118,18 @@ export default function SelectionMapScreen() {
     const fetchRoute = async () => {
       const sessionId = Number(trip_session_id);
       if (!sessionId || isNaN(sessionId)) return;
+      // Obtener ruta de la sesión
+      const trip_session_coords = await tripService.getSessionRouteCoords_Locations(sessionId);
+      setSessionData(trip_session_coords);
 
-      const { data: sd, error: se } = await supabase
-        .from("trip_sessions")
-        .select("start_coords, end_coords, start_location, end_location")
-        .eq("id", sessionId)
-        .single();
-
-      if (se || !sd) { console.error("❌ Error session:", se); return; }
-      setSessionData(sd);
-
-      const passengerStopsData = await tripService.getSessionStops(sessionId);
-      const sessionStops = passengerStopsData.filter((s) =>
-        sessionStatusStops.some(
-          (sst) => sst.passenger_stop_id === s.id && ["pending", "visited"].includes(sst.status)
-        )
-      );
+      // Obtener stops activos (pending o visited) de la sesión
+      const sessionStops = await tripService.getActiveSessionStops(sessionId);
       setStopsData(sessionStops || []);
 
-      const origin = `${sd.start_coords.coordinates[0]},${sd.start_coords.coordinates[1]}`;
-      const destination = `${sd.end_coords.coordinates[0]},${sd.end_coords.coordinates[1]}`;
+      const origin = `${trip_session_coords.start_coords.coordinates[0]},${trip_session_coords.start_coords.coordinates[1]}`;
+      const destination = `${trip_session_coords.end_coords.coordinates[0]},${trip_session_coords.end_coords.coordinates[1]}`;
       const waypoints = sessionStops
-        ?.map((s: any) => (s.coords ? `${s.coords.latitude},${s.coords.longitude}` : null))
+        ?.map((s: any) => (s.coords ? `${s.coords.longitude},${s.coords.latitude}` : null))
         .filter(Boolean)
         .join(";");
 
@@ -575,15 +565,15 @@ export default function SelectionMapScreen() {
       {/* ── BOTÓN CERRAR / VOLVER ───────────────────────────────────────────── */}
       <Pressable
         onPress={() => {
-          if (!isSelectionMode) {
-            // Volver a modo selección del punto activo
-            setIsSelectionMode(true);
-          } else if (activeMode === "destination" && pickupPoint) {
-            // Volver al modo pickup
-            setActiveMode("pickup");
-          } else {
-            router.canGoBack() ? router.back() : router.replace("/(tabs)/available-routes");
-          }
+          // if (!isSelectionMode) {
+          //   // Volver a modo selección del punto activo
+          //   setIsSelectionMode(true);
+          // } else if (activeMode === "destination" && pickupPoint) {
+          //   // Volver al modo pickup
+          //   setActiveMode("pickup");
+          // } else {
+          router.canGoBack() ? router.back() : router.replace("/(tabs)/available-routes");
+          // }
         }}
         style={[
           styles.closeBtn,
@@ -591,7 +581,7 @@ export default function SelectionMapScreen() {
         ]}
       >
         <Ionicons
-          name={!isSelectionMode || (activeMode === "destination" && pickupPoint) ? "arrow-back" : "close"}
+          name={"close"}
           size={22}
           color={Colors.dark.text}
         />

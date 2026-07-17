@@ -20,6 +20,7 @@ interface WaypointCheckInModalProps {
     visible: boolean;
     waypoint: Waypoint | null;
     onConfirm: (status: 'visited' | 'skipped') => Promise<void>;
+    onSkip: () => Promise<void>;
     onClose: () => void;
 }
 
@@ -27,11 +28,21 @@ export default function WaypointCheckInModal({
     visible,
     waypoint,
     onConfirm,
+    onSkip,
     onClose,
 }: WaypointCheckInModalProps) {
     const [loading, setLoading] = useState(false);
 
     if (!waypoint) return null;
+
+    const handleSkip = async () => {
+        setLoading(true);
+        try {
+            await onSkip();
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleConfirm = async (status: 'visited' | 'skipped') => {
         setLoading(true);
@@ -67,8 +78,8 @@ export default function WaypointCheckInModal({
             visible={visible}
             onRequestClose={onClose}
         >
-            <Pressable 
-                className="flex-1 justify-end bg-black/50" 
+            <Pressable
+                className="flex-1 justify-end bg-black/50"
                 onPress={onClose}
             >
                 <Pressable onPress={(e) => e.stopPropagation()}>
@@ -115,7 +126,7 @@ export default function WaypointCheckInModal({
                         {/* Actions */}
                         <View className="flex-row gap-4">
                             <Pressable
-                                onPress={() => handleConfirm('skipped')}
+                                onPress={() => handleSkip()}
                                 disabled={loading}
                                 className="flex-1 bg-slate-200 h-14 rounded-xl items-center justify-center border border-slate-300"
                             >

@@ -14,7 +14,7 @@ import {
 
 // Mapbox Imports
 import { useAuth } from "@/app/context/AuthContext";
-import { MeetingPoint, PassengerTripSession, StopData, UserData } from "@/interfaces/available-routes";
+import { MeetingPoint, Passenger_Stops, PassengerTripSession, UserData } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
 import { ratingsService } from "@/services/ratings.service";
 import { tripService } from "@/services/trip.service";
@@ -35,7 +35,7 @@ import DriverRatingListModal from "@/components/Modals/DriverRatingListModal";
 import PassengerActionModal from "@/components/Modals/PassengerActionModal";
 import PassengerDropOffModal from "@/components/Modals/PassengerDropOffModal";
 import WaypointCheckInModal from "@/components/Modals/WaypointCheckInModal";
-import { useDriverLocation, useTripRealtimeById, useTripStops } from "@/hooks/useRealTime";
+import { useDriverLocation, useTripMeetingPoints, useTripRealtimeById, useTripStops } from "@/hooks/useRealTime";
 import { useTripTrackingStore } from "@/store/tripTrackinStore";
 import { calculateDistance, formatDistance } from "@/utils/geo";
 
@@ -127,6 +127,7 @@ export default function RouteDetail() {
   const { stops } = useTripStops(Number(id));
   const { session } = useTripRealtimeById(Number(id));
   const { driverLocation } = useDriverLocation(Number(id));
+  const { meetingPoints: rtMeetingPoints } = useTripMeetingPoints(Number(id));
 
   const [region, setRegion] = useState<MapRegion | null>(null);
   const [hasCenteredOnDriver, setHasCenteredOnDriver] = useState(false);
@@ -134,7 +135,7 @@ export default function RouteDetail() {
   const ignoreRegionChangeRef = useRef(false);
   const [passengers, setPassengers] = useState<PassengerTripSession[]>([]);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
-  const [stopsData, setStopsData] = useState<StopData[]>([]);
+  const [stopsData, setStopsData] = useState<Passenger_Stops[]>([]);
   const [meetingPoints, setMeetingPoints] = useState<MeetingPoint[]>([]);
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
   const [currentWaypointIndex, setCurrentWaypointIndex] = useState<number>(-1);
@@ -213,20 +214,40 @@ export default function RouteDetail() {
     */
   }, [session]);
 
-  const fetchStops = async () => {
+  const fetchActiveSessionStops = async () => {
     try {
-      console.log("fetchStops: trip session stops", stops);
-      const formattedData = await tripService.getStops(stops.map((s) => s.stop_id));
-      console.log("fetchStops: formattedData", formattedData);
-      setStopsData(formattedData as StopData[]);
+      const formattedData = await tripService.getActiveSessionStops(Number(id));
+      console.log("fetchActiveSessionStops: formattedData", JSON.stringify(formattedData, null, 2));
+      setStopsData(formattedData as Passenger_Stops[]);
     } catch (error) {
-      console.error("fetchStops: unexpected error", error);
+      console.error("fetchActiveSessionStops: unexpected error", error);
     }
   };
 
+  // Usamos getActiveSessionStops directamente: ya filtra pending/visited en BD
+  // Esto evita depender del estado inicial vacío del hook useTripStops
   useEffect(() => {
-    fetchStops();
+    fetchActiveSessionStops();
+  }, [params.trip_session_id]);
+
+  // Cuando cambia el realtime de stops, refrescar por si hay cambios de estado
+  useEffect(() => {
+    if (stops && stops.length > 0) {
+      fetchActiveSessionStops();
+    }
   }, [stops]);
+
+  // Carga inicial de meeting points
+  useEffect(() => {
+    fetchMeetingPoints();
+  }, [params.trip_session_id]);
+
+  // Cuando cambia el realtime de meeting points, refrescar
+  useEffect(() => {
+    if (rtMeetingPoints && rtMeetingPoints.length > 0) {
+      fetchMeetingPoints();
+    }
+  }, [rtMeetingPoints]);
 
   const buildWaypoints = async () => {
     if (!session) return;
@@ -257,9 +278,11 @@ export default function RouteDetail() {
     // Combine stops and meeting points
     const combined = [
       ...stopsData.map((stop) => {
-        const statusInfo = stopStatuses?.find(s => s.stop_id === stop.id);
+        // trip_session_stops usa 'passenger_stop_id' para referenciar passenger_stops
+        const statusInfo = stopStatuses?.find(s => s.passenger_stop_id === stop.id);
         return {
           ...stop,
+          passengerId: stop.passenger_id,
           type: 'stop' as const,
           stopId: stop.id,
           status: statusInfo?.status || 'pending',
@@ -307,8 +330,7 @@ export default function RouteDetail() {
         coords: { latitude: item.coords.latitude, longitude: item.coords.longitude },
         order: index + 1,
         stopId: item.type === 'stop' ? item.stopId : undefined,
-        passengerId:
-          item.type === 'meeting_point' ? item.passengerId : undefined,
+        passengerId: item.passengerId || item.passenger_id,
         status: item.status,
         visitTime: item.visitTime,
       });
@@ -352,6 +374,21 @@ export default function RouteDetail() {
       setDistanceToNextPoint("0m");
     }
   };
+
+  const handleSkipPoint = async () => {
+    if (!waypointToCheckIn) return;
+
+    const isSkipped = await tripService.omitPassengerPoints(Number(id), waypointToCheckIn?.passengerId!);
+
+    if (isSkipped) {
+      await sendPushNotification(waypointToCheckIn.passengerId!, "Viaje omitido", "El conductor omitio su parada")
+      setCheckedInWaypoints((prev) => new Set(prev).add(waypointToCheckIn.id));
+      setCheckInModalVisible(false);
+      setWaypointToCheckIn(null);
+      buildWaypoints();
+
+    }
+  }
 
   const handleWaypointCheckIn = async (status: 'visited' | 'skipped') => {
     if (!waypointToCheckIn) return;
@@ -869,15 +906,15 @@ export default function RouteDetail() {
 
   const fetchMeetingPoints = async () => {
     try {
-      const data = await tripService.getMeetingPoints(Number(id));
-      const formattedData = (data || []).map((mp: any) => ({
-        ...mp,
-        coords: {
-          latitude: Number(mp.coords?.coordinates?.[1] ?? mp.coords?.latitude ?? 0),
-          longitude: Number(mp.coords?.coordinates?.[0] ?? mp.coords?.longitude ?? 0),
-        }
-      }));
-      setMeetingPoints(formattedData as MeetingPoint[]);
+      const data = await tripService.getActiveMeetingPoints(Number(id));
+      // const formattedData = (data || []).map((mp: any) => ({
+      //   ...mp,
+      //   coords: {
+      //     latitude: Number(mp.coords?.coordinates?.[1] ?? mp.coords?.latitude ?? 0),
+      //     longitude: Number(mp.coords?.coordinates?.[0] ?? mp.coords?.longitude ?? 0),
+      //   }
+      // }));
+      setMeetingPoints(data as MeetingPoint[]);
     } catch (error) {
       console.error("Error fetching meeting points:", error);
     }
@@ -1394,8 +1431,10 @@ export default function RouteDetail() {
                 {(() => {
                   const firstUnvisitedIndex = waypoints.findIndex(w => {
                     if (w.type === 'origin') return false; // El inicio no cuenta como pendiente de visita una vez arrancado
-                    return !(w.status === 'completed' || w.status === 'visited' || w.status === 'dropped_off');
+                    return !(w.status === 'completed' || w.status === 'visited');
                   });
+
+                  // Cambiar estado del punto actual no visitado a 'En camino'
 
                   return waypoints.map((waypoint, index) => {
                     const isVisited = waypoint.status === 'completed' || waypoint.status === 'visited' || waypoint.status === 'dropped_off' || (waypoint.type === 'origin');
@@ -1561,6 +1600,7 @@ export default function RouteDetail() {
           visible={checkInModalVisible}
           waypoint={waypointToCheckIn}
           onConfirm={handleWaypointCheckIn}
+          onSkip={handleSkipPoint}
           onClose={() => {
             setCheckInModalVisible(false);
             setWaypointToCheckIn(null);

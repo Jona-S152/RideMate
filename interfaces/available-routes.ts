@@ -151,6 +151,15 @@ export interface StopData {
     created_at: Date;
 }
 
+export interface Passenger_Stops {
+    id: number;
+    trip_session_id: number;
+    passenger_id: string;
+    location: string;
+    coords: {latitude: number, longitude: number};
+    created_at: string;
+}
+
 export interface DriverLocation {
     trip_session_id: number;
     driver_id: string;
