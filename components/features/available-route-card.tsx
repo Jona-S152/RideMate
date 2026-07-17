@@ -1,10 +1,11 @@
-import { Colors } from "@/constants/Colors";
+import { useAuth } from "@/app/context/AuthContext";
 import GlassCard from "@/components/common/GlassCard";
 import { Coords } from "@/interfaces/available-routes";
+import { tripService } from "@/services/trip.service";
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Href } from "expo-router";
+import { Href, router } from "expo-router";
 import { useState } from "react";
-import { Image, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Image, Text, TouchableOpacity, View } from "react-native";
 import { ThemedText } from "../ui/ThemedText";
 
 interface StopData {
@@ -20,7 +21,7 @@ interface DriverRouteCardProps {
     routeId: number;
     startCoords: Coords;
     endCoords: Coords;
-    stops: StopData[];
+    stops?: StopData[];
     trip_session_id: number;
     driverName?: string;
     driverAvatar?: string;
@@ -32,10 +33,13 @@ interface DriverRouteCardProps {
     imageUrl?: string;
     isDriver?: boolean;
     status?: string;
+    user_pending_request?: boolean;
+    pendingRequestsCount?: number;
     onPress?: () => void;
 }
 
 export default function AvailableRouteCard({
+    trip_session_id,
     start,
     end,
     passengers = 0,
@@ -46,18 +50,63 @@ export default function AvailableRouteCard({
     imageUrl,
     isDriver = false,
     status,
+    user_pending_request = false,
+    pendingRequestsCount = 0,
     onPress,
 }: DriverRouteCardProps) {
 
     const [imageError, setImageError] = useState(false);
-    const occupiedCount = passengersData.length > 0 ? passengersData.length : passengers;
+    const joinedCount = passengersData.length > 0 ? passengersData.length : passengers;
+    const { user } = useAuth();
+
+    // Determine seat color logic
+    const getSeatColor = (seatIndex: number) => {
+        // Occupied seats (approved passengers) are always green
+        if (seatIndex < joinedCount) {
+            return "#10B981"; // Green for approved passengers
+        }
+        // Pending requests are shown in blue after occupied seats
+        if (seatIndex < joinedCount + pendingRequestsCount) {
+            return "#3B82F6"; // Blue for pending requests
+        }
+        // Rest are available (gray)
+        return "#A0AECB";
+    };
 
     return (
         <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => {
-                console.log("Card pressed!", start);
                 onPress?.();
+            }}
+            onLongPress={() => {
+                if (user?.driver_mode === false) return;
+
+                Alert.alert(
+                    "Eliminar ruta",
+                    "¿Estás seguro de que deseas eliminar esta ruta?",
+                    [
+                        { text: "No", style: "cancel" },
+                        {
+                            text: "Sí, eliminar",
+                            style: "destructive",
+                            onPress: async () => {
+                                try {
+                                    await tripService.DeleteTripSession(user!.id);
+                                    Alert.alert("Éxito", "Ruta eliminada correctamente.");
+                                    if (router.canGoBack()) {
+                                        router.back();
+                                    } else {
+                                        router.replace("/(tabs)/available-routes");
+                                    }
+                                } catch (error: any) {
+                                    console.error("Error al cancelar el viaje:", error.message);
+                                    Alert.alert("Error", "No se pudo cancelar el viaje.");
+                                }
+                            }
+                        }
+                    ]
+                );
             }}
         >
             <GlassCard
@@ -144,7 +193,7 @@ export default function AvailableRouteCard({
                                         key={index}
                                         name="car-seat"
                                         size={18}
-                                        color={index < occupiedCount ? "#10B981" : "#A0AECB"}
+                                        color={getSeatColor(index)}
                                     />
                                 ))}
                             </View>

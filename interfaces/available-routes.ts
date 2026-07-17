@@ -27,6 +27,19 @@ export interface Coords {
 }
 
 // Estructura de la tabla 'routes' (Modo Conductor)
+export interface RouteCompanyData {
+    id: number;
+    start_location: string;
+    end_location: string;
+    start_coords: Coords;
+    end_coords: Coords;
+    // Propiedad Única 1
+    stops: RouteStop[]; 
+    image_url: string;
+    organization_id?: number | null;
+    branch_id?: number | null;
+}
+
 export interface RouteData {
     id: number;
     start_location: string;
@@ -112,6 +125,18 @@ export interface TripSessionStops {
     id: number;
     trip_session_id: number;
     stop_id: number;
+    status: string;
+    visit_time: Date;
+    create_at: Date;
+    passenger_id: string;
+    passenger_stop_id: number;
+}
+
+export interface TripSessionMeetingPoints {
+    id: number;
+    trip_session_id: number;
+    passenger_id: string;
+    passenger_mp_id: number;
     status: string;
     visit_time: Date;
     create_at: Date;

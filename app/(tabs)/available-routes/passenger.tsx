@@ -6,23 +6,22 @@ import FilterCard from "@/components/common/FilterCard";
 import MasonryGrid from "@/components/common/MasonryGrid";
 import AvailableRouteCard from "@/components/features/available-route-card";
 import { Colors } from "@/constants/Colors";
-import { useThemeColor } from "@/hooks/useThemeColor";
-import { SessionData, SessionStop } from "@/interfaces/available-routes";
-import { tripService } from "@/services/trip.service";
-import { supabase } from "@/lib/supabase";
 import { useAvailableRoutesSubscription } from "@/hooks/useRealTime";
+import { useThemeColor } from "@/hooks/useThemeColor";
+import { SessionData } from "@/interfaces/available-routes";
+import { tripService } from "@/services/trip.service";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useIsFocused } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    Animated,
-    Easing,
-    Pressable,
-    RefreshControl,
-    ScrollView,
-    View,
+  Alert,
+  Animated,
+  Easing,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  View,
 } from "react-native";
 
 export default function PassengerRoutesScreen() {
@@ -236,15 +235,13 @@ export default function PassengerRoutesScreen() {
                   routeId={item.route_id}
                   startCoords={item.start_coords}
                   endCoords={item.end_coords}
-                  stops={item.trip_session_stops.map((stop: SessionStop) => ({
-                    stop_id: stop.stop_id,
-                    status: stop.status || "pending",
-                  }))}
                   driverName={(item as any).driver_name}
                   driverAvatar={(item as any).driver_avatar}
                   driverRating={(item as any).driver_rating}
                   passengersData={(item as any).passengers_data}
                   status={item.status}
+                  user_pending_request={(item as any).user_pending_request}
+                  pendingRequestsCount={(item as any).pending_requests_count || 0}
                   isDriver={false}
                   imageUrl={
                     Array.isArray((item as any).routes)

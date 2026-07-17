@@ -15,7 +15,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function RoutePreviewScreen() {
-    const { id, type } = useLocalSearchParams<{ id: string; type: 'route' | 'session' }>();
+    const { id, type } = useLocalSearchParams<{ id: string; type: 'route' | 'session' | 'driver_route' }>();
     const { user } = useAuth();
     const { setSessionChanged } = useSession();
 
@@ -36,6 +36,7 @@ export default function RoutePreviewScreen() {
         if (!id) return;
         setLoading(true);
         try {
+            console.log("TYPE: ", type);
             if (type === 'route') {
                 const { data, error } = await supabase
                     .from('routes')
@@ -44,12 +45,30 @@ export default function RoutePreviewScreen() {
                     .single();
 
                 if (error) throw error;
-                console.log("Route Data (Driver):", data.id, "Stops count:", data.stops?.length);
+
+                // CORREGIR DATA.STOPS POR SESSION_STOPS
+                console.log("Route Data (Driver | company route):", data.id, "Stops count:", data.stops?.length);
                 setRouteData(data);
                 if (data.start_coords && data.end_coords) {
                     fetchMapboxRoute(data.start_coords, data.end_coords, data.stops || []);
                 }
-            } else {
+            } else if (type === 'driver_route') {
+                const { data, error } = await supabase
+                    .from('routes')
+                    .select('*')
+                    .eq('id', id)
+                    .single();
+
+                if (error) throw error;
+
+                // CORREGIR DATA.STOPS POR SESSION_STOPS
+                console.log("Route Data (Driver | driver route):", data.id);
+                setRouteData(data);
+                if (data.start_coords && data.end_coords) {
+                    fetchMapboxRoute(data.start_coords, data.end_coords, []);
+                }
+            }
+            else {
                 const { data, error } = await supabase
                     .from('trip_sessions')
                     .select(`
@@ -62,8 +81,10 @@ export default function RoutePreviewScreen() {
                             image_url
                         ),
                         trip_session_stops (
-                            *,
-                            stop:stops (*)
+                            *
+                        ),
+                        passenger_stops (
+                            *
                         ),
                         passengers:passenger_trip_sessions (
                             passenger:users!passenger_id (
@@ -86,7 +107,13 @@ export default function RoutePreviewScreen() {
                         id: p.passenger?.id,
                         avatar: p.passenger?.avatar_profile
                     })) || [],
-                    stops: data.trip_session_stops?.map((s: any) => s.stop) || []
+                    stops: (data.passenger_stops || []).filter((ps: any) =>
+                        data.trip_session_stops.some((tss: any) =>
+                            tss.passenger_stop_id === ps.id
+                            && tss.trip_session_id === ps.trip_session_id
+                            && tss.passenger_id === ps.passenger_id
+                            && ["pending", "visited"].includes(tss.status))
+                    )
                 };
                 console.log("Formatted Route Data (Passenger):", formatted.id, "Stops count:", formatted.stops.length);
                 setRouteData(formatted);
@@ -185,6 +212,9 @@ export default function RoutePreviewScreen() {
                 }
 
                 setSessionChanged(true);
+                if (router.canGoBack()) {
+                    router.dismiss();
+                }
                 router.replace("/(tabs)/home");
             } else {
                 router.push({
@@ -311,7 +341,7 @@ export default function RoutePreviewScreen() {
                     }}
                     handleComponent={CustomHandle}
                 >
-                    <BottomSheetScrollView 
+                    <BottomSheetScrollView
                         style={{ backgroundColor: Colors.dark.background }}
                         contentContainerStyle={styles.scrollContent}
                     >

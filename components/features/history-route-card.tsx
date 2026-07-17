@@ -26,6 +26,7 @@ interface HistoryRouteProps {
         id: string;
         avatar: string;
     }[];
+    pendingRequestsCount?: number;
     imageUrl?: string;
 }
 
@@ -40,6 +41,7 @@ export default function RouteCard({
     passengerCount = 0,
     driver,
     passengersData = [],
+    pendingRequestsCount = 0,
     imageUrl
 }: HistoryRouteProps) {
     console.log(`[HistoryCard] id=${sessionId} imageUrl=${imageUrl}`);
@@ -168,14 +170,35 @@ export default function RouteCard({
                         {/* Seat Icons (Bottom Right) */}
                         <View className="flex-row space-x-1">
                             {[0, 1, 2, 3].map((index) => {
-                                const occupiedCount = passengersData.length > 0 ? passengersData.length : passengerCount;
-                                const isOccupied = index < occupiedCount;
+                                const joinedCount = passengersData.length > 0 ? passengersData.length : passengerCount;
+                                if (index < joinedCount) {
+                                    return (
+                                        <MaterialCommunityIcons
+                                            key={index}
+                                            name="car-seat"
+                                            size={20}
+                                            color="#10B981"
+                                        />
+                                    );
+                                }
+
+                                if (index < joinedCount + pendingRequestsCount) {
+                                    return (
+                                        <MaterialCommunityIcons
+                                            key={index}
+                                            name="car-seat"
+                                            size={20}
+                                            color="#3B82F6"
+                                        />
+                                    );
+                                }
+
                                 return (
                                     <MaterialCommunityIcons
                                         key={index}
                                         name="car-seat"
                                         size={20}
-                                        color={isOccupied ? "#10B981" : "#6B7280"}
+                                        color="#6B7280"
                                     />
                                 );
                             })}

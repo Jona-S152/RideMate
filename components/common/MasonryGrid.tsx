@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ScrollView, StyleSheet, ViewStyle } from 'react-native';
+import { StyleSheet, View, ViewStyle } from 'react-native';
 
 interface MasonryGridProps {
   data: any[];
@@ -21,6 +21,7 @@ export default function MasonryGrid({
 
   // Distribute items into columns alternately
   data.forEach((item, index) => {
+    console.log("DATA de MasonryGrid: ", JSON.stringify(data, null, 2));
     columns[index % numColumns].push({ item, index });
   });
 

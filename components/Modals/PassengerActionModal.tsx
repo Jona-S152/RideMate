@@ -1,7 +1,7 @@
 import { Colors } from "@/constants/Colors";
-import { tripService } from "@/services/trip.service";
-import { ratingsService } from "@/services/ratings.service";
 import { sendPushNotification } from "@/services/notifications.service";
+import { ratingsService } from "@/services/ratings.service";
+import { tripService } from "@/services/trip.service";
 import { Ionicons } from "@expo/vector-icons";
 import Mapbox, { Camera, MarkerView } from "@rnmapbox/maps";
 import React, { useEffect, useState } from "react";
@@ -64,12 +64,15 @@ export default function PassengerActionModal({
 
   const fetchDetails = async () => {
     if (!passengerId) return;
+    console.log("Fetching passenger details...", visible, passengerId);
+    if (details !== null) return;
     setLoading(true);
     try {
       const { userData, requestData, sessionData } = await tripService.getPassengerRequestDetails(
         tripSessionId,
         passengerId
       );
+      console.log("Passenger details:", userData, requestData, sessionData);
 
       const ratingInfo = await ratingsService.getUserRating(userData.id);
       const pickupCoords = requestData.pickup_point?.coordinates;
@@ -90,8 +93,14 @@ export default function PassengerActionModal({
         destination_longitude: destCoords ? Number(destCoords[0]) : 0,
       });
     } catch (error: any) {
+      // If the request was already approved/rejected, silently close the modal
+      if (error?.message === "NO_PENDING_REQUEST") {
+        console.log("Request already processed, closing modal.");
+        onClose();
+        return;
+      }
       console.error("Error fetching passenger details:", error);
-      Alert.alert("Error", error?.message || "No se pudo cargar la información del pasajero.");
+      Alert.alert("Error", "No se pudo cargar la información del pasajero.");
     } finally {
       setLoading(false);
     }
@@ -106,15 +115,6 @@ export default function PassengerActionModal({
         details.request_id,
         tripSessionId,
         passengerId,
-        {
-          type: "Point",
-          coordinates: [details.pickup_longitude, details.pickup_latitude],
-        },
-        {
-          type: "Point",
-          coordinates: [details.destination_longitude, details.destination_latitude],
-        },
-        details.destination_address
       );
 
       // ── PASO 6: Notificar al pasajero ──

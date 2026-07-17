@@ -3,16 +3,19 @@ import { SwipeTripActions } from "@/components/features/SwipeTripActions";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
+import { useTripMeetingPoints, useTripRealtimeById, useTripStops } from "@/hooks/useRealTime";
 import { DriverInfo, PassengerTripSession, RouteData, SessionData, UserData } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
+import { sendMultiplePushNotifications, sendPushNotification } from "@/services/notifications.service";
 import { ratingsService } from "@/services/ratings.service";
+import { tripService } from "@/services/trip.service";
 import { useTripTrackingStore } from "@/store/tripTrackinStore";
 import { calculateDistance } from "@/utils/geo";
 import { Ionicons } from "@expo/vector-icons";
 import { format, isToday, isTomorrow } from "date-fns";
 import { es } from "date-fns/locale";
-import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Location from "expo-location";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Image, Pressable, RefreshControl, ScrollView, View } from "react-native";
 
@@ -25,25 +28,30 @@ export default function RouteDetail() {
     const sessionId = useMemo(() => Number(params.sessionId), [params.sessionId]);
     const [driver, setDriver] = useState<DriverInfo | null>(null);
     const [passengers, setPassengers] = useState<PassengerTripSession[]>([]);
-    const [meetingPoints, setMeetingPoints] = useState<any[]>([]);
+    //const [meetingPoints, setMeetingPoints] = useState<MeetingPoint[]>([]);
     const [sessionUsers, setSessionUsers] = useState<UserData[]>([]);
     const [showStops, setShowStops] = useState(false);
     const [route, setRoute] = useState<RouteData | null>(null);
     const [imageError, setImageError] = useState(false);
-    const [routeSessions, setRouteSessions] = useState<SessionData | null>(null);
+    //const [session, setRouteSessions] = useState<SessionData | null>(null);
     const [isActionLoading, setIsActionLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    const [sortedItinerary, setSortedItinerary] = useState<any[]>([]);
+    const [loadingItinerary, setLoadingItinerary] = useState(true);
+
+    const { session } = useTripRealtimeById(Number(params.sessionId));
+    const { stops: sessionStops } = useTripStops(Number(params.sessionId));
+    const { meetingPoints: sessionMeetingPoints } = useTripMeetingPoints(Number(params.sessionId));
 
     const onRefresh = async () => {
         setRefreshing(true);
         await Promise.all([
             fetchRoute(),
-            fetchRouteSessions().then(d => {
-                if (d) fetchDriverData(d);
-            }),
+            session && user?.driver_mode === false && fetchDriverData(session),
             fetchPassengers().then(data => {
                 if (data) fetchSessionUsers(data);
-            })
+            }),
+            //fetchMeetingPoints()
         ]);
         setRefreshing(false);
     };
@@ -70,28 +78,6 @@ export default function RouteDetail() {
         console.log(data);
 
         setRoute(data || null);
-    }
-
-    const fetchRouteSessions = async () => {
-        if (!params.sessionId) return;
-
-        console.log("sessionId", params.sessionId);
-
-        const { data, error } = await supabase
-            .from("trip_sessions")
-            .select("*")
-            .eq("id", params.sessionId)
-            .maybeSingle();
-
-        if (error) {
-            console.error("Error fetching route sessions:", error);
-            return;
-        }
-
-        console.log("Route Sessions: ", data);
-
-        setRouteSessions(data);
-        return data || [];
     }
 
     const fetchPassengers = async () => {
@@ -124,7 +110,17 @@ export default function RouteDetail() {
             return;
         }
 
-        setMeetingPoints(data || []);
+        const mp_available = data?.filter(mp =>
+            sessionMeetingPoints.some(smp =>
+                smp.passenger_mp_id === mp.id && ["pending", "visited"].includes(smp.status)
+            )
+            // VALIDAR MEETING_POINTS DE LA SESION POR PASAJEROS 
+            // VERIFICAR SI SE PUEDE REPLICAR COMO LA LÓGICA DE PARADAS
+            // && passengers.some(p => p.passenger_id === mp.passenger_id)
+        ) || [];
+
+        console.log('MP available: ', mp_available);
+        //setMeetingPoints(mp_available || []);
     };
 
     const fetchSessionUsers = async (passengerSessions: PassengerTripSession[]) => {
@@ -185,22 +181,23 @@ export default function RouteDetail() {
 
     useEffect(() => {
         fetchRoute();
-        fetchRouteSessions().then(d => {
-            if (d) fetchDriverData(d);
-        });
+        if (session && user?.driver_mode === false) {
+            fetchDriverData(session);
+        }
         fetchPassengers().then(data => {
             if (data) fetchSessionUsers(data);
         });
-        fetchMeetingPoints();
-    }, [params.id, sessionId]);
+        //fetchMeetingPoints();
+    }, [params.id, session, sessionMeetingPoints]);
+
 
     const handleStartTrip = async () => {
-        if (routeSessions?.status === 'active') {
-            return router.push(`/(tabs)/home/route-detail?id=${routeSessions?.id}`);
+        if (session?.status === 'active') {
+            return router.push(`/(tabs)/home/route-detail?id=${session?.id}`);
         }
 
         if (!user || user.driver_mode !== true) {
-            return router.push(`/(tabs)/home/route-detail?id=${routeSessions?.id}`);
+            return router.push(`/(tabs)/home/route-detail?id=${session?.id}`);
         }
 
         try {
@@ -217,10 +214,10 @@ export default function RouteDetail() {
             const location = await Location.getCurrentPositionAsync({});
             const driverLat = location.coords.latitude;
             const driverLon = location.coords.longitude;
-            
-            if (routeSessions?.start_coords?.coordinates) {
-                const startLon = routeSessions.start_coords.coordinates[0];
-                const startLat = routeSessions.start_coords.coordinates[1];
+
+            if (session?.start_coords?.coordinates) {
+                const startLon = session.start_coords.coordinates[0];
+                const startLat = session.start_coords.coordinates[1];
 
                 const distance = calculateDistance(driverLat, driverLon, startLat, startLon);
 
@@ -234,19 +231,38 @@ export default function RouteDetail() {
                 }
             }
 
-            const { data, error } = await supabase
-                .from('trip_sessions')
-                .update({ status: 'active' })
-                .eq('id', routeSessions?.id);
+            console.log("[available-routes.route-detail] starting trip session", { sessionId: session?.id });
+            await tripService.startTripSession(session?.id!);
+            console.log("[available-routes.route-detail] trip session started, dispatching notifications", { sessionId: session?.id });
 
-            if (error) {
-                Alert.alert("Error", `Error al actualizar: ${error.message}`)
-                return;
+
+            const passengers = await fetchPassengers();
+            const passengerIds = (passengers || [])
+                .map((p) => p.passenger_id)
+                .filter(Boolean) as string[];
+
+            if (!passengerIds.length) {
+                console.log("[route-detail.handleStartTrip] no joined/approved passengers to notify", session?.id);
+            } else {
+                console.log("[route-detail.handleStartTrip] passengers to notify:", passengerIds);
+                await sendMultiplePushNotifications(
+                    passengerIds,
+                    "¡El conductor ha iniciado la ruta! 🚗",
+                    "Tu conductor ha comenzado el viaje. Dirígete al punto de recogida.",
+                    {
+                        type: "TRIP_STARTED",
+                        trip_session_id: session?.id,
+                    }
+                );
+                console.log("[route-detail.handleStartTrip] bulk trip-start notification dispatched", {
+                    sessionId: session?.id,
+                    passengerCount: passengerIds.length,
+                });
             }
 
-            await startTracking(routeSessions?.id!, user.id);
+            await startTracking(session?.id!, user.id);
 
-            router.push(`/(tabs)/home/route-detail?id=${routeSessions?.id}`);
+            router.push(`/(tabs)/home/route-detail?id=${session?.id}`);
 
         } catch (error: any) {
             console.error("Error al iniciar el viaje:", error.message);
@@ -273,12 +289,13 @@ export default function RouteDetail() {
                     onPress: async () => {
                         try {
                             setIsActionLoading(true);
-                            const { error } = await supabase
-                                .from('trip_sessions')
-                                .update({ status: 'cancelled' })
-                                .eq('id', routeSessions?.id);
+                            await tripService.cancelTripSession(sessionId);
 
-                            if (error) throw error;
+                            const passengerIds = await tripService.getPassengersIdsByRoute_includingRequests(sessionId);
+                            await sendMultiplePushNotifications(passengerIds, "Viaje cancelado", "El conductor ha cancelado el viaje.", {
+                                type: "TRIP_CANCELLED",
+                                trip_session_id: session?.id,
+                            });
 
                             try {
                                 await stopTracking();
@@ -322,37 +339,126 @@ export default function RouteDetail() {
         return `${prefix}  •  ${time}`;
     };
 
-    const sortedItinerary = useMemo(() => {
-        if (!routeSessions || !routeSessions.start_coords) return [];
+    const handleLeaveTrip = async () => {
+        if (!session || !user) return;
 
-        const startLat = routeSessions.start_coords.coordinates[1];
-        const startLng = routeSessions.start_coords.coordinates[0];
+        Alert.alert(
+            "Abandonar viaje",
+            "¿Estás seguro de que quieres salirte de este viaje?",
+            [
+                { text: "Cancelar", style: "cancel" },
+                {
+                    text: "Sí, salir",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            await tripService.leaveTripSession(session.id, user.id);
 
-        // Filtrar solo puntos de encuentro de pasajeros aprobados
-        const approvedMeetingPoints = meetingPoints.filter(mp => {
-            const passengerSession = passengers.find(p => p.passenger_id === mp.passenger_id);
-            return passengerSession?.status === 'joined';
-        });
+                            await sendPushNotification(session.driver_id, "Viaje abandonado", `${user.name} ha abandonado el viaje.`, {
+                                type: "TRIP_CANCELLED",
+                                trip_session_id: session.id,
+                            });
 
-        const allPoints = [
-            ...(route?.stops || []).map(s => {
-                const lat = s.coords.coordinates[1];
-                const lng = s.coords.coordinates[0];
-                return { ...s, type: 'stop' as const, lat, lng };
-            }),
-            ...approvedMeetingPoints.map(mp => {
-                const lat = mp.latitude ?? mp.coords?.latitude ?? mp.coords?.coordinates?.[1] ?? 0;
-                const lng = mp.longitude ?? mp.coords?.longitude ?? mp.coords?.coordinates?.[0] ?? 0;
-                return { ...mp, type: 'meeting_point' as const, lat, lng };
-            })
-        ];
+                            Alert.alert("Éxito", "Has abandonado el viaje correctamente.");
+                            if (router.canGoBack()) {
+                                router.back();
+                            } else {
+                                router.replace("/(tabs)/available-routes");
+                            }
+                        } catch (error) {
+                            console.error("Error leaving trip:", error);
+                            Alert.alert("Error", "No se pudo abandonar el viaje.");
+                        }
+                    }
+                }
+            ]
+        );
+    };
 
-        return allPoints.sort((a, b) => {
-            const distA = calculateDistance(startLat, startLng, a.lat, a.lng);
-            const distB = calculateDistance(startLat, startLng, b.lat, b.lng);
-            return distA - distB;
-        });
-    }, [route?.stops, meetingPoints, passengers, routeSessions]);
+    useEffect(() => {
+        const fetchAndSortItinerary = async () => {
+            if (!session || !session.start_coords) {
+                setSortedItinerary([]);
+                setLoadingItinerary(false);
+                return;
+            }
+
+            try {
+                setLoadingItinerary(true);
+                const startLat = session.start_coords.coordinates[1];
+                const startLng = session.start_coords.coordinates[0];
+
+
+
+                // Petición asíncrona que causaba el problema
+                const stops = (await tripService.getSessionStops(session.id)) || [];
+                const meetingPoints = (await tripService.getMeetingPoints(session.id)) || [];
+
+                console.log("SESSION STOPS: ", JSON.stringify(stops, null, 2));
+                console.log("TRIP SESSION STOPS: ", JSON.stringify(sessionStops, null, 2));
+
+                const available_stops = stops?.filter(s =>
+                    sessionStops.some(smp =>
+                        smp.trip_session_id === s.trip_session_id
+                        && smp.passenger_id === s.passenger_id
+                        && smp.passenger_stop_id === s.id
+                        && ["pending", "visited"].includes(smp.status)
+                    )
+                ) || [];
+
+                // Filtrar solo puntos de encuentro de pasajeros aprobados
+                const approvedMeetingPoints = meetingPoints.filter(mp =>
+                    sessionMeetingPoints.some(smp =>
+                        smp.trip_session_id === mp.trip_session_id
+                        && smp.passenger_id === mp.passenger_id
+                        && smp.passenger_mp_id === mp.id
+                        && ["pending", "visited"].includes(smp.status)
+                    )
+                ) || [];
+
+                console.log("AVAILABLE STOPS: ", available_stops);
+                console.log("MEETING POINTS: ", approvedMeetingPoints);
+                console.log("SESSION STOPS: ", sessionStops);
+                console.log("STOPS: ", stops);
+
+                const stop_points = (available_stops || []).map(s => {
+                    const lat = s.coords.latitude;
+                    const lng = s.coords.longitude;
+                    return { ...s, type: 'stop' as const, lat, lng };
+                });
+
+                console.log("PARADAS: ", stops);
+                console.log("PUNTOS DE ENCUENTRO: ", approvedMeetingPoints);
+
+                const mp_points = (approvedMeetingPoints || []).map(mp => {
+                    const lat = mp.coords.coordinates[1] ?? 0;
+                    const lng = mp.coords.coordinates[0] ?? 0;
+                    return { ...mp, type: 'meeting_point' as const, lat, lng };
+                });
+
+                const allPoints = [
+                    ...stop_points,
+                    ...mp_points
+                ];
+
+                const sorted = allPoints.sort((a, b) => {
+                    const distA = calculateDistance(startLat, startLng, a.lat, a.lng);
+                    const distB = calculateDistance(startLat, startLng, b.lat, b.lng);
+                    return distA - distB;
+                });
+
+                // Guardamos el resultado síncronamente en el estado
+                console.log("Itinerario ordenado:", JSON.stringify(sorted, null, 2));
+                setSortedItinerary(sorted);
+            } catch (error) {
+                console.error("Error cargando el itinerario:", error);
+            } finally {
+                setLoadingItinerary(false);
+            }
+        };
+
+        fetchAndSortItinerary();
+    }, [sessionStops, sessionMeetingPoints, passengers, session]);
 
     return (
         <ThemedView
@@ -428,7 +534,7 @@ export default function RouteDetail() {
                     </ThemedView>
                 )}
                 {
-                    routeSessions && (
+                    session && (
                         <>
                             {/* Fecha y Estado */}
                             <View className="flex-row justify-between px-4 mt-4">
@@ -436,15 +542,15 @@ export default function RouteDetail() {
                                     lightColor={Colors.light.text}
                                     darkColor={Colors.dark.text}
                                     className="font-medium"
-                                >{formatRouteDate(routeSessions.created_at.toString())}</ThemedText>
+                                >{formatRouteDate(session.created_at.toString())}</ThemedText>
 
-                                <View className="rounded-full px-3 py-1 justify-center" style={{ backgroundColor: routeSessions.status === 'active' ? 'rgba(226, 235, 240, 0.1)' : routeSessions.status === 'pending' ? 'rgba(185, 106, 16, 0.1)' : 'rgba(16, 185, 129, 0.1)' }}>
+                                <View className="rounded-full px-3 py-1 justify-center" style={{ backgroundColor: session.status === 'active' ? 'rgba(226, 235, 240, 0.1)' : session.status === 'pending' ? 'rgba(185, 106, 16, 0.1)' : 'rgba(16, 185, 129, 0.1)' }}>
                                     <ThemedText
-                                        lightColor={routeSessions.status === 'active' ? Colors.light.secondary : routeSessions.status === 'pending' ? Colors.light.danger : Colors.light.success}
-                                        darkColor={routeSessions.status === 'active' ? Colors.dark.secondary : routeSessions.status === 'pending' ? Colors.dark.danger : Colors.dark.success}
+                                        lightColor={session.status === 'active' ? Colors.light.secondary : session.status === 'pending' ? Colors.light.danger : Colors.light.success}
+                                        darkColor={session.status === 'active' ? Colors.dark.secondary : session.status === 'pending' ? Colors.dark.danger : Colors.dark.success}
                                         className="text-xs font-bold uppercase"
                                     >
-                                        {routeSessions.status === 'active' ? 'En curso' : routeSessions.status === 'pending' ? 'Pendiente' : routeSessions.status === 'cancelled' ? 'CANCELADO' : 'COMPLETADO'}
+                                        {session.status === 'active' ? 'En curso' : session.status === 'pending' ? 'Pendiente' : session.status === 'cancelled' ? 'CANCELADO' : 'COMPLETADO'}
                                     </ThemedText>
                                 </View>
                             </View>
@@ -459,12 +565,12 @@ export default function RouteDetail() {
                                     </View>
                                     <View className="flex-1">
                                         <ThemedText className="text-[10px] font-bold text-textSecondary uppercase tracking-widest">Punto de Partida</ThemedText>
-                                        <ThemedText className="text-base font-semibold" numberOfLines={1}>{routeSessions.start_location}</ThemedText>
+                                        <ThemedText className="text-base font-semibold" numberOfLines={1}>{session.start_location}</ThemedText>
                                     </View>
                                 </View>
 
                                 {/* Botón para mostrar/ocultar paradas intermedias */}
-                                {((route?.stops?.length || 0) > 0 || meetingPoints.length > 0) && (
+                                {((sessionStops.length || 0) > 0 || sessionMeetingPoints.length > 0) && (
                                     <Pressable
                                         onPress={() => setShowStops(!showStops)}
                                         className="flex-row items-center py-2 -ml-1"
@@ -477,7 +583,7 @@ export default function RouteDetail() {
                                             />
                                         </View>
                                         <ThemedText className="text-xs font-bold" style={{ color: Colors.dark.secondary }}>
-                                            {showStops ? 'OCULTAR PARADAS' : `${(route?.stops?.length || 0) + meetingPoints.length} PARADAS INTERMEDIAS`}
+                                            {showStops ? 'OCULTAR PARADAS Y PUNTOS DE ENCUENTRO' : `${(sortedItinerary.length || 0)} PARADAS INTERMEDIAS`}
                                         </ThemedText>
                                     </Pressable>
                                 )}
@@ -485,12 +591,16 @@ export default function RouteDetail() {
                                 {/* Lista de Paradas y Meeting Points Combinados */}
                                 {showStops && (
                                     <View>
-                                        {sortedItinerary.map((item, index) => (
+                                        {loadingItinerary ? (
+                                            <ThemedText className="text-xs text-center text-gray-400 py-2">Cargando itinerario...</ThemedText>
+                                        ) : sortedItinerary.length === 0 ? (
+                                            <ThemedText className="text-xs text-center text-gray-400 py-2">No hay paradas programadas</ThemedText>
+                                        ) : (sortedItinerary.map((item, index) => (
                                             <View key={`${item.type}-${item.id}`} className="flex-row items-center">
                                                 <View className="items-center mr-4">
                                                     <View className="w-0.5 h-4 bg-gray-600" />
                                                     <View
-                                                        className={`w-2.5 h-2.5 rounded-full ${item.type === 'stop' ? 'border border-gray-400 bg-gray-800' : 'bg-orange-500'}`}
+                                                        className={`w-2.5 h-2.5 rounded-full ${item.type === 'stop' ? 'bg-orange-400' : 'border border-blue-400 bg-blue-200'}`}
                                                     />
                                                     <View className="w-0.5 h-4 bg-gray-600" />
                                                 </View>
@@ -499,12 +609,12 @@ export default function RouteDetail() {
                                                         <Ionicons
                                                             name={item.type === 'stop' ? "location-outline" : "people-outline"}
                                                             size={12}
-                                                            color={item.type === 'stop' ? "#A0AECB" : "#F59E0B"}
+                                                            color={item.type === 'stop' ? "#F59E0B" : "#A0AECB"}
                                                             className="mr-1"
                                                         />
                                                         <ThemedText
                                                             className="text-[10px] font-bold uppercase"
-                                                            style={{ color: item.type === 'stop' ? "#A0AECB" : "#F59E0B" }}
+                                                            style={{ color: item.type === 'stop' ? "#F59E0B" : "#A0AECB" }}
                                                         >
                                                             {item.type === 'stop' ? `Parada` : 'Punto de Encuentro'}
                                                         </ThemedText>
@@ -512,7 +622,7 @@ export default function RouteDetail() {
                                                     <ThemedText className="text-sm font-medium" numberOfLines={1}>{item.location}</ThemedText>
                                                 </View>
                                             </View>
-                                        ))}
+                                        )))}
                                     </View>
                                 )}
 
@@ -524,7 +634,7 @@ export default function RouteDetail() {
                                     </View>
                                     <View className="flex-1">
                                         <ThemedText className="text-[10px] font-bold text-textSecondary uppercase tracking-widest">Punto de Llegada</ThemedText>
-                                        <ThemedText className="text-base font-semibold" numberOfLines={1}>{routeSessions.end_location}</ThemedText>
+                                        <ThemedText className="text-base font-semibold" numberOfLines={1}>{session.end_location}</ThemedText>
                                     </View>
                                 </View>
                             </View>
@@ -655,7 +765,21 @@ export default function RouteDetail() {
                 </View>
             </ScrollView>
             {
-                routeSessions?.status !== 'completed' && routeSessions?.status !== 'cancelled' && (
+                (session?.status !== 'completed' && session?.status !== 'cancelled') && (user?.driver_mode === false || user?.is_driver === false) && (
+                    <Pressable onPress={() => handleLeaveTrip()}>
+                        <ThemedView className="flex-row justify-center items-center py-4 m-8 rounded-full"
+                            lightColor={Colors.light.secondary}
+                            darkColor={Colors.dark.secondary}
+                        >
+                            <Ionicons name="exit" size={20} color={Colors.dark.text} />
+                            <ThemedText className="text-lg font-bold ml-1">Abandonar viaje</ThemedText>
+
+                        </ThemedView>
+                    </Pressable>
+                )
+            }
+            {
+                session?.status !== 'completed' && session?.status !== 'cancelled' && user?.driver_mode && (
                     <SwipeTripActions
                         onStart={handleStartTrip}
                         onCancel={handleCancelTrip}

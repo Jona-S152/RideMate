@@ -99,3 +99,64 @@ export async function sendPushNotification(
     console.error("Error enviando notificación push:", error);
   }
 }
+
+export async function sendMultiplePushNotifications(
+  userIds: string[],
+  title: string,
+  body: string,
+  data?: any
+) {
+  console.warn(`[notifications] Attempting to send to ${userIds.length} users:`, userIds);
+
+  if (!userIds || userIds.length === 0) return;
+
+  console.log("User IDs:", userIds);
+  console.log("Data:", data);
+  console.log("Title:", title);
+  console.log("Body:", body);
+
+  try {
+    // 1. Obtener TODOS los tokens en una sola consulta SQL (.in)
+    const { data: tokensData, error } = await supabase
+      .from("device_tokens")
+      .select("user_id, token")
+      .in("user_id", userIds); // Trae todos los que coincidan con la lista
+
+    if (error || !tokensData || tokensData.length === 0) {
+      console.warn("No se encontraron tokens para los usuarios provistos.");
+      return;
+    }
+
+    // 2. Construir el array de mensajes para Expo
+    const messages = tokensData.map((t) => ({
+      to: t.token,
+      sound: "default",
+      title,
+      body,
+      data: data || {},
+    }));
+
+    const matchedUserIds = tokensData.map((t) => t.user_id);
+    console.warn(`[notifications] sending batch to ${messages.length} devices for users`, matchedUserIds);
+
+    // 3. Enviar todo en un solo payload HTTP POST
+    const response = await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Accept-encoding": "gzip, deflate",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(messages), // Mandamos el array completo
+    });
+
+    const result = await response.json();
+    console.log(`Lote de ${messages.length} notificaciones enviado:`, result);
+
+    if (result.errors) {
+      console.error("Errores en el envío por lotes:", result.errors);
+    }
+  } catch (error) {
+    console.error("Error enviando notificaciones múltiples:", error);
+  }
+}

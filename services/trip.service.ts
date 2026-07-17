@@ -1,5 +1,6 @@
-import { supabase } from "@/lib/supabase";
 import { RouteData, SessionData, UserData } from "@/interfaces/available-routes";
+import { supabase } from "@/lib/supabase";
+import { sendPushNotification } from "@/services/notifications.service";
 import { ratingsService } from "@/services/ratings.service";
 
 export interface TripSessionDetails {
@@ -31,7 +32,20 @@ export const tripService = {
 
     const orgIds = memberOrgs?.map(mo => mo.organization_id) || [];
 
-    // 2. Fetch active trip sessions
+    // Obtener solicitudes pendientes del pasajero
+    const { data: pendingRequests, error: pendingError } = await supabase
+      .from('passenger_requests')
+      .select('trip_session_id')
+      .eq('passenger_id', userId)
+      .eq('status', 'pending');
+
+    if (pendingError) {
+      console.error("[tripService.getPassengerRoutes] pending error:", pendingError);
+    }
+
+    const pendingSessionIds = pendingRequests?.map(pr => pr.trip_session_id) || [];
+
+    // Obtener sesiones de viaje activas
     const { data, error } = await supabase
       .from("trip_sessions")
       .select(`
@@ -44,11 +58,11 @@ export const tripService = {
           image_url,
           organization_id
         ),
-        trip_session_stops (
-          *,
-          stop:stops (*)
+        passenger_stops (
+          *
         ),
         passengers:passenger_trip_sessions (
+          status,
           passenger:users!passenger_id (
             id,
             avatar_profile
@@ -62,14 +76,44 @@ export const tripService = {
       throw error;
     }
 
+    const sessionIds = (data || []).map((session: any) => session.id);
+    let pendingCounts: Record<number, number> = {};
+    if (sessionIds.length > 0) {
+      const { data: allPendingRequests, error: allPendingError } = await supabase
+        .from('passenger_requests')
+        .select('trip_session_id')
+        .in('trip_session_id', sessionIds)
+        .eq('status', 'pending');
+
+      if (allPendingError) {
+        console.error('[tripService.getPassengerRoutes] pending counts error:', allPendingError);
+      } else {
+        pendingCounts = (allPendingRequests || []).reduce((acc: Record<number, number>, request: any) => {
+          const sessionId = request.trip_session_id;
+          acc[sessionId] = (acc[sessionId] || 0) + 1;
+          return acc;
+        }, {});
+      }
+    }
+
     // 3. Filter routes with capacity < 4 passengers joined
     const availableRoutes = (data || []).filter((session) => {
       const joinedPassengers = session.passengers?.filter((p: any) => p.status === "joined") || [];
-      return joinedPassengers.length < 4;
+      if (joinedPassengers.length >= 4) return false;
+      
+      // Excluir si el pasajero actual ya está unido al viaje
+      const isAlreadyJoined = session.passengers?.some((p: any) => p.passenger_id === userId && p.status === "joined");
+
+      if (isAlreadyJoined) return false;
+
+      return true;
     });
 
     const formattedRoutes = availableRoutes.map((session) => {
       const joinedPassengers = session.passengers?.filter((p: any) => p.status === "joined") || [];
+      const hasPendingRequest = pendingSessionIds.includes(session.id);
+      const pendingRequestsCount = pendingCounts[session.id] || 0;
+      
       return {
         ...session,
         driver_name: session.driver?.name,
@@ -79,6 +123,8 @@ export const tripService = {
           id: p.passenger?.id,
           avatar: p.passenger?.avatar_profile,
         })) || [],
+        user_pending_request: hasPendingRequest,
+        pending_requests_count: pendingRequestsCount,
       };
     });
 
@@ -89,6 +135,42 @@ export const tripService = {
       const routeOrgId = routeObj?.organization_id;
       return orgIds.includes(routeOrgId);
     });
+  },
+
+  async getPassengersIdsByRoute_includingRequests(routeId: number): Promise<string[]> {
+
+    console.log("Passengers ids by route: ", routeId);
+    const { data, error } = await supabase
+      .from("passenger_trip_sessions")
+      .select(`
+        passenger_id
+      `)
+      .eq("trip_session_id", routeId)
+      .eq("status", "cancelled");
+
+    if (error) {
+      console.error("[tripService.getPassengersByRoute] error:", error);
+      throw error;
+    }
+
+    console.log("Passengers by route: ", data);
+
+    const { data: p_requests, error: requests_error } = await supabase
+      .from("passenger_requests")
+      .select("passenger_id")
+      .eq("trip_session_id", routeId)
+      .eq("status", "cancelled");
+
+    if (requests_error) {
+      console.error("[tripService.getPassengersByRoute] requests error:", requests_error);
+      throw requests_error;
+    }
+
+    console.log("Passengers requests by route: ", p_requests);
+
+    const passengersIds = [...data.map((p: any) => p.passenger_id), ...p_requests.map((p: any) => p.passenger_id)];
+
+    return passengersIds;
   },
 
   /**
@@ -149,23 +231,23 @@ export const tripService = {
     // Get active organization
     const { data: memberOrg } = await supabase
       .from('organization_members')
-      .select('organization_id')
+      .select('organization_id, branch_id')
       .eq('user_id', userId)
       .eq('status', 'active')
       .limit(1)
       .maybeSingle();
 
-    if (memberOrg) {
-      orgId = memberOrg.organization_id;
-      
+    if (memberOrg) {      
       // Get branch
-      const { data: branches } = await supabase
+      const { data: branch } = await supabase
         .from('organization_branches')
         .select('id')
-        .eq('organization_id', orgId);
+        .eq('organization_id', memberOrg.organization_id)
+        .eq('id', memberOrg.branch_id)
+        .maybeSingle();
 
-      if (branches && branches.length > 0) {
-        branchId = branches[0].id;
+      if (branch) {
+        branchId = branch.id;
       }
     }
 
@@ -188,6 +270,18 @@ export const tripService = {
       throw error;
     }
   },
+  
+  async DeleteTripSession(userId: string): Promise<void> {
+    const { error: route_error } = await supabase
+      .from("routes")
+      .delete()
+      .eq("created_by", userId);
+    
+    if (route_error) {
+      console.error("[tripService.DeleteTripSession] error:", route_error);
+      throw route_error;
+    }
+  },
 
   /**
    * Starts a trip session by setting status to 'active'.
@@ -201,6 +295,61 @@ export const tripService = {
     if (error) {
       console.error("[tripService.startTripSession] error:", error);
       throw error;
+    }
+  },
+
+  async cancelTripSession(sessionId: number): Promise<void> {
+    const { error: p_req_error } = await supabase
+      .from("passenger_requests")
+      .update({ status: "cancelled", rejection_reason: "Ruta cancelada por el conductor" })
+      .eq("trip_session_id", sessionId)
+      .eq("status", "pending");
+    
+    if (p_req_error) {
+      console.error("[tripService.cancelTripSession] error:", p_req_error);
+      throw p_req_error;
+    }
+    const { error: errorSessionId } = await supabase
+      .from("passenger_trip_sessions")
+      .update({ status: "cancelled" })
+      .eq("trip_session_id", sessionId)
+      .eq("status", "joined");
+
+    if(errorSessionId) {
+      console.error("[tripService.cancelTripSession] error:", errorSessionId);
+      throw errorSessionId;
+    }
+
+    const { error: mp_error } = await supabase
+      .from("trip_session_meeting_points")
+      .update({ status: "cancelled" })
+      .eq("trip_session_id", sessionId)
+      .eq("status", "pending");
+    
+    if (mp_error) {
+      console.error("[tripService.cancelTripSession] error:", mp_error);
+      throw mp_error;
+    }
+
+    const { error : stops_error } = await supabase
+      .from("trip_session_stops")
+      .update({ status: "cancelled" })
+      .eq("trip_session_id", sessionId)
+      .eq("status", "pending");
+    
+    if (stops_error) {
+      console.error("[tripService.cancelTripSession] stops error:", stops_error);
+      throw stops_error;
+    }
+
+    const { error: session_error } = await supabase
+      .from("trip_sessions")
+      .update({ status: "cancelled" })
+      .eq("id", sessionId);
+
+    if (session_error) {
+      console.error("[tripService.cancelTripSession] error:", session_error);
+      throw session_error;
     }
   },
 
@@ -253,14 +402,27 @@ export const tripService = {
    * Updates meeting point check-in status.
    */
   async updateMeetingPointStatus(sessionId: number, passengerId: string, status: 'visited' | 'skipped'): Promise<void> {
-    const { error } = await supabase
+    // 1. Get the meeting point ID for this passenger in the trip session
+    const { data: mpData, error: mpError } = await supabase
       .from('passenger_meeting_points')
+      .select('id')
+      .eq('trip_session_id', sessionId)
+      .eq('passenger_id', passengerId)
+      .single();
+
+    if (mpError) {
+      console.error("[tripService.updateMeetingPointStatus] get mp id error:", mpError);
+      throw mpError;
+    }
+
+    // 2. Update the status in trip_session_meeting_points
+    const { error } = await supabase
+      .from('trip_session_meeting_points')
       .update({
         status,
         visit_time: status === 'visited' ? new Date().toISOString() : null,
       })
-      .eq('trip_session_id', sessionId)
-      .eq('passenger_id', passengerId);
+      .eq('id', mpData.id);
 
     if (error) {
       console.error("[tripService.updateMeetingPointStatus] error:", error);
@@ -318,6 +480,42 @@ export const tripService = {
       console.error("[tripService.submitPassengerRequest] error:", error);
       throw error;
     }
+
+    // Notificar al conductor sobre la nueva solicitud
+    try {
+      const { data: trip } = await supabase
+        .from('trip_sessions')
+        .select('driver_id')
+        .eq('id', tripSessionId)
+        .single();
+
+      if (!trip?.driver_id) {
+        console.warn("[tripService.submitPassengerRequest] no driver_id found for tripSessionId", tripSessionId);
+        return;
+      }
+
+      console.log("[tripService.submitPassengerRequest] notifying driver", {
+        driverId: trip.driver_id,
+        tripSessionId,
+        passengerId,
+      });
+
+      await sendPushNotification(
+        trip.driver_id,
+        "¡Nueva solicitud de pasajero! 🚗",
+        "Alguien quiere unirse a tu viaje.",
+        {
+          type: 'NEW_PASSENGER',
+          trip_session_id: tripSessionId,
+          passenger_id: passengerId,
+        }
+      );
+
+      console.log("[tripService.submitPassengerRequest] notification sent to driver", trip.driver_id);
+    } catch (notifError) {
+      console.warn("[tripService.submitPassengerRequest] notification error:", notifError);
+      // No fallar el proceso completo si la notificación falla
+    }
   },
 
   /**
@@ -327,16 +525,31 @@ export const tripService = {
     requestId: number,
     tripSessionId: number,
     passengerId: string,
-    pickupPoint: any, // coords GeoJSON
-    destinationPoint: any, // coords GeoJSON
-    destinationAddress: string
   ): Promise<void> {
-    // 1. Update request status
-    const { error: reqError } = await supabase
+    // 0. ATOMIC idempotency lock:
+    //    UPDATE ... WHERE status = 'pending' RETURNING id
+    //    If another call already set status to 'approved', this UPDATE matches 0 rows
+    //    and returns an empty array — so we bail out immediately.
+    //    This is atomic at the DB level and prevents race conditions between simultaneous calls.
+    const { data: claimed, error: claimError } = await supabase
       .from("passenger_requests")
       .update({ status: "approved" })
-      .eq("id", requestId);
-    if (reqError) throw reqError;
+      .eq("id", requestId)
+      .eq("status", "pending")  // only succeeds if still pending
+      .select("id");
+
+    if (claimError) throw claimError;
+
+    if (!claimed || claimed.length === 0) {
+      // Another call already claimed this request — skip all inserts.
+      console.warn(
+        "[tripService.approvePassengerRequest] Request already claimed by another process, skipping.",
+        { requestId }
+      );
+      return;
+    }
+
+    // 1. Request successfully locked — continue with the rest of the inserts.
 
     // 2. Insert joined passenger session
     const { error: sessionError } = await supabase
@@ -349,36 +562,80 @@ export const tripService = {
     if (sessionError) throw sessionError;
 
     // 3. Insert temporal meeting point
-    const { error: mpError } = await supabase
+    // 3.1. Fetch the pickup address from passenger_requests
+    const { data: requestData, error: requestError } = await supabase
+      .from("passenger_requests")
+      .select("pickup_point, pickup_address, destination_point, destination_address")
+      .eq("id", requestId)
+      .single();
+
+    if (requestError) throw requestError;
+
+    // 3.2. Insert into passenger_meeting_points (returns the generated ID)
+    const { data: mpData, error: mpError } = await supabase
       .from("passenger_meeting_points")
       .insert({
         trip_session_id: tripSessionId,
         passenger_id: passengerId,
-        coords: pickupPoint,
-        status: "pending",
-      });
-    if (mpError) throw mpError;
-
-    // 4. Create destination stop
-    const { data: stopData, error: stopError } = await supabase
-      .from("stops")
-      .insert({
-        name: destinationAddress || "Bajada de Pasajero",
-        coords: destinationPoint,
+        coords: requestData.pickup_point,
+        location: requestData.pickup_address || "Punto de recogida",
       })
       .select("id")
       .single();
-    if (stopError) throw stopError;
+
+    if (mpError) {
+      console.error("[tripService.approvePassengerRequest] mpError:", mpError);
+      throw mpError;
+    }
+
+    if (mpData) {
+      // 3.3. Insert into trip_session_meeting_points
+      const { error: tsmpError } = await supabase
+        .from("trip_session_meeting_points")
+        .insert({
+          passenger_mp_id: mpData.id,
+          trip_session_id: tripSessionId,
+          passenger_id: passengerId,
+          status: "pending",
+        });
+
+      if (tsmpError) {
+        console.error("[tripService.approvePassengerRequest] tsmpError:", tsmpError);
+        throw tsmpError;
+      }
+    }
+
+    // 4. Create destination stop
+    const { data: stopData, error: stopError } = await supabase
+      .from("passenger_stops")
+      .insert({
+        trip_session_id: tripSessionId,
+        passenger_id: passengerId,
+        location: requestData.destination_address || "Bajada de Pasajero",
+        coords: requestData.destination_point,
+      })
+      .select("id")
+      .single();
+
+    if (stopError) {
+      console.error("[tripService.approvePassengerRequest] stopError:", stopError);
+      throw stopError;
+    }
 
     // 5. Connect stop to trip session
     const { error: tssError } = await supabase
       .from("trip_session_stops")
       .insert({
         trip_session_id: tripSessionId,
-        stop_id: stopData.id,
+        passenger_id: passengerId,
+        passenger_stop_id: stopData.id,
         status: "pending",
       });
-    if (tssError) throw tssError;
+
+    if (tssError) {
+      console.error("[tripService.approvePassengerRequest] tssError:", tssError);
+      throw tssError;
+    }
   },
 
   /**
@@ -419,9 +676,10 @@ export const tripService = {
       .eq("trip_session_id", tripSessionId)
       .eq("passenger_id", passengerId)
       .eq("status", "pending")
-      .single();
+      .maybeSingle();
 
     if (requestError) throw requestError;
+    if (!requestData) throw new Error("NO_PENDING_REQUEST");
 
     // 3. Route ID from session
     const { data: sessionData, error: sessionError } = await supabase
@@ -465,18 +723,41 @@ export const tripService = {
   },
 
   /**
+   * Fetches session stops records by stop IDs, formatting coordinates.
+   */
+  async getSessionStops(tripSessionId: number): Promise<any[]> {
+    const { data, error } = await supabase
+      .from("passenger_stops")
+      .select("*")
+      .eq("trip_session_id", tripSessionId);
+
+    if (error) {
+      console.error("[tripService.getSessionStops] error:", error);
+      throw error;
+    }
+
+    return (data || []).map((stop: any) => ({
+      ...stop,
+      coords: {
+        latitude: Number(stop.coords?.coordinates?.[1] ?? stop.coords?.latitude ?? 0),
+        longitude: Number(stop.coords?.coordinates?.[0] ?? stop.coords?.longitude ?? 0),
+      }
+    }));
+  },
+
+  /**
    * Fetches stop and meeting point statuses for a trip session.
    */
   async getTripSessionWaypointStatuses(sessionId: number) {
     const { data: stopStatuses, error: stopErr } = await supabase
       .from('trip_session_stops')
-      .select('stop_id, status, visit_time')
+      .select('*')
       .eq('trip_session_id', sessionId);
     if (stopErr) throw stopErr;
 
     const { data: meetingStatuses, error: meetingErr } = await supabase
       .from('trip_session_meeting_points')
-      .select('passenger_id, status, visit_time')
+      .select('id, status, visit_time')
       .eq('trip_session_id', sessionId);
     if (meetingErr) throw meetingErr;
 
@@ -487,16 +768,52 @@ export const tripService = {
    * Deletes a passenger's meeting point and updates their status to 'left'.
    */
   async leaveTripSession(sessionId: number, passengerId: string): Promise<void> {
-    const { error: meetingError } = await supabase
-      .from("passenger_meeting_points")
-      .delete()
-      .eq("trip_session_id", sessionId)
-      .eq("passenger_id", passengerId);
+    // 1. Update trip_session_meeting_points status to 'left'
+    //    First get the meeting point ID for this passenger
+    const { data: mpData } = await supabase
+      .from('passenger_meeting_points')
+      .select('id')
+      .eq('trip_session_id', sessionId)
+      .eq('passenger_id', passengerId)
+      .maybeSingle();
 
-    if (meetingError) {
-      console.warn("[tripService.leaveTripSession] Warning deleting meeting point:", meetingError.message);
+    if (mpData) {
+      // Update using passenger_mp_id — this uniquely identifies the correct row
+      const { error: tsmpError } = await supabase
+        .from('trip_session_meeting_points')
+        .update({ status: "left" })
+        .eq('trip_session_id', sessionId)
+        .eq('passenger_mp_id', mpData.id);
+
+      if (tsmpError) {
+        console.warn("[tripService.leaveTripSession] Warning updating trip_session_meeting_points:", tsmpError.message);
+      }
+    } else {
+      // Fallback: no passenger_meeting_points found, try updating by passenger_id directly
+      const { error: tsmpFallbackError } = await supabase
+        .from('trip_session_meeting_points')
+        .update({ status: "left" })
+        .eq('trip_session_id', sessionId)
+        .eq('passenger_id', passengerId)
+        .eq('status', 'pending');
+
+      if (tsmpFallbackError) {
+        console.warn("[tripService.leaveTripSession] Fallback warning:", tsmpFallbackError.message);
+      }
     }
 
+    // 2. Update trip_session_stops status to 'left'
+    const { error: tspsError } = await supabase
+      .from("trip_session_stops")
+      .update({ status: "left" })
+      .eq("trip_session_id", sessionId)
+      .eq("passenger_id", passengerId);
+    
+    if (tspsError) {
+      console.warn("[tripService.leaveTripSession] Warning updating trip_session_stops:", tspsError.message);
+    }
+    
+    // 3. Update passenger_trip_sessions status to 'left'
     const { error } = await supabase
       .from("passenger_trip_sessions")
       .update({ status: "left" })
@@ -508,6 +825,7 @@ export const tripService = {
       throw error;
     }
   },
+
 
   /**
    * Sets passenger statuses to 'completed' for a list of passenger IDs.

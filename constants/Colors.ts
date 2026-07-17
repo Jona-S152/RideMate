@@ -12,7 +12,7 @@ export const Colors = {
     primary: "#000A1C",
     secondary: "#2563EB",
     success: "#10B981",
-    warning: "#F59E0B",
+    warning: "#324563ff",
     danger: "#F59E0B",
     background: "#000A1C",
     surface: "#0C162A",

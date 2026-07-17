@@ -8,9 +8,8 @@ import AvailableRouteCard from "@/components/features/available-route-card";
 import { Colors } from "@/constants/Colors";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { RouteData, RouteStop, UserData } from "@/interfaces/available-routes";
-import { userService } from "@/services/user.service";
 import { tripService } from "@/services/trip.service";
-import { supabase } from "@/lib/supabase";
+import { userService } from "@/services/user.service";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useIsFocused } from "@react-navigation/native";
 import { router } from "expo-router";
@@ -267,7 +266,7 @@ export default function DriverRoutesScreen() {
                   onPress={() => {
                     router.push({
                       pathname: "/(tabs)/available-routes/route-preview",
-                      params: { id: item.id, type: "route" },
+                      params: { id: item.id, type: "driver_route" },
                     });
                   }}
                 />

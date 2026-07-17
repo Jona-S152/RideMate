@@ -67,22 +67,17 @@ function MainApp() {
     );
 
     const foregroundSubscription = Notifications.addNotificationReceivedListener(
-      async (notification) => {
+      async (notification) =>
+      {
         const data = notification.request.content.data as NotificationData;
 
         if (data.type === "NEW_PASSENGER") {
-          const {
-            data: { user: currentUser },
-          } = await supabase.auth.getUser();
-
-          if (currentUser?.id === data.passenger_id) {
-            return;
-          }
-
-          // Abrimos el modal globalmente en primer plano
-          setPassengerIdToProcess(data.passenger_id || null);
-          setTripSessionIdToProcess(Number(data.trip_session_id));
-          setPassengerActionModalVisible(true);
+          // When the app is in foreground, the conductor can see the passenger
+          // directly in the route-detail list. We do NOT open the modal here
+          // to avoid having two modal instances simultaneously (which caused
+          // duplicate records in trip_session_meeting_points).
+          console.log("[_layout] NEW_PASSENGER notification received in foreground – handled via route-detail list.");
+          return;
         } else if (data.type === "RATE_DRIVER") {
           setRatingData({
             trip_session_id: Number(data.trip_session_id),

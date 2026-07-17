@@ -208,6 +208,7 @@ export default function HomeScreen() {
 
   const [driverDetails, setDriverDetails] = useState<{ name: string; avatar: string; rating: number } | undefined>(undefined);
   const [passengerDetails, setPassengerDetails] = useState<{ id: string; avatar: string }[]>([]);
+  const [activePendingRequestsCount, setActivePendingRequestsCount] = useState<number>(0);
 
   // Fetch details for active session
   useEffect(() => {
@@ -215,6 +216,7 @@ export default function HomeScreen() {
       if (!activeSession) {
         setDriverDetails(undefined);
         setPassengerDetails([]);
+        setActivePendingRequestsCount(0);
         return;
       }
 
@@ -261,6 +263,13 @@ export default function HomeScreen() {
           setPassengerDetails([]);
         }
 
+        const { data: pendingRequests } = await supabase
+          .from('passenger_requests')
+          .select('id')
+          .eq('trip_session_id', activeSession.id)
+          .eq('status', 'pending');
+
+        setActivePendingRequestsCount(pendingRequests?.length || 0);
       } catch (error) {
         console.error("Error fetching session details:", error);
       }
@@ -389,6 +398,7 @@ export default function HomeScreen() {
                 passengerCount={passengerDetails.length}
                 driver={driverDetails}
                 passengersData={passengerDetails}
+                pendingRequestsCount={activePendingRequestsCount}
                 imageUrl={(activeSession as any).routes?.image_url}
               />
             </View>

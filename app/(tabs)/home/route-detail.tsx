@@ -1,5 +1,6 @@
 import BottomSheetRouteDetail from "@/components/features/BottomSheetRouteDetail";
 import { Colors } from "@/constants/Colors";
+import { sendMultiplePushNotifications, sendPushNotification } from "@/services/notifications.service";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -15,9 +16,8 @@ import {
 import { useAuth } from "@/app/context/AuthContext";
 import { MeetingPoint, PassengerTripSession, StopData, UserData } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
-import { tripService } from "@/services/trip.service";
-import { sendPushNotification } from "@/services/notifications.service";
 import { ratingsService } from "@/services/ratings.service";
+import { tripService } from "@/services/trip.service";
 import Mapbox, {
   Camera,
   LineLayer,
@@ -267,7 +267,7 @@ export default function RouteDetail() {
         };
       }),
       ...meetingPoints.map((mp) => {
-        const statusInfo = meetingStatuses?.find(m => m.passenger_id === mp.passenger_id);
+        const statusInfo = meetingStatuses?.find(m => m.id === mp.id);
         return {
           ...mp,
           type: 'meeting_point' as const,
@@ -414,13 +414,15 @@ export default function RouteDetail() {
         }
       }
 
+      console.log("[route-detail.handleStartTrip] starting trip session", { sessionId: session.id });
       await tripService.startTripSession(session.id);
+      console.log("[route-detail.handleStartTrip] trip session started, dispatching notifications", { sessionId: session.id });
 
       Alert.alert("Éxito", "¡Viaje iniciado!");
 
-      // Iniciar el tracking de ubicación
+      // Iniciar el tracking de ubicación sin bloquear el flujo de notificaciones
       const { startTracking } = useTripTrackingStore.getState();
-      await startTracking(Number(id), user.id);
+      void startTracking(Number(id), user.id);
     } catch (error) {
       console.error("Error starting trip:", error);
       Alert.alert("Error", "No se pudo iniciar el viaje.");
@@ -458,6 +460,59 @@ export default function RouteDetail() {
     }
   };
 
+  const handleCancelTrip = async () => {
+    if (!session) return;
+
+    if (!user || user.driver_mode !== true) {
+      Alert.alert("Info", "Solo el conductor puede cancelar el viaje desde aquí.");
+      return;
+    }
+
+    try {
+      await useTripTrackingStore.getState().stopTracking();
+
+      Alert.alert(
+        "Cancelar viaje",
+        "¿Estás seguro de que deseas cancelar este viaje?",
+        [
+          { text: "No", style: "cancel" },
+          {
+            text: "Sí, cancelar",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                await tripService.cancelTripSession(session.id);
+
+                const passengerIds = await tripService.getPassengersIdsByRoute_includingRequests(session.id);
+                await sendMultiplePushNotifications(passengerIds, "Viaje cancelado", "El conductor ha cancelado el viaje.", {
+                  type: "TRIP_CANCELLED",
+                  trip_session_id: session.id,
+                });
+
+                Alert.alert("Éxito", "Viaje cancelado correctamente.");
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace("/(tabs)/available-routes");
+                }
+              } catch (error: any) {
+                console.error("Error al cancelar el viaje:", error.message);
+                Alert.alert("Error", "No se pudo cancelar el viaje.");
+              }
+            }
+          }
+        ]
+      );
+
+      // Alert.alert("¡Viaje finalizado!", "Has llegado al destino y completado el viaje.");
+      // router.replace("/(tabs)/home");
+
+    } catch (error) {
+      console.error("Error finishing trip:", error);
+      Alert.alert("Error", "No se pudo finalizar el viaje correctamente.");
+    }
+  };
+
   const handleLeaveTrip = async () => {
     if (!session || !user) return;
 
@@ -475,7 +530,18 @@ export default function RouteDetail() {
 
               await fetchMeetingPoints();
               buildWaypoints();
-              router.replace("/(tabs)/available-routes");
+
+              await sendPushNotification(session.driver_id, "Viaje abandonado", `${user.name} ha abandonado el viaje.`, {
+                type: "TRIP_CANCELLED",
+                trip_session_id: session.id,
+              });
+
+              Alert.alert("Éxito", "Has abandonado el viaje correctamente.");
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace("/(tabs)/available-routes");
+              }
             } catch (error) {
               console.error("Error leaving trip:", error);
               Alert.alert("Error", "No se pudo abandonar el viaje.");
@@ -610,8 +676,8 @@ export default function RouteDetail() {
 
       // Ordenar los puntos intermedios por cercanía al origen para una ruta lógica
       const sortedWaypoints = allWaypoints.sort((a, b) => {
-        const distA = Math.sqrt(Math.pow(a[0] - origin[0], 2) + Math.pow(a[1] - origin[1], 2));
-        const distB = Math.sqrt(Math.pow(b[0] - origin[0], 2) + Math.pow(b[1] - origin[1], 2));
+        const distA = calculateDistance(origin[1], origin[0], a[1], a[0]);
+        const distB = calculateDistance(origin[1], origin[0], b[1], b[0]);
         return distA - distB;
       });
 
@@ -905,6 +971,35 @@ export default function RouteDetail() {
   useEffect(() => {
     detectCurrentWaypoint();
   }, [driverLocation, waypoints]);
+
+  useEffect(() => {
+    if (!session?.id) return;
+
+    const channel = supabase
+      .channel(`trip-session-status-${session?.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'trip_sessions',
+          filter: `id=eq.${session?.id}`,
+        },
+        (payload: any) => {
+          const nextStatus = payload.new?.status;
+          // setRouteSessions((prev) => prev ? { ...prev, ...payload.new } : payload.new as SessionData);
+
+          if (nextStatus === 'completed' || nextStatus === 'cancelled') {
+            router.replace('/(tabs)/available-routes');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.id, router]);
 
   // Función para cambiar la ubicación y centrar la cámara de Mapbox
   const changeLocation = (lat: number, lng: number) => {
@@ -1430,6 +1525,7 @@ export default function RouteDetail() {
           onFinishTrip={handleFinishTrip}
           onLeaveTrip={handleLeaveTrip}
           onStartTrip={handleStartTrip}
+          onCancelTrip={handleCancelTrip}
           onCenterDriver={!isCameraCenteredOnDriver ? centerOnDriverLocation : undefined}
           onNavigate={handleOpenNavigation}
           onPassengerPress={(pId) => {

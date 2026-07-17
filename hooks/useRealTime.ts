@@ -1,5 +1,5 @@
 import { User } from '@/app/context/AuthContext';
-import { DriverLocation, SessionData, TripSessionStops } from '@/interfaces/available-routes';
+import { DriverLocation, SessionData, TripSessionMeetingPoints, TripSessionStops } from '@/interfaces/available-routes';
 import { supabase } from '@/lib/supabase';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -231,7 +231,17 @@ export const useTripStops = (tripSessionId: number) => {
             .on(
                 'postgres_changes',
                 {
-                    event: '*',
+                event: 'INSERT', // ← 1. Escucha cuando se crea una parada
+                schema: 'public',
+                table: 'trip_session_stops',
+                filter: `trip_session_id=eq.${tripSessionId}`,
+                },
+                () => refreshStops()
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE', // ← 2. Escucha cuando se actualiza una parada
                     schema: 'public',
                     table: 'trip_session_stops',
                     filter: `trip_session_id=eq.${tripSessionId}`, // ← filtro esencial
@@ -246,6 +256,70 @@ export const useTripStops = (tripSessionId: number) => {
     }, [tripSessionId]);
 
     return { stops };
+};
+
+// ─────────────────────────────────────────────────────────────
+// Hook: useTripMeetingPoints
+// Obtiene y escucha cambios en los puntos de encuentro de una sesión.
+// IMPORTANTE: el filtro por trip_session_id es crítico para
+// no escuchar cambios de otras sesiones.
+// ─────────────────────────────────────────────────────────────
+export const useTripMeetingPoints = (tripSessionId: number) => {
+    const [meetingPoints, setMeetingPoints] = useState<TripSessionMeetingPoints[]>([]);
+
+    const refreshMeetingPoints = async () => {
+        if (!tripSessionId) return;
+
+        try {
+            const { data, error } = await supabase
+                .from("trip_session_meeting_points")
+                .select("*")
+                .eq("trip_session_id", tripSessionId);
+
+            if (error) {
+                console.error("useTripMeetingPoints refresh error:", error);
+                return;
+            }
+
+            setMeetingPoints(data as TripSessionMeetingPoints[]);
+        } catch (error) {
+            console.error("useTripMeetingPoints unexpected error:", error);
+        }
+    };
+
+    useEffect(() => {
+        refreshMeetingPoints();
+
+        const channel = supabase
+            .channel(`trip_session-meeting-points-${tripSessionId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT', // ← 1. Escucha cuando se crea un punto de encuentro
+                    schema: 'public',
+                    table: 'trip_session_meeting_points',
+                    filter: `trip_session_id=eq.${tripSessionId}`, // ← filtro esencial
+                },
+                () => refreshMeetingPoints()
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE', // ← 2. Escucha cuando se actualiza un punto de encuentro
+                    schema: 'public',
+                    table: 'trip_session_meeting_points',
+                    filter: `trip_session_id=eq.${tripSessionId}`, // ← filtro esencial
+                },
+                () => refreshMeetingPoints()
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [tripSessionId]);
+
+    return { meetingPoints };
 };
 
 // ─────────────────────────────────────────────────────────────

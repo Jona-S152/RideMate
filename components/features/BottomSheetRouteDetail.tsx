@@ -21,6 +21,7 @@ interface BottomSheetRouteDetailProps {
   onFinishTrip?: () => Promise<void>;
   onLeaveTrip?: () => Promise<void>;
   onStartTrip?: () => Promise<void>;
+  onCancelTrip?: () => Promise<void>;
   onCenterDriver?: () => void;
   onNavigate?: () => void;
   distanceRemaining?: string;
@@ -34,6 +35,7 @@ export default function BottomSheetRouteDetail({
   onFinishTrip,
   onLeaveTrip,
   onStartTrip,
+  onCancelTrip,
   onCenterDriver,
   onNavigate,
   distanceRemaining = "0Km"
@@ -73,20 +75,13 @@ export default function BottomSheetRouteDetail({
     {
       label: "Cancelar",
       icon: "close-circle-outline",
-      color: Colors.light.secondary,
-      onPress: () => {
-        console.log("Cancelar viaje");
+      color: Colors.light.danger,
+      onPress: async () => {
+        if (onCancelTrip) {
+          await onCancelTrip();
+        }
       },
-      hidden: isActive, // solo antes de iniciar
-    },
-    {
-      label: "Navegar",
-      icon: "navigate-circle-outline",
-      color: Colors.light.secondary,
-      onPress: () => {
-        if (onNavigate) onNavigate();
-      },
-      hidden: !isActive,
+      hidden: !user?.driver_mode, // solo antes de iniciar
     },
     {
       label: "Finalizar",
@@ -98,6 +93,15 @@ export default function BottomSheetRouteDetail({
         }
       },
       hidden: !(user?.driver_mode && user?.is_driver) || !isActive,
+    },
+    {
+      label: "Navegar",
+      icon: "navigate-circle-outline",
+      color: Colors.light.secondary,
+      onPress: () => {
+        if (onNavigate) onNavigate();
+      },
+      hidden: !isActive || !user?.driver_mode,
     },
   ].filter(a => !a.hidden);
 
