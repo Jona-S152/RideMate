@@ -1,58 +1,65 @@
 import { Colors } from "@/constants/Colors";
 import { PassengerTripSession, UserData } from "@/interfaces/available-routes";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
-import { ActivityIndicator, FlatList, Image, Modal, Pressable, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Image, Modal, Pressable, Text, View } from "react-native";
 
 interface PassengerDropOffModalProps {
     visible: boolean;
-    passengers: PassengerTripSession[];
+    passenger: PassengerTripSession | null;
     users?: UserData[];
-    onConfirm: (passengerIds: string[]) => Promise<void>;
+    onConfirm: (passengerId: string) => Promise<void>;
+    onSkip: (passengerId: string) => Promise<void>;
     onClose: () => void;
     title?: string;
 }
 
 export default function PassengerDropOffModal({
     visible,
-    passengers,
+    passenger,
     users = [],
     onConfirm,
+    onSkip,
     onClose,
-    title = "¿Quiénes se bajan aquí?",
+    title = "¿Confirmar bajada del pasajero?",
 }: PassengerDropOffModalProps) {
-    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [passengerUser, setPassengerUser] = useState<UserData | null>(null);
     const [loading, setLoading] = useState(false);
 
-    const togglePassenger = (id: string) => {
-        setSelectedIds((prev) =>
-            prev.includes(id) ? prev.filter((pId) => pId !== id) : [...prev, id]
-        );
-    };
+    useEffect(() => {
+        if (passenger) {
+            const passengerUserData = users.find((u) => u.id === passenger.passenger_id);
+            setPassengerUser(passengerUserData || null);
+        } else {
+            setPassengerUser(null);
+        }
+    }, [passenger, users]);
 
     const handleConfirm = async () => {
-        if (selectedIds.length === 0) return;
+        if (!passenger) return;
         setLoading(true);
         try {
-            await onConfirm(selectedIds);
-            setSelectedIds([]); // Reset for next time
+            await onConfirm(passenger.passenger_id);
+            onClose(); // Cerramos el modal tras confirmar
+        } catch (error) {
+            console.error("Error al confirmar descenso:", error);
         } finally {
             setLoading(false);
         }
     };
 
-    const joinedPassengers = Array.from(
-      new Map(
-        passengers
-          .filter((p) => p.status === "joined")
-          .sort((a, b) => {
-            const aTime = new Date(a.created_at).getTime();
-            const bTime = new Date(b.created_at).getTime();
-            return bTime - aTime || b.id - a.id;
-          })
-          .map((p) => [p.passenger_id, p]),
-      ).values(),
-    );
+    const handleSkip = async () => {
+        if (!passenger) return;
+        setLoading(true);
+        try {
+            await onSkip(passenger.passenger_id);
+            onClose(); // Cerramos el modal tras confirmar
+        } catch (error) {
+            console.error("Error al saltar pasajero:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <Modal
@@ -63,6 +70,7 @@ export default function PassengerDropOffModal({
         >
             <View className="flex-1 justify-center bg-black/60 px-4">
                 <View className="bg-white rounded-3xl p-6 overflow-hidden">
+                    {/* Header */}
                     <View className="flex-row justify-between items-center mb-6">
                         <Text className="text-xl font-bold text-slate-800 flex-1">
                             {title}
@@ -72,89 +80,81 @@ export default function PassengerDropOffModal({
                         </Pressable>
                     </View>
 
-                    {joinedPassengers.length === 0 ? (
+                    {/* Content */}
+                    {!passenger ? (
                         <View className="py-8 items-center">
                             <Ionicons name="people-outline" size={48} color="#cbd5e1" />
                             <Text className="text-slate-500 mt-2 text-center">
-                                No hay pasajeros en el viaje actualmente.
+                                No se ha seleccionado ningún pasajero.
                             </Text>
                         </View>
                     ) : (
-                        <>
-                            <FlatList
-                                data={joinedPassengers}
-                                keyExtractor={(item) => item.passenger_id}
-                                className="max-h-80"
-                                renderItem={({ item }) => {
-                                    const isSelected = selectedIds.includes(item.passenger_id);
-                                    const passengerUser = users.find(u => u.id === item.passenger_id);
+                        <View>
+                            {/* Targeta con datos del Pasajero (Envuelta en flex-row) */}
+                            <View className="flex-row items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                {/* Avatar */}
+                                <View className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden mr-3">
+                                    {passengerUser?.avatar_profile ? (
+                                        <Image
+                                            source={{ uri: passengerUser.avatar_profile }}
+                                            className="w-full h-full"
+                                        />
+                                    ) : (
+                                        <View className="flex-1 items-center justify-center bg-slate-300">
+                                            <Ionicons name="person" size={24} color="#64748b" />
+                                        </View>
+                                    )}
+                                </View>
 
-                                    return (
-                                        <Pressable
-                                            onPress={() => togglePassenger(item.passenger_id)}
-                                            className={`flex-row items-center p-4 mb-2 rounded-xl border-2 ${isSelected
-                                                ? "bg-blue-50 border-primary"
-                                                : "bg-slate-50 border-transparent"
-                                                }`}
-                                        >
-                                            <View className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden mr-3">
-                                                {passengerUser?.avatar_profile ? (
-                                                    <Image
-                                                        source={{ uri: passengerUser.avatar_profile }}
-                                                        className="w-full h-full"
-                                                    />
-                                                ) : (
-                                                    <View className="flex-1 items-center justify-center">
-                                                        <Ionicons name="person" size={20} color="#64748b" />
-                                                    </View>
-                                                )}
-                                            </View>
-                                            <View className="flex-1">
-                                                <Text className="font-bold text-slate-800">
-                                                    {passengerUser?.name || `ID: ${item.passenger_id.slice(0, 8)}...`}
-                                                </Text>
-                                                <View className="flex-row items-center">
-                                                    <View className="flex-row items-center mr-2">
-                                                        <Ionicons name="star" size={12} color={Colors.light.secondary} />
-                                                        <Text className="text-[10px] font-bold text-slate-600 ml-0.5">
-                                                            {passengerUser?.rating || "0.0"}
-                                                        </Text>
-                                                    </View>
-                                                </View>
-                                            </View>
-                                            <View
-                                                className={`w-6 h-6 rounded-full items-center justify-center border-2 ${isSelected
-                                                    ? "bg-primary border-primary"
-                                                    : "border-slate-300"
-                                                    }`}
-                                            >
-                                                {isSelected && (
-                                                    <Ionicons name="checkmark" size={16} color="white" />
-                                                )}
-                                            </View>
-                                        </Pressable>
-                                    );
-                                }}
-                            />
+                                {/* Información de texto */}
+                                <View className="flex-1">
+                                    <Text className="font-bold text-base text-slate-800">
+                                        {passengerUser?.name || `ID: ${passenger.passenger_id.slice(0, 8)}...`}
+                                    </Text>
 
-                            <View className="mt-6">
+                                    <View className="flex-row items-center mt-1">
+                                        <Ionicons name="star" size={14} color={Colors.light.secondary} />
+                                        <Text className="text-xs font-bold text-slate-600 ml-1">
+                                            {passengerUser?.rating || "0.0"}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+
+                            {/* Botón de Confirmación */}
+                            <View className="flex-row gap-4">
                                 <Pressable
-                                    onPress={handleConfirm}
-                                    disabled={loading || selectedIds.length === 0}
-                                    className={`h-14 rounded-xl items-center justify-center ${selectedIds.length > 0 ? "" : "opacity-50"
-                                        }`}
+                                    onPress={() => handleSkip()}
+                                    disabled={loading}
+                                    className="flex-1 bg-slate-200 h-14 rounded-xl items-center justify-center border border-slate-300"
+                                >
+                                    <View className="flex-row items-center gap-2">
+                                        <Ionicons name="close-circle" size={20} color="#64748b" />
+                                        <Text className="text-slate-700 font-bold text-base">
+                                            Saltar
+                                        </Text>
+                                    </View>
+                                </Pressable>
+
+                                <Pressable
+                                    onPress={() => handleConfirm()}
+                                    disabled={loading}
+                                    className="flex-1 h-14 rounded-xl items-center justify-center"
                                     style={{ backgroundColor: Colors.light.secondary }}
                                 >
                                     {loading ? (
                                         <ActivityIndicator color="white" />
                                     ) : (
-                                        <Text className="text-white font-bold text-base">
-                                            Confirmar Descenso ({selectedIds.length})
-                                        </Text>
+                                        <View className="flex-row items-center gap-2">
+                                            <Ionicons name="checkmark-circle" size={20} color="white" />
+                                            <Text className="text-white font-bold text-base">
+                                                Llegué
+                                            </Text>
+                                        </View>
                                     )}
                                 </Pressable>
                             </View>
-                        </>
+                        </View>
                     )}
                 </View>
             </View>

@@ -19,16 +19,20 @@ interface Waypoint {
 interface WaypointCheckInModalProps {
     visible: boolean;
     waypoint: Waypoint | null;
-    onConfirm: (status: 'visited' | 'skipped') => Promise<void>;
+    // onConfirm: (status: 'visited' | 'skipped') => Promise<void>;
     onSkip: () => Promise<void>;
+    onArriveMeetingPoint: (passengerId: string, meetingPointId: number) => Promise<void>;
+    onArriveStop: (passengerId: string, stopId: number) => Promise<void>;
     onClose: () => void;
 }
 
 export default function WaypointCheckInModal({
     visible,
     waypoint,
-    onConfirm,
+    // onConfirm,
     onSkip,
+    onArriveMeetingPoint,
+    onArriveStop,
     onClose,
 }: WaypointCheckInModalProps) {
     const [loading, setLoading] = useState(false);
@@ -44,10 +48,14 @@ export default function WaypointCheckInModal({
         }
     };
 
-    const handleConfirm = async (status: 'visited' | 'skipped') => {
+    const handleConfirm = async () => {
         setLoading(true);
         try {
-            await onConfirm(status);
+            if (waypoint.type === 'meeting_point') {
+                await onArriveMeetingPoint(waypoint.passengerId!, Number(waypoint.id));
+            } else {
+                await onArriveStop(waypoint.passengerId!, Number(waypoint.id));
+            }
         } finally {
             setLoading(false);
         }
@@ -139,7 +147,7 @@ export default function WaypointCheckInModal({
                             </Pressable>
 
                             <Pressable
-                                onPress={() => handleConfirm('visited')}
+                                onPress={() => handleConfirm()}
                                 disabled={loading}
                                 className="flex-1 h-14 rounded-xl items-center justify-center"
                                 style={{ backgroundColor: Colors.light.secondary }}

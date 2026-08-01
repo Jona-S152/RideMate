@@ -7,7 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { Alert, Animated, AppState, AppStateStatus, Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Animated, AppState, AppStateStatus, Dimensions, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   GestureHandlerRootView
 } from "react-native-gesture-handler";
@@ -134,6 +134,8 @@ export default function RouteDetail() {
   const [isCameraCenteredOnDriver, setIsCameraCenteredOnDriver] = useState(false);
   const ignoreRegionChangeRef = useRef(false);
   const [passengers, setPassengers] = useState<PassengerTripSession[]>([]);
+  const [passengersLoaded, setPassengersLoaded] = useState(false);
+  const [currentPassengerToDropOff, setCurrentPassengerToDropOff] = useState<PassengerTripSession | null>(null);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [stopsData, setStopsData] = useState<Passenger_Stops[]>([]);
   const [meetingPoints, setMeetingPoints] = useState<MeetingPoint[]>([]);
@@ -200,19 +202,30 @@ export default function RouteDetail() {
     };
   }, [id]);
 
+  // Sale de la pantalla si la sesión no está vigente como conductor (trip_sessions.status = 'active' o 'pending') o como pasajero (passenger_trip_session.status = 'joined' o 'pending')
   useEffect(() => {
+    console.warn("ACTIVE SESSION: ", JSON.stringify(session, null, 2));
+    console.warn("PASSENGERS: ", JSON.stringify(passengers, null, 2));
     if (session === null) return;
 
-    // console.log("Checking session status for ID:", id, "Status:", session.status);
+    console.warn("USER: ", JSON.stringify(user, null, 2));
+    if (user?.driver_mode && (!['pending', 'active'].includes(session.status))) {
+      console.warn("DRIVERRRRR");
+      router.replace('/(tabs)/available-routes');
+    } else if (user?.driver_mode === false) {
+      if (!passengersLoaded) return;
 
-    /*
-    if (session.status === "completed") {
-      // Temporary Debug Alert to catch why it redirects on start
-      // Alert.alert("DEBUG", `Session ${id} is completed. Redirecting.`);
-      router.navigate("/(tabs)/home");
+      const passenger = passengers.find(p => p.passenger_id === user?.id);
+      console.warn("PASSENGERRRRR: ", JSON.stringify(passenger, null, 2));
+
+      const validStatuses = ['joined', 'pending_approval', 'pending', 'approved'];
+      const isSessionCancelled = session.status === 'cancelled';
+
+      if (isSessionCancelled || !passenger || !validStatuses.includes(passenger.status)) {
+        router.replace('/(tabs)/available-routes');
+      }
     }
-    */
-  }, [session]);
+  }, [session, passengers, passengersLoaded, user]);
 
   const fetchActiveSessionStops = async () => {
     try {
@@ -290,7 +303,7 @@ export default function RouteDetail() {
         };
       }),
       ...meetingPoints.map((mp) => {
-        const statusInfo = meetingStatuses?.find(m => m.id === mp.id);
+        const statusInfo = meetingStatuses?.find(m => m.passenger_mp_id === mp.id);
         return {
           ...mp,
           type: 'meeting_point' as const,
@@ -375,7 +388,7 @@ export default function RouteDetail() {
     }
   };
 
-  const handleSkipPoint = async () => {
+  const handleSkipPointByList = async () => {
     if (!waypointToCheckIn) return;
 
     const isSkipped = await tripService.omitPassengerPoints(Number(id), waypointToCheckIn?.passengerId!);
@@ -390,36 +403,52 @@ export default function RouteDetail() {
     }
   }
 
-  const handleWaypointCheckIn = async (status: 'visited' | 'skipped') => {
+  const handleSkipPointByPassenger = async (passengerId: string) => {
+    if (!session || !passengerId) return;
+
+    const passenger_stop_id = waypoints.find(wp => wp.passengerId === passengerId);
+    const isSkipped = await tripService.omitPassengerPoints(Number(id), passenger_stop_id?.passengerId!);
+
+    if (isSkipped) {
+      await sendPushNotification(passengerId!, "Viaje omitido", "El conductor omitio su parada")
+      setCheckedInWaypoints((prev) => new Set(prev).add(passenger_stop_id?.id || ""));
+      setCheckInModalVisible(false);
+      setWaypointToCheckIn(null);
+      buildWaypoints();
+
+    }
+  }
+
+  const handleArriveMeetingPoint = async () => {
+    console.warn("handleArriveMeetingPoint: waypointToCheckIn", waypointToCheckIn);
     if (!waypointToCheckIn) return;
 
     try {
-      if (waypointToCheckIn.type === 'stop') {
-        await tripService.updateStopStatus(Number(id), waypointToCheckIn.stopId!, status);
-
-        // If visited a stop, show drop-off modal
-        if (status === 'visited') {
-          setDropOffTitle("¿Quiénes se bajan en esta parada?");
-          setDropOffModalVisible(true);
-        }
-      } else if (waypointToCheckIn.type === 'meeting_point') {
-        await tripService.updateMeetingPointStatus(Number(id), waypointToCheckIn.passengerId!, status);
-      } else if (waypointToCheckIn.type === 'destination') {
-        if (status === 'visited') {
-          setDropOffTitle("¿Quiénes completaron el viaje?");
-          setDropOffModalVisible(true);
-        }
-      }
-
+      await tripService.updateArriveMeetingPoint(Number(waypointToCheckIn.id.split('-')[1]), waypointToCheckIn.passengerId!);
+      await sendPushNotification(waypointToCheckIn.passengerId!, "Llegada a punto de encuentro", "El conductor ha llegado a su punto de encuentro")
       setCheckedInWaypoints((prev) => new Set(prev).add(waypointToCheckIn.id));
       setCheckInModalVisible(false);
       setWaypointToCheckIn(null);
       buildWaypoints();
     } catch (error) {
-      console.error('Error updating waypoint status:', error);
-      Alert.alert('Error', 'No se pudo actualizar el estado del punto');
+      console.error("[RouteDetail] Failed to check in meeting point:", error);
     }
-  };
+  }
+
+  const handleArriveStopByList = async () => {
+    if (!waypointToCheckIn) return;
+
+    const isArrived = await tripService.updateArriveStop(Number(id), waypointToCheckIn?.passengerId!, waypointToCheckIn.stopId!);
+
+    if (isArrived) {
+      // await sendPushNotification(waypointToCheckIn.passengerId!, "Llegada a parada", "El conductor ha llegado a su parada")
+      setCheckedInWaypoints((prev) => new Set(prev).add(waypointToCheckIn.id));
+      setCheckInModalVisible(false);
+      setWaypointToCheckIn(null);
+      buildWaypoints();
+
+    }
+  }
 
   const handleStartTrip = async () => {
     if (!session || !user?.id) return;
@@ -470,27 +499,50 @@ export default function RouteDetail() {
     if (!session) return;
 
     try {
-      await tripService.finishTripSession(session.id);
+      const passengersInSession = passengers.filter(p => p.status === 'joined');
+      Alert.alert(
+        "Finalizar viaje",
+        passengersInSession.length > 0 ? `¿Estás seguro de que quieres finalizar este viaje? Hay ${passengersInSession.length} pasajero${passengersInSession.length > 1 ? 's' : ''} en el viaje. Si finalizas se omitirán sus paradas` : "¿Estás seguro de que quieres finalizar este viaje?",
+        [
+          { text: "Cancelar", style: "cancel" },
+          {
+            text: "Sí, finalizar",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                const isFinished = await tripService.finishTripSession(session.id);
 
-      // 3. Detener el tracking de ubicación
-      await useTripTrackingStore.getState().stopTracking();
+                if (!isFinished) {
+                  Alert.alert("Error", "No se pudo finalizar el viaje correctamente.");
+                  return;
+                }
 
-      // 4. Obtener datos frescos para el modal
-      const latestPassengers = await fetchPassengers();
-      if (latestPassengers) {
-        setPassengers(latestPassengers);
-        await fetchSessionUsers(latestPassengers);
+                // // 3. Detener el tracking de ubicación
+                await useTripTrackingStore.getState().stopTracking();
 
-        const participants = latestPassengers.filter(p => p.status === 'joined' || p.status === 'completed');
-        if (participants.length > 0) {
-          setDriverRatingModalVisible(true);
-          return;
-        }
-      }
+                // 4. Obtener datos frescos para el modal
+                const latestPassengers = await fetchPassengers();
+                if (latestPassengers) {
+                  setPassengers(latestPassengers);
+                  await fetchSessionUsers(latestPassengers);
 
-      Alert.alert("¡Viaje finalizado!", "Has llegado al destino y completado el viaje.");
-      router.replace("/(tabs)/home");
+                  const participants = latestPassengers.filter(p => p.status === 'joined' || p.status === 'completed');
+                  if (participants.length > 0) {
+                    setDriverRatingModalVisible(true);
+                    return;
+                  }
+                }
 
+                Alert.alert("¡Viaje finalizado!", "Has llegado al destino y completado el viaje.");
+                router.replace("/(tabs)/home");
+              } catch (error) {
+                console.error("Error leaving trip:", error);
+                Alert.alert("Error", "No se pudo abandonar el viaje.");
+              }
+            }
+          }
+        ]
+      );
     } catch (error) {
       console.error("Error finishing trip:", error);
       Alert.alert("Error", "No se pudo finalizar el viaje correctamente.");
@@ -589,18 +641,21 @@ export default function RouteDetail() {
     );
   };
 
-  const handleDropOffPassengers = async (passengerIds: string[]) => {
-    if (!session || passengerIds.length === 0) return;
+  const handleDropOffPassengers = async (passengerId: string) => {
+    if (!session || !passengerId) return;
 
     try {
-      await tripService.dropOffPassengers(session.id, passengerIds);
+      const passenger_stop_id = waypoints.find(wp => wp.passengerId === passengerId && wp.type === 'stop');
+      console.log("PASSENGER STOP ID: " + JSON.stringify(passenger_stop_id, null, 2));
+      const isArrived = await tripService.updateArriveStop(session.id, passengerId, passenger_stop_id?.stopId || 0);
+      // const isArrived = true;
 
-      // Enviar notificación push a cada pasajero completado
-      for (const passengerId of passengerIds) {
+      if (isArrived) {
+        // Enviar notificación push a cada pasajero completado
         try {
           await sendPushNotification(
             passengerId,
-            "¡Viaje completado!",
+            "¡Has llegado a tu destino!",
             "Tu viaje ha terminado. Por favor califica a tu conductor.",
             {
               type: "RATE_DRIVER",
@@ -613,20 +668,20 @@ export default function RouteDetail() {
           console.error("Error enviando notificación a pasajero:", passengerId, notificationError);
           // No fallar el proceso completo por error en notificación
         }
-      }
 
-      setDropOffModalVisible(false);
+        setDropOffModalVisible(false);
 
-      // Actualizar la lista de pasajeros localmente
-      const updatedPassengers = await fetchPassengers();
-      if (updatedPassengers) {
-        setPassengers(updatedPassengers);
-      }
+        // Actualizar la lista de pasajeros localmente
+        const updatedPassengers = await fetchPassengers();
+        if (updatedPassengers) {
+          setPassengers(updatedPassengers);
+        }
 
-      if (dropOffTitle === "¿Quiénes completaron el viaje?") {
-        await handleFinishTrip();
-      } else {
-        Alert.alert("Éxito", "Los pasajeros han sido marcados como viaje completado.");
+        if (dropOffTitle === "¿Quiénes completaron el viaje?") {
+          await handleFinishTrip();
+        } else {
+          Alert.alert("Éxito", "Los pasajeros han sido marcados como viaje completado.");
+        }
       }
     } catch (error) {
       console.error("Error dropping off passengers:", error);
@@ -635,7 +690,7 @@ export default function RouteDetail() {
   };
 
 
-  const handleOpenNavigation = () => {
+  const handleOpenNavigation = async () => {
     const nextTarget = waypoints.find(wp => {
       if (wp.type === 'origin') return false;
       const isCompleted = wp.status === 'completed' || wp.status === 'visited' || wp.status === 'dropped_off';
@@ -643,15 +698,30 @@ export default function RouteDetail() {
     });
 
     if (nextTarget) {
-      router.push({
-        pathname: "/(tabs)/home/navigation-screen",
-        params: {
-          destLat: nextTarget.coords.latitude.toString(),
-          destLng: nextTarget.coords.longitude.toString(),
-          destName: nextTarget.location,
-          trip_session_id: id?.toString()
-        }
+      const lat = nextTarget.coords.latitude.toString();
+      const lng = nextTarget.coords.longitude.toString();
+      const label = encodeURIComponent(nextTarget.location || "Destino");
+
+      const url = Platform.select({
+        ios: `maps:0,0?q=${label}@${lat},${lng}`,
+        android: `geo:0,0?q=${lat},${lng}(${label})`
       });
+
+      try {
+        if (url) {
+          const supported = await Linking.canOpenURL(url);
+          if (supported) {
+            await Linking.openURL(url);
+          } else {
+            await Linking.openURL(
+              `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
+            );
+          }
+        }
+      } catch (error) {
+        console.error("Error al abrir mapa:", error);
+        Alert.alert("Error", "No se pudo abrir la aplicación de mapas.");
+      }
     } else {
       Alert.alert("Info", "No hay más puntos pendientes en el viaje.");
     }
@@ -921,14 +991,22 @@ export default function RouteDetail() {
   };
 
   useEffect(() => {
+    setPassengersLoaded(false);
+
     // 1. Carga inicial
     const loadInitialPassengers = async () => {
-      const data = await fetchPassengers();
-      if (data) {
-        setPassengers(data);
-        fetchSessionUsers(data);
+      try {
+        const data = await fetchPassengers();
+        if (data) {
+          setPassengers(data);
+          fetchSessionUsers(data);
+        }
+        await fetchPendingRequests();
+      } catch (error) {
+        console.error("Error loading initial passengers:", error);
+      } finally {
+        setPassengersLoaded(true);
       }
-      await fetchPendingRequests();
     };
 
     loadInitialPassengers();
@@ -1009,34 +1087,34 @@ export default function RouteDetail() {
     detectCurrentWaypoint();
   }, [driverLocation, waypoints]);
 
-  useEffect(() => {
-    if (!session?.id) return;
+  // useEffect(() => {
+  //   if (!session?.id) return;
 
-    const channel = supabase
-      .channel(`trip-session-status-${session?.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'trip_sessions',
-          filter: `id=eq.${session?.id}`,
-        },
-        (payload: any) => {
-          const nextStatus = payload.new?.status;
-          // setRouteSessions((prev) => prev ? { ...prev, ...payload.new } : payload.new as SessionData);
+  //   const channel = supabase
+  //     .channel(`trip-session-status-${session?.id}`)
+  //     .on(
+  //       'postgres_changes',
+  //       {
+  //         event: 'UPDATE',
+  //         schema: 'public',
+  //         table: 'trip_sessions',
+  //         filter: `id=eq.${session?.id}`,
+  //       },
+  //       (payload: any) => {
+  //         const nextStatus = payload.new?.status;
+  //         // setRouteSessions((prev) => prev ? { ...prev, ...payload.new } : payload.new as SessionData);
 
-          if (nextStatus === 'completed' || nextStatus === 'cancelled') {
-            router.replace('/(tabs)/available-routes');
-          }
-        }
-      )
-      .subscribe();
+  //         if (nextStatus === 'completed' || nextStatus === 'cancelled') {
+  //           router.replace('/(tabs)/available-routes');
+  //         }
+  //       }
+  //     )
+  //     .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [session?.id, router]);
+  //   return () => {
+  //     supabase.removeChannel(channel);
+  //   };
+  // }, [session?.id, router]);
 
   // Función para cambiar la ubicación y centrar la cámara de Mapbox
   const changeLocation = (lat: number, lng: number) => {
@@ -1437,7 +1515,7 @@ export default function RouteDetail() {
                   // Cambiar estado del punto actual no visitado a 'En camino'
 
                   return waypoints.map((waypoint, index) => {
-                    const isVisited = waypoint.status === 'completed' || waypoint.status === 'visited' || waypoint.status === 'dropped_off' || (waypoint.type === 'origin');
+                    const isVisited = waypoint.status === 'visited' || (waypoint.type === 'origin');
                     const isCurrent = index === firstUnvisitedIndex;
                     const isNext = index === firstUnvisitedIndex + 1;
 
@@ -1573,6 +1651,7 @@ export default function RouteDetail() {
               setPassengerIdToProcess(pId);
               setModalVisible(true);
             } else if (p?.status === 'joined') {
+              setCurrentPassengerToDropOff(p);
               setDropOffTitle("Finalizar viaje para pasajero");
               setDropOffModalVisible(true);
             }
@@ -1599,8 +1678,9 @@ export default function RouteDetail() {
         <WaypointCheckInModal
           visible={checkInModalVisible}
           waypoint={waypointToCheckIn}
-          onConfirm={handleWaypointCheckIn}
-          onSkip={handleSkipPoint}
+          onArriveStop={handleArriveStopByList}
+          onSkip={handleSkipPointByList}
+          onArriveMeetingPoint={handleArriveMeetingPoint}
           onClose={() => {
             setCheckInModalVisible(false);
             setWaypointToCheckIn(null);
@@ -1609,10 +1689,11 @@ export default function RouteDetail() {
 
         <PassengerDropOffModal
           visible={dropOffModalVisible}
-          passengers={passengers}
+          passenger={currentPassengerToDropOff}
           users={sessionUsers}
           title={dropOffTitle}
           onConfirm={handleDropOffPassengers}
+          onSkip={handleSkipPointByPassenger}
           onClose={() => setDropOffModalVisible(false)}
         />
         <DriverRatingListModal

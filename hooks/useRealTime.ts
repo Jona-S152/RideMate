@@ -1,5 +1,5 @@
 import { User } from '@/app/context/AuthContext';
-import { DriverLocation, SessionData, TripSessionMeetingPoints, TripSessionStops } from '@/interfaces/available-routes';
+import { DriverLocation, PassengerTripSession, SessionData, TripSessionMeetingPoints, TripSessionStops } from '@/interfaces/available-routes';
 import { supabase } from '@/lib/supabase';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -58,6 +58,64 @@ export const useTripRealtimeById = (sessionId: number) => {
     }, [sessionId]);
 
     return { session };
+};
+
+// POSIBLE METODO REALTIME PARA REEMPLAZAR EL DE ROUTE-DETAIL DE HOME
+// ─────────────────────────────────────────────────────────────
+// Hook: usePassengerTripRealtimeById
+// Suscribe a cambios de una sesión específica de pasajero por ID.
+// ─────────────────────────────────────────────────────────────
+export const usePassengerTripRealtimeById = (sessionId: number, user: User) => {
+    const [passengerSession, setPassengerSession] = useState<PassengerTripSession | null>(null);
+
+    const refreshSession = async () => {
+        if (!sessionId) return;
+        try {
+            const { data, error } = await supabase
+                .from("passenger_trip_sessions")
+                .select("*")
+                .eq("trip_session_id", sessionId)
+                .eq("passenger_id", user.id)
+                .maybeSingle();
+
+            if (error) setPassengerSession(null);
+
+            setPassengerSession(data as PassengerTripSession);
+        } catch (error) {
+            setPassengerSession(null);
+        }
+    };
+
+    useEffect(() => {
+        refreshSession();
+
+        try {
+            const channel = supabase
+                .channel(`session-${sessionId}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: 'UPDATE',
+                        schema: 'public',
+                        table: 'passenger_trip_sessions',
+                        filter: `passenger_id=eq.${user.id},trip_session_id=eq.${sessionId}`,
+                    },
+                    (payload) => {
+                        const newData = payload.new as PassengerTripSession;
+                        setPassengerSession(newData);
+                    }
+                )
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(channel);
+            };
+        } catch (error) {
+            console.error("usePassengerTripRealtimeById subscription error:", error);
+        }
+    }, [sessionId]);
+
+    return { passengerSession };
 };
 
 // ─────────────────────────────────────────────────────────────

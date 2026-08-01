@@ -367,27 +367,14 @@ export const tripService = {
   /**
    * Finishes a trip session by setting status to 'completed' and marking all joined passengers as 'completed'.
    */
-  async finishTripSession(sessionId: number): Promise<void> {
-    const { error: sessionError } = await supabase
-      .from("trip_sessions")
-      .update({ status: "completed" })
-      .eq("id", sessionId);
-
-    if (sessionError) {
-      console.error("[tripService.finishTripSession] session error:", sessionError);
-      throw sessionError;
+  async finishTripSession(sessionId: number): Promise<boolean> {
+    const { data , error } = await supabase
+      .rpc('finish_trip_session', { p_trip_session_id: sessionId });
+    if (error) {
+      console.error("[tripService.finishTripSession] error:", error);
+      throw error;
     }
-
-    const { error: passengersError } = await supabase
-      .from("passenger_trip_sessions")
-      .update({ status: "completed" })
-      .eq("trip_session_id", sessionId)
-      .eq("status", "joined");
-
-    if (passengersError) {
-      console.error("[tripService.finishTripSession] passengers error:", passengersError);
-      throw passengersError;
-    }
+    return data;
   },
 
   async omitPassengerPoints(sessionId: number, passengerId: string): Promise<boolean> {
@@ -400,6 +387,17 @@ export const tripService = {
     }
     return data;
     
+  },
+
+  async updateArriveStop(sessionId: number, passengerId: string, passenger_stop_id: number): Promise<boolean> {
+    // Logica para omitir mp y stops del pasajero mediante funcion rpc en supabase
+    const { data, error } = await supabase
+      .rpc('arrive_passenger_stop', { p_trip_session_id: sessionId, p_passenger_id: passengerId, p_passenger_stop_id: passenger_stop_id });
+    if (error) {
+      console.error("[tripService.updateArriveStop] error:", error);
+      throw error;
+    }
+    return data;
   },
 
   /**
@@ -424,31 +422,32 @@ export const tripService = {
   /**
    * Updates meeting point check-in status.
    */
-  async updateMeetingPointStatus(sessionId: number, passengerId: string, status: 'visited' | 'skipped'): Promise<void> {
+  async updateArriveMeetingPoint(sessionMPId: number, passengerId: string): Promise<void> {
     // 1. Get the meeting point ID for this passenger in the trip session
-    const { data: mpData, error: mpError } = await supabase
-      .from('passenger_meeting_points')
-      .select('id')
-      .eq('trip_session_id', sessionId)
-      .eq('passenger_id', passengerId)
-      .single();
+    // const { data: mpData, error: mpError } = await supabase
+    //   .from('passenger_meeting_points')
+    //   .select('id')
+    //   .eq('trip_session_id', sessionId)
+    //   .eq('passenger_id', passengerId)
+    //   .single();
 
-    if (mpError) {
-      console.error("[tripService.updateMeetingPointStatus] get mp id error:", mpError);
-      throw mpError;
-    }
+    // if (mpError) {
+    //   console.error("[tripService.updateMeetingPointStatus] get mp id error:", mpError);
+    //   throw mpError;
+    // }
 
+    console.log("UPDATE ARRIVE MEETING POINT", sessionMPId, passengerId);
     // 2. Update the status in trip_session_meeting_points
     const { error } = await supabase
       .from('trip_session_meeting_points')
       .update({
-        status,
-        visit_time: status === 'visited' ? new Date().toISOString() : null,
+        status: "visited",
+        visit_time: new Date().toISOString(),
       })
-      .eq('id', mpData.id);
+      .eq('passenger_mp_id', sessionMPId);
 
     if (error) {
-      console.error("[tripService.updateMeetingPointStatus] error:", error);
+      console.error("[tripService.updateArriveMeetingPoint] error:", error);
       throw error;
     }
   },
@@ -825,7 +824,7 @@ export const tripService = {
 
     const { data: meetingStatuses, error: meetingErr } = await supabase
       .from('trip_session_meeting_points')
-      .select('id, status, visit_time')
+      .select('*')
       .eq('trip_session_id', sessionId);
     if (meetingErr) throw meetingErr;
 
