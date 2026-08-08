@@ -33,7 +33,6 @@ Mapbox.setAccessToken(
 
 import DriverRatingListModal from "@/components/Modals/DriverRatingListModal";
 import PassengerActionModal from "@/components/Modals/PassengerActionModal";
-import PassengerDropOffModal from "@/components/Modals/PassengerDropOffModal";
 import WaypointCheckInModal from "@/components/Modals/WaypointCheckInModal";
 import { useDriverLocation, useTripMeetingPoints, useTripRealtimeById, useTripStops } from "@/hooks/useRealTime";
 import { useTripTrackingStore } from "@/store/tripTrackinStore";
@@ -152,10 +151,6 @@ export default function RouteDetail() {
   const [checkInModalVisible, setCheckInModalVisible] = useState(false);
   const [waypointToCheckIn, setWaypointToCheckIn] = useState<Waypoint | null>(null);
   const [checkedInWaypoints, setCheckedInWaypoints] = useState<Set<string>>(new Set());
-
-  // Drop-off Modal State
-  const [dropOffModalVisible, setDropOffModalVisible] = useState(false);
-  const [dropOffTitle, setDropOffTitle] = useState("¿Quiénes se bajan aquí?");
 
   // Rating Modal State
   const [driverRatingModalVisible, setDriverRatingModalVisible] = useState(false);
@@ -390,69 +385,73 @@ export default function RouteDetail() {
   };
 
   const handleSkipPointByList = async () => {
-    if (!waypointToCheckIn) return;
+    if (!waypointToCheckIn || !waypointToCheckIn.passengerId) return;
 
-    const isSkipped = await tripService.omitPassengerPoints(Number(id), waypointToCheckIn?.passengerId!);
+    const isSkipped = await tripService.omitPassengerPoints(Number(id), waypointToCheckIn.passengerId);
 
     if (isSkipped) {
-      await sendPushNotification(waypointToCheckIn.passengerId!, "Viaje omitido", "El conductor omitio su parada")
+      await sendPushNotification(waypointToCheckIn.passengerId, "Viaje omitido", "El conductor omitió su parada");
       setCheckedInWaypoints((prev) => new Set(prev).add(waypointToCheckIn.id));
       setCheckInModalVisible(false);
       setWaypointToCheckIn(null);
-      buildWaypoints();
-
+      await buildWaypoints();
     }
-  }
+  };
 
-  const handleSkipPointByPassenger = async (passengerId: string) => {
-    if (!session || !passengerId) return;
-
-    const passenger_stop_id = waypoints.find(wp => wp.passengerId === passengerId);
-    const isSkipped = await tripService.omitPassengerPoints(Number(id), passenger_stop_id?.passengerId!);
-
-    if (isSkipped) {
-      await sendPushNotification(passengerId!, "Viaje omitido", "El conductor omitio su parada")
-      setCheckedInWaypoints((prev) => new Set(prev).add(passenger_stop_id?.id || ""));
-      setCheckInModalVisible(false);
-      setWaypointToCheckIn(null);
-      buildWaypoints();
-
-    }
-  }
-
-  const handleArriveMeetingPoint = async () => {
+  const handleArriveMeetingPoint = async (passengerId?: string, meetingPointId?: number) => {
     console.warn("handleArriveMeetingPoint: waypointToCheckIn", waypointToCheckIn);
-    if (!waypointToCheckIn) return;
+    const pId = passengerId || waypointToCheckIn?.passengerId;
+    const mpId = meetingPointId || (waypointToCheckIn?.id.includes('-') ? Number(waypointToCheckIn.id.split('-')[1]) : Number(waypointToCheckIn?.id));
+
+    if (!pId) return;
 
     try {
-      // const passenger = passengers.find(p => p.passenger_id === waypointToCheckIn.passengerId);
-      // console.warn("CURRENT PASSENGER FROM MODAL ARRIVE MP: ", JSON.stringify(passenger, null, 2));
-      console.warn("WAYPOINT TO CHECK IN: " + JSON.stringify(waypointToCheckIn, null, 2));
-      //await tripService.updateArriveMeetingPoint(Number(waypointToCheckIn.id.split('-')[1]), waypointToCheckIn.passengerId!);
-      await sendPushNotification(waypointToCheckIn.passengerId!, "Llegada a punto de encuentro", "El conductor ha llegado a su punto de encuentro")
-      setCheckedInWaypoints((prev) => new Set(prev).add(waypointToCheckIn.id));
-      setCheckInModalVisible(false);
-      setWaypointToCheckIn(null);
-      buildWaypoints();
+      if (mpId) {
+        await tripService.updateArriveMeetingPoint(mpId, pId);
+      }
+      await sendPushNotification(pId, "Llegada a punto de encuentro", "El conductor ha llegado a su punto de encuentro");
+      if (waypointToCheckIn) {
+        setCheckedInWaypoints((prev) => new Set(prev).add(waypointToCheckIn.id));
+      }
+      await buildWaypoints();
     } catch (error) {
       console.error("[RouteDetail] Failed to check in meeting point:", error);
     }
-  }
+  };
 
-  const handleArriveStopByList = async () => {
-    if (!waypointToCheckIn) return;
+  const handleArriveStopByList = async (passengerId?: string, stopId?: number) => {
+    const pId = passengerId || waypointToCheckIn?.passengerId;
+    const sId = stopId || waypointToCheckIn?.stopId || (waypointToCheckIn?.id.includes('-') ? Number(waypointToCheckIn.id.split('-')[1]) : Number(waypointToCheckIn?.id));
 
-    const isArrived = await tripService.updateArriveStop(Number(id), waypointToCheckIn?.passengerId!, waypointToCheckIn.stopId!);
+    if (!pId || !sId) return;
+
+    const isArrived = await tripService.updateArriveStop(Number(id), pId, sId);
 
     if (isArrived) {
-      // await sendPushNotification(waypointToCheckIn.passengerId!, "Llegada a parada", "El conductor ha llegado a su parada")
-      setCheckedInWaypoints((prev) => new Set(prev).add(waypointToCheckIn.id));
+      try {
+        await sendPushNotification(
+          pId,
+          "¡Has llegado a tu destino!",
+          "Tu viaje ha terminado. Por favor califica a tu conductor.",
+          {
+            type: "RATE_DRIVER",
+            trip_session_id: Number(id),
+            driver_id: session?.driver_id,
+            driver_name: user?.name || "tu conductor",
+          }
+        );
+      } catch (notificationError) {
+        console.error("Error enviando notificación a pasajero:", pId, notificationError);
+      }
+
+      if (waypointToCheckIn) {
+        setCheckedInWaypoints((prev) => new Set(prev).add(waypointToCheckIn.id));
+      }
       setCheckInModalVisible(false);
       setWaypointToCheckIn(null);
-      buildWaypoints();
-
+      await buildWaypoints();
     }
-  }
+  };
 
   const handleStartTrip = async () => {
     if (!session || !user?.id) return;
@@ -645,63 +644,7 @@ export default function RouteDetail() {
     );
   };
 
-  const handleDropOffPassengers = async (passengerId: string) => {
-    if (!session || !passengerId) return;
 
-    try {
-      console.warn("CURRENT PASSENGER TO DROPOFF: ", JSON.stringify(currentPassengerToDropOff, null, 2));
-      if (currentPassengerToDropOff?.status === 'pending') {
-        const waypoint = waypoints.find(wp => wp.passengerId === passengerId && wp.type === 'meeting_point');
-        console.warn("SESSION ID TO DROPOFF: " + JSON.stringify(Number(waypoint?.id?.split('-')[1]), null, 2));
-        await tripService.updateArriveMeetingPoint(Number(waypoint?.id?.split('-')[1]), passengerId);
-
-        // LOGICA PARA MARCAR PASAJERO ABORDO
-      }
-      else if (currentPassengerToDropOff?.status === 'joined') {
-        const passenger_stop_id = waypoints.find(wp => wp.passengerId === passengerId && wp.type === 'stop');
-        console.log("PASSENGER STOP ID: " + JSON.stringify(passenger_stop_id, null, 2));
-        const isArrived = await tripService.updateArriveStop(session.id, passengerId, passenger_stop_id?.stopId || 0);
-        //const isArrived = true;
-
-        if (isArrived) {
-          // Enviar notificación push a cada pasajero completado
-          try {
-            await sendPushNotification(
-              passengerId,
-              "¡Has llegado a tu destino!",
-              "Tu viaje ha terminado. Por favor califica a tu conductor.",
-              {
-                type: "RATE_DRIVER",
-                trip_session_id: session.id,
-                driver_id: session.driver_id,
-                driver_name: user?.name || "tu conductor",
-              }
-            );
-          } catch (notificationError) {
-            console.error("Error enviando notificación a pasajero:", passengerId, notificationError);
-            // No fallar el proceso completo por error en notificación
-          }
-
-          setDropOffModalVisible(false);
-
-          // Actualizar la lista de pasajeros localmente
-          const updatedPassengers = await fetchPassengers();
-          if (updatedPassengers) {
-            setPassengers(updatedPassengers);
-          }
-
-          if (dropOffTitle === "¿Quiénes completaron el viaje?") {
-            await handleFinishTrip();
-          } else {
-            Alert.alert("Éxito", "Los pasajeros han sido marcados como viaje completado.");
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error dropping off passengers:", error);
-      Alert.alert("Error", "No se pudo actualizar el estado de los pasajeros.");
-    }
-  };
 
 
   const handleOpenNavigation = async () => {
@@ -1575,11 +1518,25 @@ export default function RouteDetail() {
                         {/* Waypoint Info */}
                         <Pressable
                           onPress={() => {
-                            if (!isVisited) {
-                              setWaypointToCheckIn(waypoint);
-                              setCheckInModalVisible(true);
-                            }
+                            // Siempre realizar focus de cámara al punto seleccionado
                             changeLocation(waypoint.coords.latitude, waypoint.coords.longitude);
+
+                            const p = passengers.find(px => px.passenger_id === waypoint.passengerId);
+
+                            if (waypoint.type === "meeting_point") {
+                              // Solo abrir modal si el pasajero aún está pendiente de abordaje (status === 'pending')
+                              if (p?.status === "pending") {
+                                setWaypointToCheckIn(waypoint);
+                                setCheckInModalVisible(true);
+                              }
+                            } else if (waypoint.type === "stop") {
+                              // Solo abrir modal si el pasajero YA está a bordo (status === 'joined') y la parada no está visitada
+                              const isUnvisited = waypoint.status !== "visited" && waypoint.status !== "completed";
+                              if (p?.status === "joined" && isUnvisited) {
+                                setWaypointToCheckIn(waypoint);
+                                setCheckInModalVisible(true);
+                              }
+                            }
                           }}
                           className="flex-1"
                         >
@@ -1663,13 +1620,32 @@ export default function RouteDetail() {
             console.warn("PASSENGER PRESSED: ", pId);
             const p = passengers.find(px => px.passenger_id === pId);
             console.warn("PASSENGER DATA: ", p);
+
             if (p?.status === 'pending_approval') {
               setPassengerIdToProcess(pId);
               setModalVisible(true);
-            } else if (['joined', 'pending'].includes(p?.status ?? "")) {
-              setCurrentPassengerToDropOff(p ?? null);
-              setDropOffTitle(p?.status === "joined" ? "Finalizar viaje para pasajero" : "Notificar llegada al punto de encuentro");
-              setDropOffModalVisible(true);
+            } else if (p?.status === 'pending') {
+              // Pasajero pendiente: Buscar STRICTAMENTE su punto de encuentro (meeting_point)
+              const targetWaypoint = waypoints.find(wp => wp.passengerId === pId && wp.type === 'meeting_point');
+
+              if (targetWaypoint) {
+                changeLocation(targetWaypoint.coords.latitude, targetWaypoint.coords.longitude);
+                setWaypointToCheckIn(targetWaypoint);
+                setCheckInModalVisible(true);
+              } else {
+                Alert.alert("Información", "No se encontró el punto de encuentro del pasajero.");
+              }
+            } else if (p?.status === 'joined') {
+              // Pasajero a bordo: Buscar STRICTAMENTE su parada de destino (stop)
+              const targetWaypoint = waypoints.find(wp => wp.passengerId === pId && wp.type === 'stop');
+
+              if (targetWaypoint && targetWaypoint.status !== 'visited' && targetWaypoint.status !== 'completed') {
+                changeLocation(targetWaypoint.coords.latitude, targetWaypoint.coords.longitude);
+                setWaypointToCheckIn(targetWaypoint);
+                setCheckInModalVisible(true);
+              } else {
+                Alert.alert("Información", "El pasajero no tiene paradas pendientes.");
+              }
             }
           }}
           distanceRemaining={distanceToNextPoint}
@@ -1694,6 +1670,7 @@ export default function RouteDetail() {
         <WaypointCheckInModal
           visible={checkInModalVisible}
           waypoint={waypointToCheckIn}
+          users={sessionUsers}
           onArriveStop={handleArriveStopByList}
           onSkip={handleSkipPointByList}
           onArriveMeetingPoint={handleArriveMeetingPoint}
@@ -1701,20 +1678,6 @@ export default function RouteDetail() {
             setCheckInModalVisible(false);
             setWaypointToCheckIn(null);
           }}
-        />
-
-        {/* Agregar logica sobre pasajero a bordo o no
-        -Si el pasajero esta 'joined' se muestra la opcion de finalizar viaje para el pasajero
-        -Si el pasajero esta 'pending' se muestra la opcion de notificarle que el conductor esta en el punto de encuentro
-        */}
-        <PassengerDropOffModal
-          visible={dropOffModalVisible}
-          passenger={currentPassengerToDropOff}
-          users={sessionUsers}
-          title={dropOffTitle}
-          onConfirm={handleDropOffPassengers}
-          onSkip={handleSkipPointByPassenger}
-          onClose={() => setDropOffModalVisible(false)}
         />
         <DriverRatingListModal
           visible={driverRatingModalVisible}

@@ -1,7 +1,9 @@
 import { Colors } from "@/constants/Colors";
+import { UserData } from "@/interfaces/available-routes";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
-import { ActivityIndicator, Modal, Pressable, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Alert, Image, Modal, Pressable, Text, View } from "react-native";
+import SlideToConfirmButton from "../ui/SlideToConfirmButton";
 
 interface Waypoint {
     id: string;
@@ -14,30 +16,54 @@ interface Waypoint {
     order: number;
     passengerId?: string;
     stopId?: number;
+    status?: string;
 }
 
 interface WaypointCheckInModalProps {
     visible: boolean;
     waypoint: Waypoint | null;
-    // onConfirm: (status: 'visited' | 'skipped') => Promise<void>;
+    users?: UserData[];
     onSkip: () => Promise<void>;
     onArriveMeetingPoint: (passengerId: string, meetingPointId: number) => Promise<void>;
     onArriveStop: (passengerId: string, stopId: number) => Promise<void>;
+    onPassengerBoarded?: (passengerId: string) => Promise<void>;
     onClose: () => void;
 }
 
 export default function WaypointCheckInModal({
     visible,
     waypoint,
-    // onConfirm,
+    users = [],
     onSkip,
     onArriveMeetingPoint,
     onArriveStop,
+    onPassengerBoarded,
     onClose,
 }: WaypointCheckInModalProps) {
     const [loading, setLoading] = useState(false);
+    const [step, setStep] = useState<1 | 2>(1);
+
+    useEffect(() => {
+        if (visible && waypoint) {
+            if (waypoint.type === 'meeting_point' && (waypoint.status === 'visited' || waypoint.status === 'arrived')) {
+                setStep(2);
+            } else {
+                setStep(1);
+            }
+        }
+    }, [visible, waypoint]);
 
     if (!waypoint) return null;
+
+    const passengerUser = users.find((u) => u.id === waypoint.passengerId);
+
+    const extractNumericId = (idStr: string): number => {
+        if (idStr.includes('-')) {
+            const parts = idStr.split('-');
+            return Number(parts[parts.length - 1]);
+        }
+        return Number(idStr);
+    };
 
     const handleSkip = async () => {
         setLoading(true);
@@ -48,32 +74,61 @@ export default function WaypointCheckInModal({
         }
     };
 
-    const handleConfirm = async () => {
+    const handleConfirmStep1 = async () => {
         setLoading(true);
         try {
+            const targetId = waypoint.type === 'stop' && waypoint.stopId
+                ? waypoint.stopId
+                : extractNumericId(waypoint.id);
+
             if (waypoint.type === 'meeting_point') {
-                await onArriveMeetingPoint(waypoint.passengerId!, Number(waypoint.id));
+                await onArriveMeetingPoint(waypoint.passengerId || '', targetId);
+                setStep(2);
             } else {
-                await onArriveStop(waypoint.passengerId!, Number(waypoint.id));
+                await onArriveStop(waypoint.passengerId || '', targetId);
+                onClose();
             }
         } finally {
             setLoading(false);
         }
     };
 
+    const handleBoardPassengerStep2 = async () => {
+        Alert.alert("Pasajero a bordo", "El pasajero ha sido marcado como a bordo.");
+        if (onPassengerBoarded && waypoint.passengerId) {
+            try {
+                await onPassengerBoarded(waypoint.passengerId);
+            } catch (err) {
+                console.error("Error onPassengerBoarded:", err);
+            }
+        }
+        onClose();
+        setStep(1);
+    };
+
     const getIcon = () => {
+        if (step === 2) return 'person-add';
         if (waypoint.type === 'stop') return 'location';
         if (waypoint.type === 'meeting_point') return 'person';
         return 'flag';
     };
 
     const getTitle = () => {
-        if (waypoint.type === 'stop') return '¿Llegaste a la parada?';
-        if (waypoint.type === 'meeting_point') return '¿Recogiste al pasajero?';
+        const name = passengerUser?.name;
+        if (step === 2) {
+            return name ? `Marcar a ${name} a bordo` : 'Marcar pasajero a bordo';
+        }
+        if (waypoint.type === 'stop') {
+            return name ? `¿Llegaste a la parada de ${name}?` : '¿Llegaste a la parada?';
+        }
+        if (waypoint.type === 'meeting_point') {
+            return name ? `¿Llegaste a la recolección de ${name}?` : '¿Recogiste al pasajero?';
+        }
         return '¿Llegaste al punto?';
     };
 
     const getTypeColor = () => {
+        if (step === 2) return 'bg-emerald-500';
         if (waypoint.type === 'stop') return 'bg-purple-500';
         if (waypoint.type === 'meeting_point') return 'bg-primary';
         return 'bg-green-500';
@@ -92,12 +147,23 @@ export default function WaypointCheckInModal({
             >
                 <Pressable onPress={(e) => e.stopPropagation()}>
                     <View className="bg-white rounded-t-3xl p-6 pb-8">
-                        {/* Waypoint Icon */}
+                        {/* Waypoint / Step Icon */}
                         <View className="items-center mb-4">
                             <View className={`w-20 h-20 ${getTypeColor()} rounded-full items-center justify-center shadow-lg`}>
                                 <Ionicons name={getIcon()} size={40} color="white" />
                             </View>
                         </View>
+
+                        {/* Step Badge */}
+                        {waypoint.type === 'meeting_point' && (
+                            <View className="items-center mb-2">
+                                <View className="bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
+                                    <Text className="text-xs font-bold text-slate-600">
+                                        Paso {step} de 2 {step === 1 ? "• Llegada" : "• Abordaje"}
+                                    </Text>
+                                </View>
+                            </View>
+                        )}
 
                         {/* Title */}
                         <Text className="text-2xl font-bold text-center mb-2 text-slate-800">
@@ -108,7 +174,7 @@ export default function WaypointCheckInModal({
                         <View className="items-center mb-4">
                             {waypoint.type === 'stop' && (
                                 <Text className="text-sm font-bold text-purple-600 uppercase">
-                                    Parada
+                                    Parada Destino
                                 </Text>
                             )}
                             {waypoint.type === 'meeting_point' && (
@@ -118,52 +184,97 @@ export default function WaypointCheckInModal({
                             )}
                         </View>
 
-                        {/* Location */}
-                        <View className="bg-slate-50 p-4 rounded-xl mb-6 border border-slate-200">
-                            <Text className="text-center text-slate-600 text-sm mb-1">
-                                Ubicación
-                            </Text>
-                            <Text className="text-center text-slate-800 font-semibold">
-                                {waypoint.location.split(',')[0]}
-                            </Text>
-                            <Text className="text-center text-slate-500 text-sm">
-                                {waypoint.location.split(',').slice(1).join(',')}
-                            </Text>
-                        </View>
-
-                        {/* Actions */}
-                        <View className="flex-row gap-4">
-                            <Pressable
-                                onPress={() => handleSkip()}
-                                disabled={loading}
-                                className="flex-1 bg-slate-200 h-14 rounded-xl items-center justify-center border border-slate-300"
-                            >
-                                <View className="flex-row items-center gap-2">
-                                    <Ionicons name="close-circle" size={20} color="#64748b" />
-                                    <Text className="text-slate-700 font-bold text-base">
-                                        Saltar
-                                    </Text>
+                        {/* Tarjeta de Pasajero si existe */}
+                        {passengerUser && (
+                            <View className="flex-row items-center p-3 bg-slate-50 rounded-2xl border border-slate-200 mb-4">
+                                <View className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden mr-3">
+                                    {passengerUser.avatar_profile ? (
+                                        <Image
+                                            source={{ uri: passengerUser.avatar_profile }}
+                                            className="w-full h-full"
+                                        />
+                                    ) : (
+                                        <View className="flex-1 items-center justify-center bg-slate-300">
+                                            <Ionicons name="person" size={24} color="#64748b" />
+                                        </View>
+                                    )}
                                 </View>
-                            </Pressable>
-
-                            <Pressable
-                                onPress={() => handleConfirm()}
-                                disabled={loading}
-                                className="flex-1 h-14 rounded-xl items-center justify-center"
-                                style={{ backgroundColor: Colors.light.secondary }}
-                            >
-                                {loading ? (
-                                    <ActivityIndicator color="white" />
-                                ) : (
-                                    <View className="flex-row items-center gap-2">
-                                        <Ionicons name="checkmark-circle" size={20} color="white" />
-                                        <Text className="text-white font-bold text-base">
-                                            Llegué
+                                <View className="flex-1">
+                                    <Text className="font-bold text-base text-slate-800">
+                                        {passengerUser.name}
+                                    </Text>
+                                    <View className="flex-row items-center mt-0.5">
+                                        <Ionicons name="star" size={14} color={Colors.light.secondary} />
+                                        <Text className="text-xs font-bold text-slate-600 ml-1">
+                                            {passengerUser.rating || "0.0"}
                                         </Text>
                                     </View>
-                                )}
-                            </Pressable>
+                                </View>
+                            </View>
+                        )}
+
+                        {/* Ubicación y Descripción de Calles */}
+                        <View className="bg-slate-50 p-4 rounded-xl mb-6 border border-slate-200">
+                            <View className="flex-row items-center justify-center gap-1 mb-1">
+                                <Ionicons name="location-outline" size={16} color="#64748b" />
+                                <Text className="text-center text-slate-600 text-xs font-semibold uppercase tracking-wider">
+                                    Descripción de la Ubicación
+                                </Text>
+                            </View>
+                            <Text className="text-center text-slate-800 font-bold text-base mb-0.5">
+                                {waypoint.location.split(',')[0]}
+                            </Text>
+                            {waypoint.location.split(',').length > 1 && (
+                                <Text className="text-center text-slate-500 text-sm">
+                                    {waypoint.location.split(',').slice(1).join(',').trim()}
+                                </Text>
+                            )}
                         </View>
+
+                        {/* Actions (Paso 1 vs Paso 2) */}
+                        {step === 1 ? (
+                            <View className="flex-row gap-4">
+                                <Pressable
+                                    onPress={() => handleSkip()}
+                                    disabled={loading}
+                                    className="flex-1 bg-slate-200 h-14 rounded-xl items-center justify-center border border-slate-300"
+                                >
+                                    <View className="flex-row items-center gap-2">
+                                        <Ionicons name="close-circle" size={20} color="#64748b" />
+                                        <Text className="text-slate-700 font-bold text-base">
+                                            Saltar
+                                        </Text>
+                                    </View>
+                                </Pressable>
+
+                                <Pressable
+                                    onPress={() => handleConfirmStep1()}
+                                    disabled={loading}
+                                    className="flex-1 h-14 rounded-xl items-center justify-center"
+                                    style={{ backgroundColor: Colors.light.secondary }}
+                                >
+                                    {loading ? (
+                                        <ActivityIndicator color="white" />
+                                    ) : (
+                                        <View className="flex-row items-center gap-2">
+                                            <Ionicons name="checkmark-circle" size={20} color="white" />
+                                            <Text className="text-white font-bold text-base">
+                                                Llegué
+                                            </Text>
+                                        </View>
+                                    )}
+                                </Pressable>
+                            </View>
+                        ) : (
+                            /* Paso 2: Deslizador de Confirmación de Abordaje */
+                            <View className="mb-2">
+                                <SlideToConfirmButton
+                                    onConfirm={handleBoardPassengerStep2}
+                                    title="Desliza para marcar a bordo"
+                                    disabled={loading}
+                                />
+                            </View>
+                        )}
 
                         {/* Close hint */}
                         <Pressable onPress={onClose} className="mt-4">
@@ -177,3 +288,5 @@ export default function WaypointCheckInModal({
         </Modal>
     );
 }
+
+
