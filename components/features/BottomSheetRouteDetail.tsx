@@ -307,9 +307,12 @@ export default function BottomSheetRouteDetail({
                       pSession?.status === "pending_approval";
 
                     const handlePress = () => {
+                      console.log(pSession?.status);
+                      console.log(user?.driver_mode);
+                      console.log(pSession?.status === 'pending_approval' || pSession?.status === 'joined');
                       if (!user?.driver_mode || !pSession) return;
 
-                      const canProcess = pSession.status === 'pending_approval' || pSession.status === 'joined';
+                      const canProcess = pSession.status === 'pending_approval' || pSession.status === 'joined' || pSession.status === 'pending';
                       if (!canProcess) return;
 
                       // Delegate to parent/modal

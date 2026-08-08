@@ -153,7 +153,7 @@ export const useActiveSession = (user: User | null) => {
                     .from('passenger_trip_sessions')
                     .select('trip_session_id')
                     .eq('passenger_id', user.id)
-                    .in('status', ['joined'])
+                    .in('status', ['joined', 'pending'])
                     .limit(1)
                     .maybeSingle();
 

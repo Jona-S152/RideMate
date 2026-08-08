@@ -190,6 +190,13 @@ export default function RouteDetail() {
         //fetchMeetingPoints();
     }, [params.id, session, sessionMeetingPoints]);
 
+    useEffect(() => {
+        console.warn("SESSION", JSON.stringify(session, null, 2));
+        if (session?.status === 'active' && user?.driver_mode === false) {
+            router.replace(`/(tabs)/home/route-detail?id=${sessionId}`);
+        }
+    }, [session?.status]);
+
 
     const handleStartTrip = async () => {
         if (session?.status === 'active') {

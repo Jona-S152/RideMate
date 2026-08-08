@@ -5,6 +5,7 @@ import { Colors } from "@/constants/Colors";
 import { UserData } from "@/interfaces/available-routes";
 import { ratingsService } from "@/services/ratings.service";
 import { userService } from "@/services/user.service";
+import { Ionicons } from "@expo/vector-icons";
 import { Link } from "expo-router";
 import { useEffect, useState } from "react";
 import { Image, Pressable, ScrollView, View } from "react-native";
@@ -60,7 +61,13 @@ export default function ProfileScreen() {
                             )
                             :
                             (
-                                <View className="bg-stone-300 rounded-full w-60 h-60 my-3" />
+                                <View className="rounded-full" >
+                                    <Ionicons
+                                        name="person-circle"
+                                        size={256}
+                                        color={Colors.dark.text}
+                                    />
+                                </View>
                             )
                         }
                     </View>

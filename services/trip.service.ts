@@ -573,13 +573,13 @@ export const tripService = {
 
     // 1. Request successfully locked — continue with the rest of the inserts.
 
-    // 2. Insert joined passenger session
+    // 2. Insert pending passenger session
     const { error: sessionError } = await supabase
       .from("passenger_trip_sessions")
       .insert({
         trip_session_id: tripSessionId,
         passenger_id: passengerId,
-        status: "joined",
+        status: "pending",
       });
     if (sessionError) throw sessionError;
 
@@ -919,7 +919,7 @@ export const tripService = {
       .from("passenger_trip_sessions")
       .select("*")
       .eq("trip_session_id", sessionId)
-      .in("status", ["joined", "completed"]);
+      .in("status", ["joined", "pending", "completed"]);
 
     if (joinedError) throw joinedError;
 
