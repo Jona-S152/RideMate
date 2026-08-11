@@ -142,11 +142,11 @@ export default function WaypointCheckInModal({
             onRequestClose={onClose}
         >
             <Pressable
-                className="flex-1 justify-end bg-black/50"
+                className="flex-1 justify-end bg-black/60"
                 onPress={onClose}
             >
                 <Pressable onPress={(e) => e.stopPropagation()}>
-                    <View className="bg-white rounded-t-3xl p-6 pb-8">
+                    <View className="rounded-t-3xl p-6 pb-8 border-t border-slate-700" style={{ backgroundColor: Colors.dark.primary }}>
                         {/* Waypoint / Step Icon */}
                         <View className="items-center mb-4">
                             <View className={`w-20 h-20 ${getTypeColor()} rounded-full items-center justify-center shadow-lg`}>
@@ -157,8 +157,8 @@ export default function WaypointCheckInModal({
                         {/* Step Badge */}
                         {waypoint.type === 'meeting_point' && (
                             <View className="items-center mb-2">
-                                <View className="bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
-                                    <Text className="text-xs font-bold text-slate-600">
+                                <View className="bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
+                                    <Text className="text-xs font-bold text-slate-300">
                                         Paso {step} de 2 {step === 1 ? "• Llegada" : "• Abordaje"}
                                     </Text>
                                 </View>
@@ -166,19 +166,19 @@ export default function WaypointCheckInModal({
                         )}
 
                         {/* Title */}
-                        <Text className="text-2xl font-bold text-center mb-2 text-slate-800">
+                        <Text className="text-2xl font-bold text-center mb-2 text-white">
                             {getTitle()}
                         </Text>
 
                         {/* Type Badge */}
                         <View className="items-center mb-4">
                             {waypoint.type === 'stop' && (
-                                <Text className="text-sm font-bold text-purple-600 uppercase">
+                                <Text className="text-sm font-bold text-purple-400 uppercase">
                                     Parada Destino
                                 </Text>
                             )}
                             {waypoint.type === 'meeting_point' && (
-                                <Text className="text-sm font-bold text-primary uppercase">
+                                <Text className="text-sm font-bold uppercase" style={{ color: Colors.dark.secondary }}>
                                     Punto de Encuentro
                                 </Text>
                             )}
@@ -186,26 +186,26 @@ export default function WaypointCheckInModal({
 
                         {/* Tarjeta de Pasajero si existe */}
                         {passengerUser && (
-                            <View className="flex-row items-center p-3 bg-slate-50 rounded-2xl border border-slate-200 mb-4">
-                                <View className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden mr-3">
+                            <View className="flex-row items-center p-3 bg-slate-800/50 rounded-2xl border border-slate-700 mb-4">
+                                <View className="w-12 h-12 rounded-full bg-slate-700 overflow-hidden mr-3">
                                     {passengerUser.avatar_profile ? (
                                         <Image
                                             source={{ uri: passengerUser.avatar_profile }}
                                             className="w-full h-full"
                                         />
                                     ) : (
-                                        <View className="flex-1 items-center justify-center bg-slate-300">
-                                            <Ionicons name="person" size={24} color="#64748b" />
+                                        <View className="flex-1 items-center justify-center bg-slate-600">
+                                            <Ionicons name="person" size={24} color="#94a3b8" />
                                         </View>
                                     )}
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="font-bold text-base text-slate-800">
+                                    <Text className="font-bold text-base text-white">
                                         {passengerUser.name}
                                     </Text>
                                     <View className="flex-row items-center mt-0.5">
-                                        <Ionicons name="star" size={14} color={Colors.light.secondary} />
-                                        <Text className="text-xs font-bold text-slate-600 ml-1">
+                                        <Ionicons name="star" size={14} color={Colors.dark.danger} />
+                                        <Text className="text-xs font-bold text-slate-400 ml-1">
                                             {passengerUser.rating || "0.0"}
                                         </Text>
                                     </View>
@@ -214,18 +214,18 @@ export default function WaypointCheckInModal({
                         )}
 
                         {/* Ubicación y Descripción de Calles */}
-                        <View className="bg-slate-50 p-4 rounded-xl mb-6 border border-slate-200">
+                        <View className="bg-slate-800/50 p-4 rounded-xl mb-6 border border-slate-700">
                             <View className="flex-row items-center justify-center gap-1 mb-1">
-                                <Ionicons name="location-outline" size={16} color="#64748b" />
-                                <Text className="text-center text-slate-600 text-xs font-semibold uppercase tracking-wider">
+                                <Ionicons name="location-outline" size={16} color="#94a3b8" />
+                                <Text className="text-center text-slate-400 text-xs font-semibold uppercase tracking-wider">
                                     Descripción de la Ubicación
                                 </Text>
                             </View>
-                            <Text className="text-center text-slate-800 font-bold text-base mb-0.5">
+                            <Text className="text-center text-white font-bold text-base mb-0.5">
                                 {waypoint.location.split(',')[0]}
                             </Text>
                             {waypoint.location.split(',').length > 1 && (
-                                <Text className="text-center text-slate-500 text-sm">
+                                <Text className="text-center text-slate-400 text-sm">
                                     {waypoint.location.split(',').slice(1).join(',').trim()}
                                 </Text>
                             )}
@@ -237,11 +237,11 @@ export default function WaypointCheckInModal({
                                 <Pressable
                                     onPress={() => handleSkip()}
                                     disabled={loading}
-                                    className="flex-1 bg-slate-200 h-14 rounded-xl items-center justify-center border border-slate-300"
+                                    className="flex-1 bg-slate-800 h-14 rounded-xl items-center justify-center border border-slate-700"
                                 >
                                     <View className="flex-row items-center gap-2">
-                                        <Ionicons name="close-circle" size={20} color="#64748b" />
-                                        <Text className="text-slate-700 font-bold text-base">
+                                        <Ionicons name="close-circle" size={20} color="#94a3b8" />
+                                        <Text className="text-slate-300 font-bold text-base">
                                             Saltar
                                         </Text>
                                     </View>
@@ -251,7 +251,7 @@ export default function WaypointCheckInModal({
                                     onPress={() => handleConfirmStep1()}
                                     disabled={loading}
                                     className="flex-1 h-14 rounded-xl items-center justify-center"
-                                    style={{ backgroundColor: Colors.light.secondary }}
+                                    style={{ backgroundColor: Colors.dark.secondary }}
                                 >
                                     {loading ? (
                                         <ActivityIndicator color="white" />
@@ -278,7 +278,7 @@ export default function WaypointCheckInModal({
 
                         {/* Close hint */}
                         <Pressable onPress={onClose} className="mt-4">
-                            <Text className="text-center text-slate-400 text-sm">
+                            <Text className="text-center text-slate-500 text-sm">
                                 Toca para cerrar
                             </Text>
                         </Pressable>

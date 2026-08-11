@@ -61,48 +61,61 @@ export default function ChangePasswordModal({ animationType, transparent, visibl
                 onRequestClose={() => setVisible(false)}
             >
                 <Pressable
-                    className="flex-1 justify-center items-center bg-black/50"
+                    className="flex-1 justify-center items-center bg-black/60"
                     onPress={() => setVisible(false)}
                 >
                     <Pressable
-                        style={{ backgroundColor: Colors.light.background }}
-                        className="rounded-2xl w-80 overflow-hidden"
+                        style={{ backgroundColor: Colors.dark.primary }}
+                        className="rounded-3xl w-80 overflow-hidden border border-slate-700"
                         onPress={(e) => e.stopPropagation()}
                     >
                         <View>
-                            <View style={{ backgroundColor: Colors.light.primary }} className="p-4">
+                            {/* Header */}
+                            <View className="p-5 pb-4 flex-row items-center justify-between">
                                 <ThemedText
-                                    lightColor={Colors.light.text}
-                                    darkColor={Colors.dark.text}
-                                    className="text-2xl">
+                                    lightColor="#ffffff"
+                                    darkColor="#ffffff"
+                                    className="text-2xl font-bold">
                                     Cambiar contraseña
                                 </ThemedText>
+                                <Pressable
+                                    onPress={() => setVisible(false)}
+                                    className="p-2 bg-slate-800 rounded-full"
+                                >
+                                    <ThemedText lightColor="#ffffff" darkColor="#ffffff" className="text-sm">✕</ThemedText>
+                                </Pressable>
                             </View>
-                            <View className="mt-4">
+
+                            {/* Inputs */}
+                            <View className="mt-2">
                                 <ThemedTextInput
-                                    lightColor={Colors.light.background} // Ensure input background is distinguishable inside the modal
+                                    lightColor="#1e293b"
                                     placeholder="Contraseña nueva"
-                                    placeholderTextColor="#9ca3af"
+                                    placeholderTextColor="#64748b"
                                     secureTextEntry
                                     value={newPassword}
                                     onChangeText={setNewPassword}
-                                    className="text-lg mx-4 mb-3 border border-gray-200 rounded-lg px-3 py-2"
+                                    className="text-lg mx-4 mb-3 border border-slate-700 rounded-xl px-3 py-2"
+                                    style={{ color: '#ffffff' }}
                                 />
 
                                 <ThemedTextInput
-                                    lightColor={Colors.light.background}
+                                    lightColor="#1e293b"
                                     placeholder="Confirmar contraseña"
-                                    placeholderTextColor="#9ca3af"
+                                    placeholderTextColor="#64748b"
                                     secureTextEntry
                                     value={confirmPassword}
                                     onChangeText={setConfirmPassword}
-                                    className="text-lg mx-4 border border-gray-200 rounded-lg px-3 py-2"
+                                    className="text-lg mx-4 border border-slate-700 rounded-xl px-3 py-2"
+                                    style={{ color: '#ffffff' }}
                                 />
                             </View>
+
+                            {/* Action Button */}
                             <View className="m-4 mt-6">
                                 <Pressable
-                                    style={{ backgroundColor: Colors.light.secondary }}
-                                    className={`rounded-full p-3 active:bg-yellow-200 items-center`}
+                                    style={{ backgroundColor: Colors.dark.secondary }}
+                                    className="rounded-full p-3 items-center"
                                     onPress={handleUpdatePassword}
                                     disabled={loading}
                                 >
@@ -110,8 +123,8 @@ export default function ChangePasswordModal({ animationType, transparent, visibl
                                         <ActivityIndicator color="white" />
                                     ) : (
                                         <ThemedText
-                                            lightColor={Colors.light.text}
-                                            darkColor={Colors.dark.text}
+                                            lightColor="#ffffff"
+                                            darkColor="#ffffff"
                                             className="text-lg font-bold">
                                             Actualizar
                                         </ThemedText>

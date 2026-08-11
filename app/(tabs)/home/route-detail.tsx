@@ -419,6 +419,22 @@ export default function RouteDetail() {
     }
   };
 
+  const handlePassengerBoarded = async (passengerId?: string) => {
+    const pId = passengerId || waypointToCheckIn?.passengerId;
+    if (!pId) return;
+
+    try {
+      await tripService.updatePassengerBoarded(Number(id), pId);
+      await sendPushNotification(pId, "¡Pasajero a bordo!", "El conductor ha marcado que el pasajero está a bordo");
+      if (waypointToCheckIn) {
+        setCheckedInWaypoints((prev) => new Set(prev).add(waypointToCheckIn.id));
+      }
+      await buildWaypoints();
+    } catch (error) {
+      console.error("[RouteDetail] Failed to check in passenger boarded:", error);
+    }
+  };
+
   const handleArriveStopByList = async (passengerId?: string, stopId?: number) => {
     const pId = passengerId || waypointToCheckIn?.passengerId;
     const sId = stopId || waypointToCheckIn?.stopId || (waypointToCheckIn?.id.includes('-') ? Number(waypointToCheckIn.id.split('-')[1]) : Number(waypointToCheckIn?.id));
@@ -1674,6 +1690,7 @@ export default function RouteDetail() {
           onArriveStop={handleArriveStopByList}
           onSkip={handleSkipPointByList}
           onArriveMeetingPoint={handleArriveMeetingPoint}
+          onPassengerBoarded={handlePassengerBoarded}
           onClose={() => {
             setCheckInModalVisible(false);
             setWaypointToCheckIn(null);

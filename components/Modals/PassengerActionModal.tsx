@@ -245,7 +245,7 @@ export default function PassengerActionModal({
                     {details.name}
                   </Text>
                   <View className="flex-row items-center mb-1">
-                    <Ionicons name="star" size={14} color={Colors.dark.secondary} />
+                    <Ionicons name="star" size={14} color={Colors.dark.danger} />
                     <Text className="text-sm font-bold text-slate-300 ml-1">
                       {details.rating?.toFixed(1) || "0.0"}
                     </Text>

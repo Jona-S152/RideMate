@@ -1,6 +1,6 @@
+import { Colors } from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
-import { Colors } from "@/constants/Colors";
 import {
     ActivityIndicator,
     Modal,
@@ -66,22 +66,22 @@ export default function RatingModal({
             onRequestClose={onClose}
         >
             <View style={styles.overlay}>
-                <View style={styles.container}>
+                <View style={[styles.container, { backgroundColor: Colors.dark.primary }]}>
                     <Pressable onPress={onClose} style={styles.closeButton}>
-                        <Ionicons name="close" size={24} color="#64748b" />
+                        <Ionicons name="close" size={20} color="white" />
                     </Pressable>
 
                     <View style={styles.header}>
                         <View style={styles.iconContainer}>
-                            <Ionicons name="star" size={32} color={Colors.light.secondary} />
+                            <Ionicons name="star" size={32} color={Colors.dark.danger} />
                         </View>
                         <Text style={styles.title}>{title}</Text>
                         {userName && (
                             <View style={{ alignItems: 'center' }}>
                                 <Text style={styles.userName}>{userName}</Text>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                                    <Ionicons name="star" size={14} color={Colors.light.secondary} />
-                                    <Text style={{ fontSize: 14, color: '#64748b', marginLeft: 4, fontWeight: 'bold' }}>
+                                    <Ionicons name="star" size={14} color={Colors.dark.danger} />
+                                    <Text style={{ fontSize: 14, color: '#94a3b8', marginLeft: 4, fontWeight: 'bold' }}>
                                         {userRating || "0.0"}
                                     </Text>
                                 </View>
@@ -100,7 +100,7 @@ export default function RatingModal({
                                 <Ionicons
                                     name={rating >= value ? "star" : "star-outline"}
                                     size={40}
-                                    color={rating >= value ? Colors.light.secondary : "#cbd5e1"}
+                                    color={rating >= value ? Colors.dark.danger : "#475569"}
                                 />
                             </Pressable>
                         ))}
@@ -113,7 +113,7 @@ export default function RatingModal({
                         numberOfLines={4}
                         value={comment}
                         onChangeText={setComment}
-                        placeholderTextColor="#94a3b8"
+                        placeholderTextColor="#64748b"
                     />
 
                     <Pressable
@@ -136,18 +136,19 @@ export default function RatingModal({
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        backgroundColor: "rgba(0, 0, 0, 0.6)",
         justifyContent: "center",
         alignItems: "center",
         padding: 24,
     },
     container: {
-        backgroundColor: "white",
         width: "100%",
         borderRadius: 32,
         padding: 24,
         alignItems: "center",
         position: "relative",
+        borderWidth: 1,
+        borderColor: "#334155",
     },
     closeButton: {
         position: "absolute",
@@ -155,7 +156,8 @@ const styles = StyleSheet.create({
         right: 16,
         padding: 8,
         borderRadius: 20,
-        backgroundColor: "#f1f5f9",
+        backgroundColor: "#1e293b",
+        zIndex: 10,
     },
     header: {
         alignItems: "center",
@@ -166,7 +168,7 @@ const styles = StyleSheet.create({
         width: 64,
         height: 64,
         borderRadius: 32,
-        backgroundColor: "#fffbeb",
+        backgroundColor: "rgba(37, 99, 235, 0.15)",
         justifyContent: "center",
         alignItems: "center",
         marginBottom: 16,
@@ -174,18 +176,18 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 24,
         fontWeight: "bold",
-        color: "#1e293b",
+        color: "#ffffff",
         marginBottom: 4,
     },
     userName: {
         fontSize: 18,
         fontWeight: "600",
-        color: "#334155",
+        color: "#e2e8f0",
         marginBottom: 4,
     },
     subtitle: {
         fontSize: 14,
-        color: "#64748b",
+        color: "#94a3b8",
         textAlign: "center",
     },
     starsContainer: {
@@ -198,18 +200,18 @@ const styles = StyleSheet.create({
     },
     input: {
         width: "100%",
-        backgroundColor: "#f8fafc",
+        backgroundColor: "#1e293b",
         borderRadius: 16,
         padding: 16,
         fontSize: 14,
-        color: "#1e293b",
+        color: "#ffffff",
         borderWidth: 1,
-        borderColor: "#e2e8f0",
+        borderColor: "#334155",
         marginBottom: 24,
         textAlignVertical: "top",
     },
     submitButton: {
-        backgroundColor: Colors.light.primary,
+        backgroundColor: Colors.dark.secondary,
         width: "100%",
         height: 56,
         borderRadius: 28,
@@ -225,3 +227,4 @@ const styles = StyleSheet.create({
         fontWeight: "bold",
     },
 });
+

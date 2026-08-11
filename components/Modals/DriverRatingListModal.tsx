@@ -1,5 +1,5 @@
-import { UserData } from "@/interfaces/available-routes";
 import { Colors } from "@/constants/Colors";
+import { UserData } from "@/interfaces/available-routes";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
@@ -98,8 +98,8 @@ export default function DriverRatingListModal({
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Text style={styles.passengerRole}>Pasajero</Text>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
-                            <Ionicons name="star" size={10} color={Colors.light.secondary} />
-                            <Text style={{ fontSize: 10, color: '#64748b', marginLeft: 2, fontWeight: 'bold' }}>
+                            <Ionicons name="star" size={10} color={Colors.light.danger} />
+                            <Text style={{ fontSize: 10, color: '#94a3b8', marginLeft: 2, fontWeight: 'bold' }}>
                                 {item.rating || "0.0"}
                             </Text>
                         </View>
@@ -117,7 +117,7 @@ export default function DriverRatingListModal({
                         <Ionicons
                             name={item.selectedRating >= value ? "star" : "star-outline"}
                             size={32}
-                            color={item.selectedRating >= value ? Colors.light.secondary : "#cbd5e1"}
+                            color={item.selectedRating >= value ? Colors.dark.danger : "#475569"}
                         />
                     </Pressable>
                 ))}
@@ -141,7 +141,14 @@ export default function DriverRatingListModal({
             onRequestClose={onClose}
         >
             <View style={styles.overlay}>
-                <View style={styles.container}>
+                <View style={[styles.container, { backgroundColor: Colors.dark.primary }]}>
+                    <Pressable
+                        onPress={onClose}
+                        style={styles.closeButton}
+                    >
+                        <Ionicons name="close" size={20} color="white" />
+                    </Pressable>
+
                     <View style={styles.header}>
                         <Text style={styles.title}>Calificar Pasajeros</Text>
                         <Text style={styles.subtitle}>
@@ -182,40 +189,52 @@ export default function DriverRatingListModal({
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        backgroundColor: "rgba(0, 0, 0, 0.6)",
         justifyContent: "flex-end",
     },
     container: {
-        backgroundColor: "white",
         width: "100%",
         height: "85%",
         borderTopLeftRadius: 32,
         borderTopRightRadius: 32,
         padding: 24,
+        borderTopWidth: 1,
+        borderColor: "#334155",
+        position: "relative",
+    },
+    closeButton: {
+        position: "absolute",
+        top: 20,
+        right: 20,
+        zIndex: 10,
+        padding: 8,
+        backgroundColor: "#1e293b",
+        borderRadius: 20,
     },
     header: {
         marginBottom: 24,
+        marginTop: 8,
     },
     title: {
         fontSize: 24,
         fontWeight: "bold",
-        color: "#1e293b",
+        color: "#ffffff",
         marginBottom: 4,
     },
     subtitle: {
         fontSize: 14,
-        color: "#64748b",
+        color: "#94a3b8",
     },
     listContent: {
         paddingBottom: 24,
     },
     card: {
-        backgroundColor: "#f8fafc",
+        backgroundColor: "rgba(30, 41, 59, 0.5)",
         borderRadius: 20,
         padding: 16,
         marginBottom: 16,
         borderWidth: 1,
-        borderColor: "#e2e8f0",
+        borderColor: "#334155",
     },
     passengerHeader: {
         flexDirection: "row",
@@ -226,7 +245,7 @@ const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: "#e2e8f0",
+        backgroundColor: "#334155",
         marginRight: 12,
     },
     passengerInfo: {
@@ -235,11 +254,11 @@ const styles = StyleSheet.create({
     passengerName: {
         fontSize: 16,
         fontWeight: "bold",
-        color: "#334155",
+        color: "#f1f5f9",
     },
     passengerRole: {
         fontSize: 12,
-        color: "#64748b",
+        color: "#94a3b8",
     },
     starsContainer: {
         flexDirection: "row",
@@ -251,20 +270,20 @@ const styles = StyleSheet.create({
         padding: 2,
     },
     input: {
-        backgroundColor: "white",
+        backgroundColor: "#1e293b",
         borderRadius: 12,
         padding: 12,
         fontSize: 14,
-        color: "#1e293b",
+        color: "#ffffff",
         borderWidth: 1,
-        borderColor: "#e2e8f0",
+        borderColor: "#334155",
     },
     footer: {
         paddingTop: 16,
         gap: 12,
     },
     submitButton: {
-        backgroundColor: "#0C162A",
+        backgroundColor: Colors.dark.secondary,
         width: "100%",
         height: 56,
         borderRadius: 28,
@@ -286,7 +305,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     skipText: {
-        color: "#64748b",
+        color: "#94a3b8",
         fontSize: 14,
         fontWeight: "500",
     },

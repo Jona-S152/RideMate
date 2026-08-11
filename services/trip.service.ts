@@ -452,6 +452,22 @@ export const tripService = {
     }
   },
 
+  async updatePassengerBoarded(sessionId: number, passengerId: string): Promise<void> {
+    const { error } = await supabase
+      .from('passenger_trip_sessions')
+      .update({
+        status: "joined",
+      })
+      .eq('trip_session_id', sessionId)
+      .eq('passenger_id', passengerId)
+      .eq('status', 'pending');
+
+    if (error) {
+      console.error("[tripService.updatePassengerBoarded] error:", error);
+      throw error;
+    }
+  },
+
   /**
    * Submits a new passenger request.
    */

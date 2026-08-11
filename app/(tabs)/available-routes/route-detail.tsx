@@ -724,7 +724,7 @@ export default function RouteDetail() {
                         <View className="flex-row items-center bg-blue-500/10 px-2 py-1 rounded-full">
                             <Ionicons name="people" size={14} color={Colors.dark.secondary} />
                             <ThemedText className="text-xs font-bold ml-1" lightColor={Colors.light.secondary} darkColor={Colors.dark.secondary}>
-                                {`${passengers.filter(p => p.status === 'joined').length} APROBADOS`}
+                                {`${passengers.filter(p => p.status === 'pending' || p.status === 'joined').length} APROBADOS`}
                             </ThemedText>
                         </View>
                     </View>
@@ -732,7 +732,7 @@ export default function RouteDetail() {
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
                         {sessionUsers.map((passenger) => {
                             const sessionInfo = passengers.find(p => p.passenger_id === passenger.id);
-                            const isApproved = sessionInfo?.status === 'joined';
+                            const isApproved = (sessionInfo?.status === 'pending' || sessionInfo?.status === 'joined');
 
                             return (
                                 <View key={passenger.id} className="items-center mr-4">
@@ -749,7 +749,7 @@ export default function RouteDetail() {
                                             <ThemedText className="text-[10px] font-bold text-black">
                                                 {Number(passenger.rating || 0).toFixed(1)}
                                             </ThemedText>
-                                            <Ionicons name="star" size={8} color="#F59E0B" />
+                                            <Ionicons name="star" size={8} color={Colors.dark.danger} />
                                         </View>
                                         {!isApproved && (
                                             <View className="absolute inset-0 bg-black/40 rounded-full items-center justify-center">

@@ -174,7 +174,7 @@ export default function RoutePreviewModal({
                         {/* Action Button */}
                         <Pressable
                             style={({ pressed }) => [
-                                { backgroundColor: Colors.light.primary, opacity: pressed ? 0.8 : 1 },
+                                { backgroundColor: Colors.dark.secondary, opacity: pressed ? 0.8 : 1 },
                                 styles.actionButton
                             ]}
                             onPress={() => {
