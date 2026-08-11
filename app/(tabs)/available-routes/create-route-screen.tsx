@@ -308,6 +308,8 @@ export default function CreateRouteScreen() {
         styleURL={Mapbox.StyleURL.TrafficNight}
         onDidFinishLoadingMap={() => setIsMapReady(true)}
         onMapIdle={handleMapIdle}
+        scaleBarEnabled={false}
+        attributionEnabled={false}
         logoEnabled={false}
         compassEnabled={false}
       >

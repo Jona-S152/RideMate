@@ -1182,6 +1182,9 @@ export default function RouteDetail() {
       <View style={{ flex: 1 }}>
         {/* Mapa de Mapbox - Siempre montado */}
         <Mapbox.MapView
+          scaleBarEnabled={false}
+          attributionEnabled={false}
+          logoEnabled={false}
           ref={mapRef}
           styleURL={Mapbox.StyleURL.TrafficNight}
           style={StyleSheet.absoluteFillObject}

@@ -260,6 +260,9 @@ export default function PassengerActionModal({
                       <Mapbox.MapView
                         style={StyleSheet.absoluteFillObject}
                         styleURL={Mapbox.StyleURL.TrafficNight}
+                        scaleBarEnabled={false}
+                        attributionEnabled={false}
+                        logoEnabled={false}
                         scrollEnabled={false}
                         zoomEnabled={false}
                         pitchEnabled={false}

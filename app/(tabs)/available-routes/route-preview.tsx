@@ -257,7 +257,7 @@ export default function RoutePreviewScreen() {
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <View style={styles.container}>
-                <MapView style={styles.map} styleURL={Mapbox.StyleURL.TrafficNight} logoEnabled={false} compassEnabled={false}>
+                <MapView scaleBarEnabled={false} attributionEnabled={false} logoEnabled={false} style={styles.map} styleURL={Mapbox.StyleURL.TrafficNight} compassEnabled={false}>
                     <Camera
                         ref={cameraRef}
                         zoomLevel={12}

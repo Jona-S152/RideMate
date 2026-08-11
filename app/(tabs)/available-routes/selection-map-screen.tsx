@@ -393,6 +393,8 @@ export default function SelectionMapScreen() {
 
       {/* ── MAPA ────────────────────────────────────────────────────────────── */}
       <MapView
+        scaleBarEnabled={false}
+        attributionEnabled={false}
         style={{ flex: 1 }}
         styleURL={Mapbox.StyleURL.TrafficNight}
         onDidFinishLoadingMap={() => setIsMapReady(true)}
