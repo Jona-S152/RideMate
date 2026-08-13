@@ -3,6 +3,8 @@ import RatingModal from "@/components/Modals/RatingModal";
 import { Colors } from "@/constants/Colors";
 import { supabase } from "@/lib/supabase";
 import { ratingsService } from "@/services/ratings.service";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Linking from "expo-linking";
 import * as Notifications from "expo-notifications";
 import { router, Stack } from "expo-router";
 import { useEffect, useState } from "react";
@@ -67,8 +69,7 @@ function MainApp() {
     );
 
     const foregroundSubscription = Notifications.addNotificationReceivedListener(
-      async (notification) =>
-      {
+      async (notification) => {
         const data = notification.request.content.data as NotificationData;
 
         if (data.type === "NEW_PASSENGER") {
@@ -89,9 +90,46 @@ function MainApp() {
       },
     );
 
+    // Escuchar Deep Links para callback de autenticación por correo
+    const handleDeepLink = async (event: { url: string }) => {
+      const url = event.url;
+      if (!url) return;
+      console.log("[_layout] Deep link recibido:", url);
+      const decodedUrl = decodeURIComponent(url);
+      console.log("[_layout] Decoded URL:", decodedUrl);
+
+      const isAuthLink =
+        decodedUrl.includes("email-confirmation") ||
+        decodedUrl.includes("access_token") ||
+        decodedUrl.includes("refresh_token") ||
+        decodedUrl.includes("type=signup");
+
+      const pendingReg = await AsyncStorage.getItem("pendingRegistration").catch(() => null);
+
+      if (isAuthLink || (pendingReg && decodedUrl.includes("expo-development-client"))) {
+        console.log("[_layout] Link de autenticación / registro pendiente detectado. Navegando a email-confirmation...");
+        try {
+          const { data, error } = await supabase.auth.getSession();
+          if (error) console.error("[_layout] Error obteniendo sesión tras deep link:", error);
+          else console.log("[_layout] Sesión tras deep link:", data.session?.user?.email);
+        } catch (e) {
+          console.error("[_layout] Error en deep link handler:", e);
+        }
+
+        // Navegar a la pantalla de confirmación de correo
+        router.replace("/(auth)/email-confirmation");
+      }
+    };
+
+    const linkSubscription = Linking.addEventListener("url", handleDeepLink);
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink({ url });
+    });
+
     return () => {
       subscription.remove();
       foregroundSubscription.remove();
+      linkSubscription.remove();
     };
   }, []);
 
@@ -105,7 +143,7 @@ function MainApp() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="(auth)" />
       </Stack>
-      
+
       {/* Modal Global para calificar conductor */}
       {ratingData && (
         <RatingModal
@@ -133,8 +171,8 @@ function MainApp() {
         tripSessionId={tripSessionIdToProcess}
         onClose={() => setPassengerActionModalVisible(false)}
         onActionComplete={() => {
-            // Aquí se podría disparar un evento global de refresco si fuera necesario
-            console.log("Acción de pasajero completada globalmente");
+          // Aquí se podría disparar un evento global de refresco si fuera necesario
+          console.log("Acción de pasajero completada globalmente");
         }}
       />
     </>

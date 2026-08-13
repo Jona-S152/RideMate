@@ -1,4 +1,5 @@
 import { useAuth } from "@/app/context/AuthContext";
+import AvatarStudioModal from "@/components/Modals/avatar-studio-modal";
 import ChangePasswordModal from "@/components/Modals/change-password";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedTextInput } from "@/components/ThemedTextInput";
@@ -6,6 +7,7 @@ import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { userService } from "@/services/user.service";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, Keyboard, Pressable, View } from "react-native";
@@ -20,6 +22,10 @@ export default function EditProfileScreen() {
     const [name, setName] = useState(user?.name || "");
     const [lastName, setLastName] = useState("");
     const [email, setEmail] = useState(user?.email || "");
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.avatar_profile || null);
+    const [phoneNumber, setPhoneNumber] = useState("");
+    const [phoneError, setPhoneError] = useState("");
+    const [studioVisible, setStudioVisible] = useState(false);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
 
@@ -63,6 +69,8 @@ export default function EditProfileScreen() {
                 setName(data.name || "");
                 setLastName(data.last_name || "");
                 setEmail(data.email || "");
+                setPhoneNumber(data.phone_number ? data.phone_number.replace(/^\+593/, "") : "");
+                if (data.avatar_profile) setAvatarUrl(data.avatar_profile);
             }
         } catch (error: any) {
             console.error("Error fetching user details:", error.message);
@@ -71,21 +79,49 @@ export default function EditProfileScreen() {
         }
     };
 
+    const handlePhoneChange = (text: string) => {
+        const cleaned = text.replace(/\D/g, "");
+        const truncated = cleaned.slice(0, 9);
+        setPhoneNumber(truncated);
+
+        if (truncated.length > 0 && truncated.length < 9) {
+            setPhoneError("El número debe tener 9 dígitos");
+        } else {
+            setPhoneError("");
+        }
+    };
+
     const handleSave = async () => {
         if (!user?.id) return;
+
+        if (phoneNumber.length > 0 && phoneNumber.length !== 9) {
+            Alert.alert("Error", "El número de teléfono debe tener exactamente 9 dígitos.");
+            return;
+        }
+
         setSaving(true);
         try {
-            await userService.updateProfile(user.id, {
+            const fullPhoneNumber = phoneNumber ? `+593${phoneNumber}` : undefined;
+
+            const isUpdated = await userService.updateProfile(user.id, {
                 name,
                 last_name: lastName,
-                email
+                email,
+                avatar_profile: avatarUrl || undefined,
+                phone_number: fullPhoneNumber
             });
 
+            if (!isUpdated) {
+                Alert.alert("Error", "No se ha podido actualizar la información del perfil.");
+                return;
+            }
             // Update Auth Context
             await updateUser({
                 ...user,
                 name: name,
-                email: email
+                email: email,
+                avatar_profile: avatarUrl || undefined,
+                phone_number: fullPhoneNumber
             });
 
             Alert.alert("Éxito", "Perfil actualizado correctamente");
@@ -128,11 +164,18 @@ export default function EditProfileScreen() {
                 </Pressable>
                 <View className="items-center">
                     <View className="relative w-32 h-32 mb-4">
-                        <View className="rounded-full w-32 h-32 items-center justify-center overflow-hidden border-4 shadow-sm" style={{ backgroundColor: Colors.dark.glassSoft, borderColor: Colors.dark.border }}>
-                            <Ionicons name="person" size={60} color="#94a3b8" />
+                        <View className="rounded-full w-32 h-32 items-center justify-center overflow-hidden border-4 shadow-sm relative" style={{ backgroundColor: Colors.dark.glassSoft, borderColor: Colors.dark.border }}>
+                            {avatarUrl ? (
+                                <Image source={{ uri: avatarUrl }} className="w-full h-full" contentFit="cover" />
+                            ) : (
+                                <Ionicons name="person" size={60} color="#94a3b8" />
+                            )}
                         </View>
-                        <Pressable className="absolute bottom-0 right-0 p-2 rounded-full shadow-md border" style={{ backgroundColor: Colors.dark.glassSoft, borderColor: Colors.dark.border }}>
-                            <Ionicons name="camera" size={20} color={Colors.light.primary} />
+                        <Pressable
+                            onPress={() => setStudioVisible(true)}
+                            className="absolute bottom-0 right-0 p-2 rounded-full shadow-md border" style={{ backgroundColor: Colors.dark.glassSoft, borderColor: Colors.dark.border }}
+                        >
+                            <Ionicons name="color-palette" size={20} color={Colors.dark.secondary} />
                         </Pressable>
                     </View>
                     <ThemedText
@@ -166,6 +209,28 @@ export default function EditProfileScreen() {
                         value={lastName}
                         onChangeText={setLastName}
                     />
+                </View>
+
+                <View className="mb-6">
+                    <ThemedText className="text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Número de teléfono</ThemedText>
+                    <View
+                        className="flex-row items-center rounded-full border px-4"
+                        style={{ borderColor: phoneError ? "#ef4444" : Colors.dark.border, backgroundColor: Colors.dark.glassSoft }}
+                    >
+                        <ThemedText className="mr-2 font-bold text-base">🇪🇨 +593</ThemedText>
+                        <ThemedTextInput
+                            keyboardType="phone-pad"
+                            lightColor="transparent"
+                            className="flex-1 py-4 text-base bg-transparent"
+                            style={{ borderWidth: 0 }}
+                            placeholder="99 123 4567"
+                            value={phoneNumber}
+                            onChangeText={handlePhoneChange}
+                        />
+                    </View>
+                    {phoneError ? (
+                        <ThemedText className="text-red-500 text-xs mt-1 ml-2">{phoneError}</ThemedText>
+                    ) : null}
                 </View>
 
                 <View className="mb-6">
@@ -213,6 +278,12 @@ export default function EditProfileScreen() {
                 transparent={true}
                 visible={changePassVisibleModal}
                 setVisible={setChangePassVisibleModal}
+            />
+
+            <AvatarStudioModal
+                visible={studioVisible}
+                setVisible={setStudioVisible}
+                onApply={(url) => setAvatarUrl(url)}
             />
         </KeyboardAwareScrollView>
     );

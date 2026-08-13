@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import * as Linking from "expo-linking";
 
 export interface UserRecord {
   id: string;
@@ -6,6 +7,7 @@ export interface UserRecord {
   is_driver: boolean;
   driver_mode: boolean;
   name: string;
+  avatar_profile?: string;
 }
 
 export interface AuthSessionResponse {
@@ -103,12 +105,22 @@ export const authService = {
    * Fetches user profile, auto-assigns tenant if missing, and updates last_seen_at.
    */
   async signIn(email: string, password: string): Promise<AuthSessionResponse> {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    if (error) throw error;
+    if (signInError) {
+        if (
+          signInError.message.includes("Email not confirmed")
+        ) {
+          throw new Error("Tu correo electrónico aún no ha sido confirmado. Por favor revisa tu bandeja de entrada y haz clic en el enlace de confirmación.");
+        } else if (signInError.message.includes("Invalid login credentials")){
+          throw new Error("Email o contraseña incorrectos");
+        } else{
+          throw new Error("No se pudo iniciar sesión después de la confirmación: " + signInError.message);
+        }
+      }
 
     const userId = data.user?.id;
     if (!userId) throw new Error("No se pudo obtener el ID del usuario.");
@@ -180,50 +192,105 @@ export const authService = {
   },
 
   /**
-   * Registers a new user, automatically signs them in, resolves tenant, and inserts profile.
+   * Phase 1: Registers user in Supabase Auth and sends confirmation email.
+   * Does NOT insert into public.users — that happens after email confirmation.
    */
-  async signUp(form: { email: string; password: string; name: string; lastname: string }): Promise<AuthSessionResponse> {
+  async signUp(form: { email: string; password: string; name: string; lastname: string }): Promise<{ needsEmailConfirmation: boolean }> {
+    // Clear any existing active session from a previous user
+    await supabase.auth.signOut().catch(() => {});
+
     // Verify that the organization exists for this email domain
     const org = await this.resolveOrganizationByEmail(form.email);
     if (!org) {
       throw new Error("El dominio de tu correo electrónico no pertenece a ninguna organización registrada.");
     }
 
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const redirectUrl = Linking.createURL('email-confirmation');
+    console.log("[authService.signUp] Redirect URL: ", redirectUrl);
+    const { error: authError } = await supabase.auth.signUp({
       email: form.email.trim(),
       password: form.password,
+      options: {
+        emailRedirectTo: redirectUrl,
+      },
     });
 
     if (authError) throw authError;
 
-    // Ensure we get an active session
-    const session = await this.ensureSession(form.email.trim(), form.password);
+    return { needsEmailConfirmation: true };
+  },
+
+  /**
+   * Phase 2: Completes registration after email confirmation.
+   * Inserts profile into public.users and assigns tenant/organization.
+   */
+  async completeRegistration(form: { email: string; password: string; name: string; lastname: string }): Promise<AuthSessionResponse> {
+    const cleanEmail = form.email.trim().toLowerCase();
+    let session = (await supabase.auth.getSession()).data.session;
+
+    // Verify that active session matches the target registration email
+    const isMatchingSession = session?.user?.email?.toLowerCase() === cleanEmail;
+
+    if (!isMatchingSession) {
+      // Clear mismatched session if any
+      if (session) {
+        await supabase.auth.signOut().catch(() => {});
+      }
+
+      // Sign in specifically for the newly registered email
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: form.email.trim(),
+        password: form.password,
+      });
+
+      if (signInError) {
+        if (
+          signInError.message.includes("Email not confirmed") ||
+          signInError.message.includes("Invalid login credentials")
+        ) {
+          throw new Error("Tu correo electrónico aún no ha sido confirmado. Por favor revisa tu bandeja de entrada y haz clic en el enlace de confirmación.");
+        }
+        throw new Error("No se pudo iniciar sesión después de la confirmación: " + signInError.message);
+      }
+      session = signInData.session;
+    }
+
     if (!session?.user) {
-      throw new Error("No se pudo iniciar sesión automáticamente después del registro.");
+      throw new Error("No se pudo obtener la sesión después de la confirmación.");
     }
 
     const userId = session.user.id;
+    const org = await this.resolveOrganizationByEmail(form.email);
 
-    // Insert user record in public.users first (necessary due to foreign key constraints on organization_members)
-    const { error: insertError } = await supabase.from("users").insert({
-      id: userId,
-      name: form.name || null,
-      last_name: form.lastname || null,
-      email: form.email,
-      is_driver: false,
-      role_id: 2,
-      city_id: org.city_id,
-      status: 'active',
-      last_seen_at: new Date().toISOString()
-    });
+    // Check if user record already exists (in case of retry)
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle();
 
-    if (insertError) throw insertError;
+    if (!existingUser) {
+      // Insert user record in public.users
+      const { error: insertError } = await supabase.from("users").insert({
+        id: userId,
+        name: form.name || null,
+        last_name: form.lastname || null,
+        email: form.email,
+        is_driver: false,
+        role_id: 2,
+        city_id: org?.city_id,
+        status: 'active',
+        last_seen_at: new Date().toISOString()
+      });
 
-    // Resolve tenant and create organization member relation
-    try {
-      await this.assignTenantByEmail(userId, form.email);
-    } catch (tenantErr) {
-      console.error("[authService.signUp] Error resolving tenant:", tenantErr);
+      if (insertError) throw insertError;
+
+      // Resolve tenant and create organization member relation
+      try {
+        await this.assignTenantByEmail(userId, form.email);
+      } catch (tenantErr) {
+        console.error("[authService.completeRegistration] Error resolving tenant:", tenantErr);
+      }
     }
 
     return {

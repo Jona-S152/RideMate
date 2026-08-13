@@ -3,6 +3,7 @@ import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { useCollapsingHeader } from "@/hooks/useCollapsingHeader";
 import { authService } from "@/services/auth.service";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Animated, Dimensions, Image, Keyboard, Platform, Pressable, ScrollView, Text, View } from "react-native";
@@ -65,23 +66,36 @@ export default function RegisterScreen() {
   }, []);
 
   const handleRegister = async () => {
+    if (!form.name || !form.lastname || !form.email || !form.password) {
+      Alert.alert("Campos requeridos", "Por favor completa todos los campos.");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const { session, userRecord } = await authService.signUp({
+      // Phase 1: Register in Supabase Auth (sends confirmation email)
+      await authService.signUp({
         email: form.email.trim(),
         password: form.password,
         name: form.name,
         lastname: form.lastname
       });
 
-      // Guardar token + user en el contexto inmediatamente
-      await login(session?.access_token ?? "", userRecord);
-      setLoading(false);
+      // Save form data for Phase 2 (after email confirmation)
+      await AsyncStorage.setItem('pendingRegistration', JSON.stringify({
+        email: form.email.trim(),
+        password: form.password,
+        name: form.name,
+        lastname: form.lastname,
+      }));
 
+      // Navigate to email confirmation screen
+      router.push('/(auth)/email-confirmation');
     } catch (err: any) {
       console.log("Register error:", err);
       Alert.alert("Error al registrarse", err?.message ?? String(err));
+    } finally {
       setLoading(false);
     }
   };

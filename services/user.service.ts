@@ -8,6 +8,7 @@ export interface UserProfile {
   is_driver: boolean;
   avatar_profile?: string;
   city_id?: number | null;
+  phone_number?: string;
 }
 
 export interface ActivityItem {
@@ -42,20 +43,32 @@ export const userService = {
   /**
    * Updates basic profile details for a user.
    */
-  async updateProfile(userId: string, data: { name: string; last_name: string; email: string }): Promise<void> {
-    const { error } = await supabase
-      .from("users")
-      .update({
-        name: data.name,
-        last_name: data.last_name,
-        email: data.email,
-      })
-      .eq("id", userId);
+  async updateProfile(userId: string, data: { name: string; last_name: string; email: string; avatar_profile?: string, phone_number?: string }): Promise<boolean> {
+    const updateData: any = {
+      name: data.name,
+      last_name: data.last_name,
+      email: data.email,
+      phone_number: data.phone_number,
+    };
+    
+    if (data.avatar_profile !== undefined) {
+      updateData.avatar_profile = data.avatar_profile;
+    }
+
+    const { data: result, error } = await supabase
+      .rpc("update_user_profile", {user_id: userId, payload: updateData});
+
+    // const { error } = await supabase
+    //   .from("users")
+    //   .update(updateData)
+    //   .eq("id", userId);
 
     if (error) {
       console.error("[userService.updateProfile] Error:", error.message);
       throw error;
     }
+
+    return result;
   },
 
   /**

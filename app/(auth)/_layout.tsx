@@ -1,4 +1,4 @@
-import { Redirect, Slot } from "expo-router";
+import { Redirect, Stack } from "expo-router";
 import { useAuth } from "../context/AuthContext";
 
 export default function AuthLayout() {
@@ -8,5 +8,5 @@ export default function AuthLayout() {
 
   if (token) return <Redirect href="/(tabs)/home" />;
 
-  return <Slot initialRouteName="login" />;
+  return <Stack screenOptions={{ headerShown: false }} />;
 }

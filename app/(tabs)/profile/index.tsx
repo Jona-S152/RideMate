@@ -6,9 +6,10 @@ import { UserData } from "@/interfaces/available-routes";
 import { ratingsService } from "@/services/ratings.service";
 import { userService } from "@/services/user.service";
 import { Ionicons } from "@expo/vector-icons";
-import { Link } from "expo-router";
-import { useEffect, useState } from "react";
-import { Image, Pressable, ScrollView, View } from "react-native";
+import { Image } from "expo-image";
+import { Link, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
+import { Pressable, ScrollView, View } from "react-native";
 
 export default function ProfileScreen() {
     const { user, logout } = useAuth();
@@ -17,9 +18,12 @@ export default function ProfileScreen() {
 
     const fetchUser = async () => {
         if (!user?.id) return;
+        
+        console.log("Recargando datos del usuario en ProfileScreen...");
 
         try {
             const data = await userService.getUserProfile(user.id);
+            console.log("Datos obtenidos de Supabase:", data?.avatar_profile);
             if (data) {
                 const ratingInfo = await ratingsService.getUserRating(user.id);
                 setUserData({
@@ -33,9 +37,11 @@ export default function ProfileScreen() {
         }
     }
 
-    useEffect(() => {
-        fetchUser();
-    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            fetchUser();
+        }, [user?.id])
+    );
 
     const contentTextColor = Colors.dark.text;
 
@@ -52,11 +58,12 @@ export default function ProfileScreen() {
                         {userData?.name}
                     </ThemedText>
                     <View className="relative w-60 h-60 my-3">
-                        {userData?.avatar_profile ?
+                        {userData?.avatar_profile || user?.avatar_profile ?
                             (
                                 <Image
                                     className="rounded-full w-60 h-60 my-3"
-                                    source={{ uri: userData?.avatar_profile }}
+                                    source={{ uri: userData?.avatar_profile || user?.avatar_profile }}
+                                    contentFit="cover"
                                 />
                             )
                             :
