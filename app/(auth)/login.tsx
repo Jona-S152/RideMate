@@ -49,7 +49,7 @@ export default function LoginScreen() {
     const handleLogin = async (email: string, password: string) => {
         try {
             const { session, userRecord } = await authService.signIn(email, password);
-            
+
             // Llamamos a login correctamente
             await login(session?.access_token ?? '', userRecord);
             console.log("Sesión iniciada", userRecord);
@@ -104,7 +104,7 @@ export default function LoginScreen() {
                     </ThemedText>
                 </Pressable>
 
-                <View className="mt-1">
+                <View className="mt-4">
                     <Link href={'/(auth)/register'}>
                         <Text style={{ color: Colors.light.secondary }}>
                             ¿No tienes cuenta? Crea una

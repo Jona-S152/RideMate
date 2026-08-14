@@ -3,10 +3,11 @@ import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { useCollapsingHeader } from "@/hooks/useCollapsingHeader";
 import { authService } from "@/services/auth.service";
+import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Dimensions, Image, Keyboard, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Alert, Animated, Dimensions, Image, Keyboard, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useAuth } from "../context/AuthContext";
 
 export default function RegisterScreen() {
@@ -21,6 +22,7 @@ export default function RegisterScreen() {
 
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const headerHeight = useCollapsingHeader({
     expanded: HEADER_EXPANDED,
@@ -68,6 +70,20 @@ export default function RegisterScreen() {
   const handleRegister = async () => {
     if (!form.name || !form.lastname || !form.email || !form.password) {
       Alert.alert("Campos requeridos", "Por favor completa todos los campos.");
+      return;
+    }
+
+    // Validate password requirements
+    const reqs = {
+      minLength: form.password.length >= 8,
+      hasUppercase: /[A-Z]/.test(form.password),
+      hasLowercase: /[a-z]/.test(form.password),
+      hasNumber: /[0-9]/.test(form.password),
+      hasSpecial: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password),
+    };
+    const allMet = Object.values(reqs).every(Boolean);
+    if (!allMet) {
+      Alert.alert("Contraseña inválida", "La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula, un número y un carácter especial.");
       return;
     }
 
@@ -152,14 +168,61 @@ export default function RegisterScreen() {
             onChangeText={(t) => setForm({ ...form, email: t })}
           />
 
-          <ThemedTextInput
-            lightColor={Colors.light.glassSoft}
-            className="py-6 px-4 mb-4 w-full"
-            placeholder="Contraseña"
-            secureTextEntry
-            value={form.password}
-            onChangeText={(t) => setForm({ ...form, password: t })}
-          />
+          {/* Password field with eye toggle */}
+          <View className="mb-4">
+            {/* Input row */}
+            <ThemedView
+              className="flex-row items-center p-4 rounded-full"
+              style={{ borderWidth: 1, borderColor: Colors.dark.borderColor }}
+            >
+              <TextInput
+                style={{ color: Colors.dark.text }}
+                placeholderTextColor="rgba(160,174,203,0.9)"
+                className="flex-1"
+                placeholder="Contraseña"
+                secureTextEntry={!showPassword}
+                value={form.password}
+                onChangeText={(t) => setForm({ ...form, password: t })}
+              />
+              <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={8} className="p-2">
+                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color="#64748b" />
+              </Pressable>
+            </ThemedView>
+            {/* Password Requirements */}
+            {form.password.length > 0 && (() => {
+              const reqs = {
+                minLength: form.password.length >= 8,
+                hasUppercase: /[A-Z]/.test(form.password),
+                hasLowercase: /[a-z]/.test(form.password),
+                hasNumber: /[0-9]/.test(form.password),
+                hasSpecial: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password),
+              };
+              return (
+                <View
+                  className="px-4 pb-3 mt-1 rounded-xl"
+                  style={{
+                    borderColor: Colors.dark.borderWarning,
+                    borderWidth: 1,
+                    backgroundColor: Colors.dark.warning,
+                    paddingTop: 12,
+                  }}
+                >
+                  {([
+                    [reqs.minLength, "Mínimo 8 caracteres"],
+                    [reqs.hasUppercase, "Al menos una mayúscula"],
+                    [reqs.hasLowercase, "Al menos una minúscula"],
+                    [reqs.hasNumber, "Al menos un número"],
+                    [reqs.hasSpecial, "Al menos un carácter especial"],
+                  ] as [boolean, string][]).map(([met, label]) => (
+                    <View key={label} className="flex-row items-center mb-1">
+                      <Ionicons name={met ? "checkmark-circle" : "ellipse-outline"} size={14} color={met ? "#22c55e" : "#64748b"} />
+                      <Text className="ml-2 text-xs" style={{ color: met ? "#22c55e" : "#64748b" }}>{label}</Text>
+                    </View>
+                  ))}
+                </View>
+              );
+            })()}
+          </View>
 
           <Pressable
             onPress={handleRegister}
