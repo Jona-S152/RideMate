@@ -7,7 +7,8 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Dimensions, Image, Keyboard, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Animated, Dimensions, Image, Keyboard, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import Toast from "react-native-toast-message";
 import { useAuth } from "../context/AuthContext";
 
 export default function RegisterScreen() {
@@ -69,7 +70,11 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     if (!form.name || !form.lastname || !form.email || !form.password) {
-      Alert.alert("Campos requeridos", "Por favor completa todos los campos.");
+      Toast.show({
+        type: "error",
+        text1: "Campos requeridos",
+        text2: "Por favor completa todos los campos.",
+      });
       return;
     }
 
@@ -83,20 +88,41 @@ export default function RegisterScreen() {
     };
     const allMet = Object.values(reqs).every(Boolean);
     if (!allMet) {
-      Alert.alert("Contraseña inválida", "La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula, un número y un carácter especial.");
+      Toast.show({
+        type: "warning",
+        text1: "Contraseña inválida",
+        text2: "La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula, un número y un carácter especial.",
+      });
       return;
     }
 
     setLoading(true);
 
     try {
-      // Phase 1: Register in Supabase Auth (sends confirmation email)
-      await authService.signUp({
+      // Phase 1: Register in Supabase Auth (sends confirmation email or registers directly)
+      const res = await authService.signUp({
         email: form.email.trim(),
         password: form.password,
         name: form.name,
         lastname: form.lastname
       });
+
+      if (!res.needsEmailConfirmation && res.session) {
+        await login(res.session.access_token, {
+          id: res.session.user.id,
+          email: res.session.user.email || form.email.trim(),
+          is_driver: false,
+          driver_mode: false,
+          name: `${form.name} ${form.lastname}`.trim(),
+        });
+        Toast.show({
+          type: "success",
+          text1: "¡Registro Exitoso!",
+          text2: "Tu cuenta ha sido creada.",
+        });
+        router.replace('/(tabs)/available-routes'); // REDIRIGIR A HOME
+        return;
+      }
 
       // Save form data for Phase 2 (after email confirmation)
       await AsyncStorage.setItem('pendingRegistration', JSON.stringify({
@@ -110,7 +136,11 @@ export default function RegisterScreen() {
       router.push('/(auth)/email-confirmation');
     } catch (err: any) {
       console.log("Register error:", err);
-      Alert.alert("Error al registrarse", err?.message ?? String(err));
+      Toast.show({
+        type: "error",
+        text1: "Error al registrarse",
+        text2: err?.message ?? String(err),
+      });
     } finally {
       setLoading(false);
     }

@@ -10,7 +10,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Keyboard, Pressable, View } from "react-native";
+import { ActivityIndicator, Animated, Keyboard, Pressable, View } from "react-native";
+import Toast from "react-native-toast-message";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 export default function EditProfileScreen() {
@@ -95,7 +96,11 @@ export default function EditProfileScreen() {
         if (!user?.id) return;
 
         if (phoneNumber.length > 0 && phoneNumber.length !== 9) {
-            Alert.alert("Error", "El número de teléfono debe tener exactamente 9 dígitos.");
+            Toast.show({
+                type: "warning",
+                text1: "Número inválido",
+                text2: "El número de teléfono debe tener exactamente 9 dígitos.",
+            });
             return;
         }
 
@@ -112,7 +117,11 @@ export default function EditProfileScreen() {
             });
 
             if (!isUpdated) {
-                Alert.alert("Error", "No se ha podido actualizar la información del perfil.");
+                Toast.show({
+                    type: "error",
+                    text1: "Error",
+                    text2: "No se ha podido actualizar la información del perfil.",
+                });
                 return;
             }
             // Update Auth Context
@@ -124,14 +133,22 @@ export default function EditProfileScreen() {
                 phone_number: fullPhoneNumber
             });
 
-            Alert.alert("Éxito", "Perfil actualizado correctamente");
+            Toast.show({
+                type: "success",
+                text1: "Éxito",
+                text2: "Perfil actualizado correctamente",
+            });
             if (router.canGoBack()) {
                 router.back();
             } else {
                 router.replace("/(tabs)/profile");
             }
         } catch (error: any) {
-            Alert.alert("Error", error.message);
+            Toast.show({
+                type: "error",
+                text1: "Error",
+                text2: error.message,
+            });
         } finally {
             setSaving(false);
         }

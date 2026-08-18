@@ -15,7 +15,6 @@ import { useIsFocused } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Animated,
   Easing,
   Pressable,
@@ -23,6 +22,7 @@ import {
   ScrollView,
   View,
 } from "react-native";
+import Toast from "react-native-toast-message";
 
 export default function PassengerRoutesScreen() {
   const { user } = useAuth();
@@ -73,21 +73,33 @@ export default function PassengerRoutesScreen() {
       // 1. Verificar si el usuario ya está unido a este viaje en passenger_trip_sessions
       const existingJoinStatus = await tripService.checkPassengerSessionStatus(user.id, route.id);
       if (existingJoinStatus === 'joined') {
-        Alert.alert('Ya estás en este viaje', 'Ya estás participando en este viaje.');
+        Toast.show({
+          type: "info",
+          text1: "Ya estás en este viaje",
+          text2: "Ya estás participando en este viaje.",
+        });
         return;
       }
 
       // 2. Verificar si el usuario ya tiene una solicitud pendiente en passenger_requests
       const pendingRequest = await tripService.checkPassengerRequestStatus(user.id, route.id);
       if (pendingRequest?.status === 'pending') {
-        Alert.alert('Solicitud pendiente', 'Ya has enviado una solicitud para este viaje. Espera a que el conductor la apruebe.');
+        Toast.show({
+          type: "info",
+          text1: "Solicitud pendiente",
+          text2: "Ya has enviado una solicitud para este viaje. Espera a que el conductor la apruebe.",
+        });
         return;
       }
 
       // 3. Verificar si el usuario ya tiene algún viaje activo (cualquiera con status joined)
       const hasActiveSession = await tripService.hasActiveTripSession(user.id);
       if (hasActiveSession) {
-        Alert.alert("Error", "Ya tienes un viaje en curso");
+        Toast.show({
+          type: "warning",
+          text1: "Viaje activo",
+          text2: "Ya tienes un viaje en curso.",
+        });
         return;
       }
 
@@ -98,7 +110,11 @@ export default function PassengerRoutesScreen() {
       });
     } catch (error) {
       console.error("Error in handleRoutePress:", error);
-      Alert.alert("Error", "No se pudo procesar la solicitud");
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: "No se pudo procesar la solicitud",
+      });
     }
   };
 

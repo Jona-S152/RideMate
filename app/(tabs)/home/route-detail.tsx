@@ -8,6 +8,7 @@ import * as Location from "expo-location";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import { Alert, Animated, AppState, AppStateStatus, Dimensions, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import Toast from "react-native-toast-message";
 import {
   GestureHandlerRootView
 } from "react-native-gesture-handler";
@@ -476,7 +477,11 @@ export default function RouteDetail() {
       // Validar ubicación del conductor respecto al punto de inicio
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permiso denegado', 'Se requiere acceso a la ubicación para iniciar el viaje.');
+        Toast.show({
+          type: 'error',
+          text1: 'Permiso denegado',
+          text2: 'Se requiere acceso a la ubicación para iniciar el viaje.',
+        });
         return;
       }
 
@@ -491,10 +496,11 @@ export default function RouteDetail() {
         const distance = calculateDistance(driverLat, driverLon, startLat, startLon);
 
         if (distance > 1.0) { // 1.0 km de tolerancia
-          Alert.alert(
-            "Punto de inicio lejano",
-            "Estás muy lejos del punto de inicio para comenzar la ruta. Por favor, acércate al punto de partida."
-          );
+          Toast.show({
+            type: 'error',
+            text1: 'Punto de inicio lejano',
+            text2: 'Estás muy lejos del punto de inicio para comenzar la ruta. Por favor, acércate al punto de partida.',
+          });
           return;
         }
       }
@@ -503,14 +509,22 @@ export default function RouteDetail() {
       await tripService.startTripSession(session.id);
       console.log("[route-detail.handleStartTrip] trip session started, dispatching notifications", { sessionId: session.id });
 
-      Alert.alert("Éxito", "¡Viaje iniciado!");
+      Toast.show({
+        type: 'success',
+        text1: 'Éxito',
+        text2: '¡Viaje iniciado!',
+      });
 
       // Iniciar el tracking de ubicación sin bloquear el flujo de notificaciones
       const { startTracking } = useTripTrackingStore.getState();
       void startTracking(Number(id), user.id);
     } catch (error) {
       console.error("Error starting trip:", error);
-      Alert.alert("Error", "No se pudo iniciar el viaje.");
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'No se pudo iniciar el viaje.',
+      });
     }
   };
 
@@ -532,7 +546,11 @@ export default function RouteDetail() {
                 const isFinished = await tripService.finishTripSession(session.id);
 
                 if (!isFinished) {
-                  Alert.alert("Error", "No se pudo finalizar el viaje correctamente.");
+                  Toast.show({
+                    type: 'error',
+                    text1: 'Error',
+                    text2: 'No se pudo finalizar el viaje correctamente.',
+                  });
                   return;
                 }
 
@@ -552,11 +570,19 @@ export default function RouteDetail() {
                   }
                 }
 
-                Alert.alert("¡Viaje finalizado!", "Has llegado al destino y completado el viaje.");
+                Toast.show({
+                  type: 'success',
+                  text1: '¡Viaje finalizado!',
+                  text2: 'Has llegado al destino y completado el viaje.',
+                });
                 router.replace("/(tabs)/home");
               } catch (error) {
                 console.error("Error leaving trip:", error);
-                Alert.alert("Error", "No se pudo abandonar el viaje.");
+                Toast.show({
+                  type: 'error',
+                  text1: 'Error',
+                  text2: 'No se pudo abandonar el viaje.',
+                });
               }
             }
           }
@@ -564,7 +590,11 @@ export default function RouteDetail() {
       );
     } catch (error) {
       console.error("Error finishing trip:", error);
-      Alert.alert("Error", "No se pudo finalizar el viaje correctamente.");
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'No se pudo finalizar el viaje correctamente.',
+      });
     }
   };
 
@@ -572,7 +602,11 @@ export default function RouteDetail() {
     if (!session) return;
 
     if (!user || user.driver_mode !== true) {
-      Alert.alert("Info", "Solo el conductor puede cancelar el viaje desde aquí.");
+      Toast.show({
+        type: 'info',
+        text1: 'Info',
+        text2: 'Solo el conductor puede cancelar el viaje desde aquí.',
+      });
       return;
     }
 
@@ -597,7 +631,11 @@ export default function RouteDetail() {
                   trip_session_id: session.id,
                 });
 
-                Alert.alert("Éxito", "Viaje cancelado correctamente.");
+                Toast.show({
+                  type: 'success',
+                  text1: 'Éxito',
+                  text2: 'Viaje cancelado correctamente.',
+                });
                 if (router.canGoBack()) {
                   router.back();
                 } else {
@@ -605,19 +643,23 @@ export default function RouteDetail() {
                 }
               } catch (error: any) {
                 console.error("Error al cancelar el viaje:", error.message);
-                Alert.alert("Error", "No se pudo cancelar el viaje.");
+                Toast.show({
+                  type: 'error',
+                  text1: 'Error',
+                  text2: 'No se pudo cancelar el viaje.',
+                });
               }
             }
           }
         ]
       );
-
-      // Alert.alert("¡Viaje finalizado!", "Has llegado al destino y completado el viaje.");
-      // router.replace("/(tabs)/home");
-
     } catch (error) {
       console.error("Error finishing trip:", error);
-      Alert.alert("Error", "No se pudo finalizar el viaje correctamente.");
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'No se pudo finalizar el viaje correctamente.',
+      });
     }
   };
 
@@ -644,7 +686,11 @@ export default function RouteDetail() {
                 trip_session_id: session.id,
               });
 
-              Alert.alert("Éxito", "Has abandonado el viaje correctamente.");
+              Toast.show({
+                type: 'success',
+                text1: 'Éxito',
+                text2: 'Has abandonado el viaje correctamente.',
+              });
               if (router.canGoBack()) {
                 router.back();
               } else {
@@ -652,7 +698,11 @@ export default function RouteDetail() {
               }
             } catch (error) {
               console.error("Error leaving trip:", error);
-              Alert.alert("Error", "No se pudo abandonar el viaje.");
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: 'No se pudo abandonar el viaje.',
+              });
             }
           }
         }
@@ -693,10 +743,18 @@ export default function RouteDetail() {
         }
       } catch (error) {
         console.error("Error al abrir mapa:", error);
-        Alert.alert("Error", "No se pudo abrir la aplicación de mapas.");
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'No se pudo abrir la aplicación de mapas.',
+        });
       }
     } else {
-      Alert.alert("Info", "No hay más puntos pendientes en el viaje.");
+      Toast.show({
+        type: 'info',
+        text1: 'Info',
+        text2: 'No hay más puntos pendientes en el viaje.',
+      });
     }
   };
 
@@ -1652,7 +1710,11 @@ export default function RouteDetail() {
                 setWaypointToCheckIn(targetWaypoint);
                 setCheckInModalVisible(true);
               } else {
-                Alert.alert("Información", "No se encontró el punto de encuentro del pasajero.");
+                Toast.show({
+                  type: 'info',
+                  text1: 'Información',
+                  text2: 'No se encontró el punto de encuentro del pasajero.',
+                });
               }
             } else if (p?.status === 'joined') {
               // Pasajero a bordo: Buscar STRICTAMENTE su parada de destino (stop)
@@ -1663,7 +1725,11 @@ export default function RouteDetail() {
                 setWaypointToCheckIn(targetWaypoint);
                 setCheckInModalVisible(true);
               } else {
-                Alert.alert("Información", "El pasajero no tiene paradas pendientes.");
+                Toast.show({
+                  type: 'info',
+                  text1: 'Información',
+                  text2: 'El pasajero no tiene paradas pendientes.',
+                });
               }
             }
           }}
@@ -1720,7 +1786,11 @@ export default function RouteDetail() {
                   comment: r.comment
                 }))
               );
-              Alert.alert("Éxito", "¡Gracias por tus calificaciones!");
+              Toast.show({
+                type: 'success',
+                text1: 'Éxito',
+                text2: '¡Gracias por tus calificaciones!',
+              });
             } catch (error) {
               console.error("Error saving ratings:", error);
               throw error;

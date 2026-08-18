@@ -6,6 +6,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Href, router } from "expo-router";
 import { useState } from "react";
 import { Alert, Image, Text, TouchableOpacity, View } from "react-native";
+import Toast from "react-native-toast-message";
 import { ThemedText } from "../ui/ThemedText";
 
 interface StopData {
@@ -93,7 +94,11 @@ export default function AvailableRouteCard({
                             onPress: async () => {
                                 try {
                                     await tripService.DeleteTripSession(user!.id);
-                                    Alert.alert("Éxito", "Ruta eliminada correctamente.");
+                                    Toast.show({
+                                        type: "success",
+                                        text1: "Éxito",
+                                        text2: "Ruta eliminada correctamente.",
+                                    });
                                     if (router.canGoBack()) {
                                         router.back();
                                     } else {
@@ -101,7 +106,11 @@ export default function AvailableRouteCard({
                                     }
                                 } catch (error: any) {
                                     console.error("Error al cancelar el viaje:", error.message);
-                                    Alert.alert("Error", "No se pudo cancelar el viaje.");
+                                    Toast.show({
+                                        type: "error",
+                                        text1: "Error",
+                                        text2: "No se pudo cancelar el viaje.",
+                                    });
                                 }
                             }
                         }

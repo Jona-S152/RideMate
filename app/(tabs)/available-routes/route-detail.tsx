@@ -18,6 +18,7 @@ import * as Location from "expo-location";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Image, Pressable, RefreshControl, ScrollView, View } from "react-native";
+import Toast from "react-native-toast-message";
 
 
 export default function RouteDetail() {
@@ -213,7 +214,11 @@ export default function RouteDetail() {
             // Validate driver proximity to start point
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
-                Alert.alert('Permiso denegado', 'Se requiere acceso a la ubicación para iniciar el viaje.');
+                Toast.show({
+                    type: "error",
+                    text1: "Permiso denegado",
+                    text2: "Se requiere acceso a la ubicación para iniciar el viaje.",
+                });
                 setIsActionLoading(false);
                 return;
             }
@@ -229,10 +234,11 @@ export default function RouteDetail() {
                 const distance = calculateDistance(driverLat, driverLon, startLat, startLon);
 
                 if (distance > 1.0) { // 1.0 km de tolerancia
-                    Alert.alert(
-                        "Punto de inicio lejano",
-                        "Estás muy lejos del punto de inicio para comenzar la ruta. Por favor, acércate al punto de partida."
-                    );
+                    Toast.show({
+                        type: "warning",
+                        text1: "Punto de inicio lejano",
+                        text2: "Estás muy lejos del punto de inicio para comenzar la ruta. Por favor, acércate al punto de partida.",
+                    });
                     setIsActionLoading(false);
                     return;
                 }
@@ -273,7 +279,11 @@ export default function RouteDetail() {
 
         } catch (error: any) {
             console.error("Error al iniciar el viaje:", error.message);
-            Alert.alert("Error", "No se pudo iniciar el viaje. Por favor, intentalo de nuevo.");
+            Toast.show({
+                type: "error",
+                text1: "Error",
+                text2: "No se pudo iniciar el viaje. Por favor, intentalo de nuevo.",
+            });
         } finally {
             setIsActionLoading(false);
         }
@@ -281,7 +291,11 @@ export default function RouteDetail() {
 
     const handleCancelTrip = async () => {
         if (!user || user.driver_mode !== true) {
-            Alert.alert("Info", "Solo el conductor puede cancelar el viaje desde aquí.");
+            Toast.show({
+                type: "info",
+                text1: "Información",
+                text2: "Solo el conductor puede cancelar el viaje desde aquí.",
+            });
             return;
         }
 
@@ -310,7 +324,11 @@ export default function RouteDetail() {
                                 console.error("Error stopping tracking on cancel:", trackError);
                             }
 
-                            Alert.alert("Éxito", "Viaje cancelado correctamente.");
+                            Toast.show({
+                                type: "success",
+                                text1: "Éxito",
+                                text2: "Viaje cancelado correctamente.",
+                            });
                             if (router.canGoBack()) {
                                 router.back();
                             } else {
@@ -318,7 +336,11 @@ export default function RouteDetail() {
                             }
                         } catch (error: any) {
                             console.error("Error al cancelar el viaje:", error.message);
-                            Alert.alert("Error", "No se pudo cancelar el viaje.");
+                            Toast.show({
+                                type: "error",
+                                text1: "Error",
+                                text2: "No se pudo cancelar el viaje.",
+                            });
                         } finally {
                             setIsActionLoading(false);
                         }
@@ -366,7 +388,11 @@ export default function RouteDetail() {
                                 trip_session_id: session.id,
                             });
 
-                            Alert.alert("Éxito", "Has abandonado el viaje correctamente.");
+                            Toast.show({
+                                type: "success",
+                                text1: "Éxito",
+                                text2: "Has abandonado el viaje correctamente.",
+                            });
                             if (router.canGoBack()) {
                                 router.back();
                             } else {
@@ -374,7 +400,11 @@ export default function RouteDetail() {
                             }
                         } catch (error) {
                             console.error("Error leaving trip:", error);
-                            Alert.alert("Error", "No se pudo abandonar el viaje.");
+                            Toast.show({
+                                type: "error",
+                                text1: "Error",
+                                text2: "No se pudo abandonar el viaje.",
+                            });
                         }
                     }
                 }

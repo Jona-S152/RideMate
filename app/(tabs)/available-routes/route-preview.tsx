@@ -9,7 +9,8 @@ import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import Mapbox, { Camera, LineLayer, MapView, MarkerView, ShapeSource } from "@rnmapbox/maps";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Dimensions, Image, Pressable, StyleSheet, View, ViewStyle } from "react-native";
+import { ActivityIndicator, Dimensions, Image, Pressable, StyleSheet, View, ViewStyle } from "react-native";
+import Toast from "react-native-toast-message";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -123,7 +124,11 @@ export default function RoutePreviewScreen() {
             }
         } catch (error) {
             console.error("Error fetching route details:", error);
-            Alert.alert("Error", "No se pudieron cargar los detalles de la ruta");
+            Toast.show({
+                type: "error",
+                text1: "Error",
+                text2: "No se pudieron cargar los detalles de la ruta",
+            });
         } finally {
             setLoading(false);
         }
@@ -180,7 +185,11 @@ export default function RoutePreviewScreen() {
                     .maybeSingle();
 
                 if (activeSession) {
-                    Alert.alert("Error", "Ya tienes un viaje en curso");
+                    Toast.show({
+                        type: "warning",
+                        text1: "Viaje activo",
+                        text2: "Ya tienes un viaje en curso",
+                    });
                     return;
                 }
 
@@ -228,7 +237,11 @@ export default function RoutePreviewScreen() {
             }
         } catch (error) {
             console.error(error);
-            Alert.alert("Error", "No se pudo procesar la solicitud");
+            Toast.show({
+                type: "error",
+                text1: "Error",
+                text2: "No se pudo procesar la solicitud",
+            });
         } finally {
             setActionLoading(false);
         }

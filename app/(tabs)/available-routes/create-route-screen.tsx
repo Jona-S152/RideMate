@@ -16,11 +16,11 @@ import { useLocalSearchParams } from "expo-router/build/hooks";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   StyleSheet,
   View
 } from "react-native";
+import Toast from "react-native-toast-message";
 
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
 Mapbox.setAccessToken(MAPBOX_TOKEN);
@@ -54,11 +54,12 @@ export default function CreateRouteScreen() {
   // Route Guard: solo conductores en modo conductor pueden acceder
   useEffect(() => {
     if (user && (!user.is_driver || !user.driver_mode)) {
-      Alert.alert(
-        "Acceso restringido",
-        "Solo los conductores en modo conductor pueden crear rutas.",
-        [{ text: "OK", onPress: () => router.replace("/(tabs)/home") }]
-      );
+      Toast.show({
+        type: "error",
+        text1: "Acceso restringido",
+        text2: "Solo los conductores en modo conductor pueden crear rutas.",
+      });
+      router.replace("/(tabs)/home");
     }
   }, [user]);
 
@@ -194,10 +195,11 @@ export default function CreateRouteScreen() {
       const distance = calculateDistance(driverLat, driverLon, startLat, startLon);
 
       if (distance > 1.0) { // 1.0 km tolerance
-        Alert.alert(
-          "Punto de inicio lejano",
-          "El punto de inicio de la ruta está muy lejos de tu ubicación actual. Por favor, acércate al punto de partida o ajusta el inicio de la ruta para continuar."
-        );
+        Toast.show({
+          type: "warning",
+          text1: "Punto de inicio lejano",
+          text2: "El punto de inicio de la ruta está muy lejos de tu ubicación actual. Por favor, acércate al punto de partida o ajusta el inicio de la ruta para continuar.",
+        });
         isSubmitting.current = false;
         setLoading(false);
         return;
@@ -215,20 +217,18 @@ export default function CreateRouteScreen() {
         endPoint.coords,
         staticMapUrl
       );
-      Alert.alert(
-        "¡Éxito!",
-        "Ruta creada correctamente.",
-        [
-          {
-            text: "OK",
-            onPress: () => {
-              router.replace("/(tabs)/available-routes");
-            }
-          }
-        ]
-      );
+      Toast.show({
+        type: "success",
+        text1: "¡Éxito!",
+        text2: "Ruta creada correctamente.",
+      });
+      router.replace("/(tabs)/available-routes");
     } catch (error: any) {
-      Alert.alert("Error", error.message);
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: error.message,
+      });
       isSubmitting.current = false;
     } finally {
       setLoading(false);

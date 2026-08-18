@@ -2,7 +2,8 @@ import { Colors } from "@/constants/Colors";
 import { UserData } from "@/interfaces/available-routes";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, Modal, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Image, Modal, Pressable, Text, View } from "react-native";
+import Toast from "react-native-toast-message";
 import SlideToConfirmButton from "../ui/SlideToConfirmButton";
 
 interface Waypoint {
@@ -94,7 +95,11 @@ export default function WaypointCheckInModal({
     };
 
     const handleBoardPassengerStep2 = async () => {
-        Alert.alert("Pasajero a bordo", "El pasajero ha sido marcado como a bordo.");
+        Toast.show({
+            type: 'success',
+            text1: 'Pasajero a bordo',
+            text2: 'El pasajero ha sido marcado como a bordo.',
+        });
         if (onPassengerBoarded && waypoint.passengerId) {
             try {
                 await onPassengerBoarded(waypoint.passengerId);

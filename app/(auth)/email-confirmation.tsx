@@ -5,7 +5,8 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import Toast from "react-native-toast-message";
 import { useAuth } from "../context/AuthContext";
 
 export default function EmailConfirmationScreen() {
@@ -81,10 +82,11 @@ export default function EmailConfirmationScreen() {
       await login(session?.access_token ?? "", userRecord);
     } catch (err: any) {
       console.error("[email-confirmation] Error completando registro:", err);
-      Alert.alert(
-        "Verificación incompleta",
-        err?.message || "Asegúrate de haber confirmado tu correo antes de continuar."
-      );
+      Toast.show({
+        type: "error",
+        text1: "Verificación incompleta",
+        text2: err?.message || "Asegúrate de haber confirmado tu correo antes de continuar.",
+      });
     } finally {
       setLoading(false);
     }
@@ -92,7 +94,11 @@ export default function EmailConfirmationScreen() {
 
   const handleResendEmail = async () => {
     if (!email) {
-      Alert.alert("Error", "No se encontró la dirección de correo.");
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: "No se encontró la dirección de correo.",
+      });
       return;
     }
     setResending(true);
@@ -106,10 +112,18 @@ export default function EmailConfirmationScreen() {
       });
 
       if (error) throw error;
-      Alert.alert("Correo reenviado", "Se ha enviado un nuevo enlace de confirmación a tu correo electrónico.");
+      Toast.show({
+        type: "success",
+        text1: "Correo reenviado",
+        text2: "Se ha enviado un nuevo enlace de confirmación a tu correo electrónico.",
+      });
     } catch (err: any) {
       console.error("[email-confirmation] Error reenviando correo:", err);
-      Alert.alert("Error", err?.message || "No se pudo reenviar el correo de confirmación.");
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: err?.message || "No se pudo reenviar el correo de confirmación.",
+      });
     } finally {
       setResending(false);
     }

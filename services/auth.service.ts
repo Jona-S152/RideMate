@@ -193,9 +193,9 @@ export const authService = {
 
   /**
    * Phase 1: Registers user in Supabase Auth and sends confirmation email.
-   * Does NOT insert into public.users — that happens after email confirmation.
+   * If email confirmation is disabled in Supabase, directly creates public.users record.
    */
-  async signUp(form: { email: string; password: string; name: string; lastname: string }): Promise<{ needsEmailConfirmation: boolean }> {
+  async signUp(form: { email: string; password: string; name: string; lastname: string }): Promise<{ needsEmailConfirmation: boolean; session?: any }> {
     // Clear any existing active session from a previous user
     await supabase.auth.signOut().catch(() => {});
 
@@ -207,15 +207,45 @@ export const authService = {
 
     const redirectUrl = Linking.createURL('email-confirmation');
     console.log("[authService.signUp] Redirect URL: ", redirectUrl);
-    const { error: authError } = await supabase.auth.signUp({
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email: form.email.trim(),
       password: form.password,
       options: {
         emailRedirectTo: redirectUrl,
+        data: {
+          name: form.name,
+          lastname: form.lastname,
+        }
       },
     });
 
     if (authError) throw authError;
+
+    const targetUser = authData?.user || authData?.session?.user;
+
+    // Si Supabase tiene desactivada la confirmación de correo, se genera el perfil directo en public.users
+    if (targetUser && (authData?.session || targetUser.confirmed_at)) {
+      const userId = targetUser.id;
+      const { error: insertError } = await supabase.from("users").upsert({
+        id: userId,
+        name: form.name || null,
+        last_name: form.lastname || null,
+        email: form.email.trim(),
+        is_driver: false,
+        role_id: 2,
+        city_id: org?.city_id,
+        status: 'active',
+        last_seen_at: new Date().toISOString()
+      }, { onConflict: "id" });
+
+      if (insertError) {
+        console.error("[authService.signUp] Error creando perfil directo en public.users:", insertError);
+      } else {
+        await this.assignTenantByEmail(userId, form.email.trim());
+      }
+
+      return { needsEmailConfirmation: false, session: authData?.session || null };
+    }
 
     return { needsEmailConfirmation: true };
   },

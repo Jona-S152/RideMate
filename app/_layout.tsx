@@ -14,6 +14,10 @@ import "../services/backgroundLocation.task";
 import AuthProvider, { useAuth } from "./context/AuthContext";
 import SessionProvider from "./context/SessionContext";
 
+import Toast from "react-native-toast-message";
+import { toastConfig } from "@/components/common/toast-config";
+import { registerDeviceToken, setupNotificationChannel } from "@/services/notifications.service";
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -37,6 +41,13 @@ function MainApp() {
   const [passengerActionModalVisible, setPassengerActionModalVisible] = useState(false);
   const [passengerIdToProcess, setPassengerIdToProcess] = useState<string | null>(null);
   const [tripSessionIdToProcess, setTripSessionIdToProcess] = useState<number>(0);
+
+  useEffect(() => {
+    setupNotificationChannel();
+    if (user?.id) {
+      registerDeviceToken(user.id);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     // Definimos la estructura esperada de los datos de la notificación
@@ -175,6 +186,8 @@ function MainApp() {
           console.log("Acción de pasajero completada globalmente");
         }}
       />
+
+      <Toast config={toastConfig} />
     </>
   );
 }

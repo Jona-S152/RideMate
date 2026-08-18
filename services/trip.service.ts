@@ -512,6 +512,8 @@ export const tripService = {
       payload.organization_id = orgId;
     }
 
+    console.warn("PAYLOAD PASSENGER REQUESTS: ", JSON.stringify(payload, null, 2));
+
     const { error } = await supabase.from("passenger_requests").insert([payload]);
 
     if (error) {

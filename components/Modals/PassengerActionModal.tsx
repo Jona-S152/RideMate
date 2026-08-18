@@ -16,6 +16,7 @@ import {
   Text,
   View,
 } from "react-native";
+import Toast from "react-native-toast-message";
 
 interface PassengerActionModalProps {
   visible: boolean;
@@ -100,7 +101,11 @@ export default function PassengerActionModal({
         return;
       }
       console.error("Error fetching passenger details:", error);
-      Alert.alert("Error", "No se pudo cargar la información del pasajero.");
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: "No se pudo cargar la información del pasajero.",
+      });
     } finally {
       setLoading(false);
     }
@@ -136,7 +141,11 @@ export default function PassengerActionModal({
       onClose();
     } catch (error: any) {
       console.error("Error approving passenger:", error);
-      Alert.alert("Error", error?.message || "No se pudo aprobar la solicitud.");
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: error?.message || "No se pudo aprobar la solicitud.",
+      });
     } finally {
       setActionLoading(false);
     }
@@ -168,7 +177,11 @@ export default function PassengerActionModal({
       onClose();
     } catch (error: any) {
       console.error("Error rejecting passenger:", error);
-      Alert.alert("Error", error?.message || "No se pudo rechazar la solicitud.");
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: error?.message || "No se pudo rechazar la solicitud.",
+      });
     } finally {
       setActionLoading(false);
     }

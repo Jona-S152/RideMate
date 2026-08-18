@@ -20,12 +20,12 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import Toast from "react-native-toast-message";
 
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
 Mapbox.setAccessToken(MAPBOX_TOKEN);
@@ -87,11 +87,19 @@ export default function SelectionMapScreen() {
       try {
         const enabled = await Location.hasServicesEnabledAsync();
         if (!enabled) {
-          Alert.alert("GPS Desactivado", "Activa tu ubicación para usar el mapa correctamente.", [{ text: "OK" }]);
+          Toast.show({
+            type: "warning",
+            text1: "GPS Desactivado",
+            text2: "Activa tu ubicación para usar el mapa correctamente.",
+          });
         }
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
-          Alert.alert("Permiso denegado", "Necesitamos tu ubicación para mostrar el mapa.");
+          Toast.show({
+            type: "error",
+            text1: "Permiso denegado",
+            text2: "Necesitamos tu ubicación para mostrar el mapa.",
+          });
           return;
         }
         const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
@@ -172,10 +180,20 @@ export default function SelectionMapScreen() {
 
       if (data) {
         if (data.status === "approved" && joinedStatus) {
-          Alert.alert("Ya estás en este viaje", "Tu solicitud fue aprobada.", [{ text: "OK", onPress: () => router.replace("/(tabs)/available-routes") }]);
+          Toast.show({
+            type: "info",
+            text1: "Ya estás en este viaje",
+            text2: "Tu solicitud fue aprobada.",
+          });
+          router.replace("/(tabs)/available-routes");
         } else if (data.status === "pending") {
           setHasPendingRequest(true);
-          Alert.alert("Solicitud existente", "Ya enviaste una solicitud. Espera la respuesta del conductor.", [{ text: "OK", onPress: () => router.replace("/(tabs)/available-routes") }]);
+          Toast.show({
+            type: "info",
+            text1: "Solicitud existente",
+            text2: "Ya enviaste una solicitud. Espera la respuesta del conductor.",
+          });
+          router.replace("/(tabs)/available-routes");
         }
       }
     };
@@ -229,7 +247,11 @@ export default function SelectionMapScreen() {
 
     if (activeMode === "pickup") {
       if (!isValidPickup) {
-        Alert.alert("Selección Inválida", "El punto de encuentro debe estar a menos de 150 metros de la ruta.");
+        Toast.show({
+          type: "warning",
+          text1: "Selección Inválida",
+          text2: "El punto de encuentro debe estar a menos de 150 metros de la ruta.",
+        });
         return;
       }
       setLoading(true);
@@ -270,10 +292,18 @@ export default function SelectionMapScreen() {
         pickupPoint.name || "Punto de Encuentro",
         destPoint.name || "Punto de Destino"
       );
-      Alert.alert("Solicitud Enviada", "Tu solicitud fue enviada. Espera la aprobación del conductor.");
+      Toast.show({
+        type: "success",
+        text1: "Solicitud Enviada",
+        text2: "Tu solicitud fue enviada. Espera la aprobación del conductor.",
+      });
       router.replace("/(tabs)/available-routes");
     } catch (error: any) {
-      Alert.alert("Error", error.message);
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: error.message,
+      });
     } finally {
       setLoading(false);
     }

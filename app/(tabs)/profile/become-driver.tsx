@@ -7,7 +7,8 @@ import { userService } from "@/services/user.service";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Keyboard, Pressable, View } from "react-native";
+import { ActivityIndicator, Animated, Keyboard, Pressable, View } from "react-native";
+import Toast from "react-native-toast-message";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 export default function BecomeDriverScreen() {
@@ -68,7 +69,11 @@ export default function BecomeDriverScreen() {
     const handleApply = async () => {
         try {
             if (!user?.id) {
-                Alert.alert("Error", "Por favor inicia sesión primero.");
+                Toast.show({
+                    type: "error",
+                    text1: "Error",
+                    text2: "Por favor inicia sesión primero.",
+                });
                 return;
             }
 
@@ -86,11 +91,19 @@ export default function BecomeDriverScreen() {
                 name: name
             });
 
-            Alert.alert("¡Felicidades!", "Ahora eres un conductor verificado.");
+            Toast.show({
+                type: "success",
+                text1: "¡Felicidades!",
+                text2: "Ahora eres un conductor verificado.",
+            });
             router.replace("/(tabs)/profile");
 
         } catch (error: any) {
-            Alert.alert("Error", error.message);
+            Toast.show({
+                type: "error",
+                text1: "Error",
+                text2: error.message,
+            });
         } finally {
             setLoading(false);
         }
