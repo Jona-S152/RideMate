@@ -1,5 +1,7 @@
 import { Colors } from "@/constants/Colors";
 import { UserData } from "@/interfaces/available-routes";
+import { configService } from "@/services/config.service";
+import { tripService } from "@/services/trip.service";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Image, Modal, Pressable, Text, View } from "react-native";
@@ -18,12 +20,14 @@ interface Waypoint {
     passengerId?: string;
     stopId?: number;
     status?: string;
+    paymentStatus?: string;
 }
 
 interface WaypointCheckInModalProps {
     visible: boolean;
     waypoint: Waypoint | null;
     users?: UserData[];
+    tripSessionId?: number;
     onSkip: () => Promise<void>;
     onArriveMeetingPoint: (passengerId: string, meetingPointId: number) => Promise<void>;
     onArriveStop: (passengerId: string, stopId: number) => Promise<void>;
@@ -35,6 +39,7 @@ export default function WaypointCheckInModal({
     visible,
     waypoint,
     users = [],
+    tripSessionId,
     onSkip,
     onArriveMeetingPoint,
     onArriveStop,
@@ -43,10 +48,26 @@ export default function WaypointCheckInModal({
 }: WaypointCheckInModalProps) {
     const [loading, setLoading] = useState(false);
     const [step, setStep] = useState<1 | 2>(1);
+    const [fareAmount, setFareAmount] = useState<number>(1.25);
 
     useEffect(() => {
         if (visible && waypoint) {
-            if (waypoint.type === 'meeting_point' && (waypoint.status === 'visited' || waypoint.status === 'arrived')) {
+            configService.getStandardPassengerFare().then((val) => setFareAmount(val));
+
+            // Paso 2 en puntos de encuentro: ya se registró la llegada pero el pasajero aún no abordó
+            const isMeetingPointStep2 = waypoint.type === 'meeting_point' &&
+                (waypoint.status === 'visited' || waypoint.status === 'arrived');
+
+            // Paso 2 en paradas de destino: SOLO si el conductor ya confirmó la llegada anteriormente
+            // (tiene un paymentStatus activo) pero no completó el cobro.
+            // Si el status es 'visited' pero NO hay paymentStatus, significa que se acaba de marcar la
+            // llegada y el modal debe comenzar en Paso 1 para confirmar primero.
+            const isStopStep2 = waypoint.type === 'stop' &&
+                (waypoint.status === 'visited' || waypoint.status === 'arrived' || waypoint.status === 'completed' || waypoint.paymentStatus !== undefined) &&
+                waypoint.paymentStatus !== 'confirmed' &&
+                waypoint.paymentStatus !== 'disputed';
+
+            if (isMeetingPointStep2 || isStopStep2) {
                 setStep(2);
             } else {
                 setStep(1);
@@ -87,7 +108,7 @@ export default function WaypointCheckInModal({
                 setStep(2);
             } else {
                 await onArriveStop(waypoint.passengerId || '', targetId);
-                onClose();
+                setStep(2); // Pasar al paso 2 (Cobro de Tarifa)
             }
         } finally {
             setLoading(false);
@@ -111,8 +132,45 @@ export default function WaypointCheckInModal({
         setStep(1);
     };
 
+    const handleConfirmDriverPayment = async (isReceived: boolean) => {
+        setLoading(true);
+        try {
+            const sId = tripSessionId || extractNumericId(waypoint.id);
+            if (waypoint.passengerId && sId) {
+                await tripService.confirmDriverPayment(sId, waypoint.passengerId, isReceived);
+            }
+
+            if (isReceived) {
+                Toast.show({
+                    type: 'success',
+                    text1: 'Pago recibido',
+                    text2: `Se confirmó el cobro de $${fareAmount.toFixed(2)}.`,
+                });
+            } else {
+                Toast.show({
+                    type: 'info',
+                    text1: 'Reportado',
+                    text2: 'Se reportó el no pago del pasajero.',
+                });
+            }
+            onClose();
+            setStep(1);
+        } catch (err) {
+            console.error("Error confirmDriverPayment:", err);
+            Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: 'No se pudo registrar la confirmación de pago.',
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const getIcon = () => {
-        if (step === 2) return 'person-add';
+        if (step === 2) {
+            return waypoint.type === 'stop' ? 'wallet' : 'person-add';
+        }
         if (waypoint.type === 'stop') return 'location';
         if (waypoint.type === 'meeting_point') return 'person';
         return 'flag';
@@ -121,6 +179,9 @@ export default function WaypointCheckInModal({
     const getTitle = () => {
         const name = passengerUser?.name;
         if (step === 2) {
+            if (waypoint.type === 'stop') {
+                return name ? `Cobrar $${fareAmount.toFixed(2)} a ${name}` : `Cobrar $${fareAmount.toFixed(2)}`;
+            }
             return name ? `Marcar a ${name} a bordo` : 'Marcar pasajero a bordo';
         }
         if (waypoint.type === 'stop') {
@@ -133,7 +194,9 @@ export default function WaypointCheckInModal({
     };
 
     const getTypeColor = () => {
-        if (step === 2) return 'bg-emerald-500';
+        if (step === 2) {
+            return waypoint.type === 'stop' ? 'bg-emerald-600' : 'bg-emerald-500';
+        }
         if (waypoint.type === 'stop') return 'bg-purple-500';
         if (waypoint.type === 'meeting_point') return 'bg-primary';
         return 'bg-green-500';
@@ -160,15 +223,15 @@ export default function WaypointCheckInModal({
                         </View>
 
                         {/* Step Badge */}
-                        {waypoint.type === 'meeting_point' && (
-                            <View className="items-center mb-2">
-                                <View className="bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
-                                    <Text className="text-xs font-bold text-slate-300">
-                                        Paso {step} de 2 {step === 1 ? "• Llegada" : "• Abordaje"}
-                                    </Text>
-                                </View>
+                        <View className="items-center mb-2">
+                            <View className="bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
+                                <Text className="text-xs font-bold text-slate-300">
+                                    {waypoint.type === 'stop'
+                                        ? step === 1 ? "Paso 1 de 2 • Llegada" : "Paso 2 de 2 • Cobro de Tarifa"
+                                        : step === 1 ? "Paso 1 de 2 • Llegada" : "Paso 2 de 2 • Abordaje"}
+                                </Text>
                             </View>
-                        )}
+                        </View>
 
                         {/* Title */}
                         <Text className="text-2xl font-bold text-center mb-2 text-white">
@@ -179,7 +242,7 @@ export default function WaypointCheckInModal({
                         <View className="items-center mb-4">
                             {waypoint.type === 'stop' && (
                                 <Text className="text-sm font-bold text-purple-400 uppercase">
-                                    Parada Destino
+                                    {step === 1 ? "Parada Destino" : `Tarifa a cobrar: $${fareAmount.toFixed(2)}`}
                                 </Text>
                             )}
                             {waypoint.type === 'meeting_point' && (
@@ -215,26 +278,51 @@ export default function WaypointCheckInModal({
                                         </Text>
                                     </View>
                                 </View>
+
+                                {step === 2 && waypoint.type === 'stop' && (
+                                    <View className="bg-emerald-950/80 px-3 py-1.5 rounded-xl border border-emerald-500/50 items-end">
+                                        <Text className="text-emerald-400 font-extrabold text-base">
+                                            ${fareAmount.toFixed(2)}
+                                        </Text>
+                                        <Text className="text-emerald-300 text-[10px]">Efectivo</Text>
+                                    </View>
+                                )}
                             </View>
                         )}
 
-                        {/* Ubicación y Descripción de Calles */}
-                        <View className="bg-slate-800/50 p-4 rounded-xl mb-6 border border-slate-700">
-                            <View className="flex-row items-center justify-center gap-1 mb-1">
-                                <Ionicons name="location-outline" size={16} color="#94a3b8" />
-                                <Text className="text-center text-slate-400 text-xs font-semibold uppercase tracking-wider">
-                                    Descripción de la Ubicación
+                        {/* Ubicación y Descripción de Calles (Paso 1) */}
+                        {step === 1 && (
+                            <View className="bg-slate-800/50 p-4 rounded-xl mb-6 border border-slate-700">
+                                <View className="flex-row items-center justify-center gap-1 mb-1">
+                                    <Ionicons name="location-outline" size={16} color="#94a3b8" />
+                                    <Text className="text-center text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                                        Descripción de la Ubicación
+                                    </Text>
+                                </View>
+                                <Text className="text-center text-white font-bold text-base mb-0.5">
+                                    {waypoint.location.split(',')[0]}
                                 </Text>
+                                {waypoint.location.split(',').length > 1 && (
+                                    <Text className="text-center text-slate-400 text-sm">
+                                        {waypoint.location.split(',').slice(1).join(',').trim()}
+                                    </Text>
+                                )}
                             </View>
-                            <Text className="text-center text-white font-bold text-base mb-0.5">
-                                {waypoint.location.split(',')[0]}
-                            </Text>
-                            {waypoint.location.split(',').length > 1 && (
-                                <Text className="text-center text-slate-400 text-sm">
-                                    {waypoint.location.split(',').slice(1).join(',').trim()}
-                                </Text>
-                            )}
-                        </View>
+                        )}
+
+                        {/* Resumen de Cobro (Paso 2 de Parada Destino) */}
+                        {step === 2 && waypoint.type === 'stop' && (
+                            <View className="bg-emerald-950/40 p-4 rounded-2xl mb-6 border border-emerald-500/40">
+                                <View className="flex-row items-center justify-between mb-2">
+                                    <Text className="text-slate-300 font-semibold text-sm">Tarifa fija por asiento:</Text>
+                                    <Text className="text-white font-bold text-base">${fareAmount.toFixed(2)}</Text>
+                                </View>
+                                <View className="flex-row items-center justify-between">
+                                    <Text className="text-slate-300 font-semibold text-sm">Método de pago:</Text>
+                                    <Text className="text-emerald-400 font-bold text-sm">💵 Efectivo directo</Text>
+                                </View>
+                            </View>
+                        )}
 
                         {/* Actions (Paso 1 vs Paso 2) */}
                         {step === 1 ? (
@@ -270,8 +358,41 @@ export default function WaypointCheckInModal({
                                     )}
                                 </Pressable>
                             </View>
+                        ) : waypoint.type === 'stop' ? (
+                            /* Paso 2 para Parada: Confirmación de Pago del Conductor */
+                            <View className="gap-3">
+                                <Pressable
+                                    onPress={() => handleConfirmDriverPayment(true)}
+                                    disabled={loading}
+                                    className="bg-emerald-600 h-14 rounded-xl items-center justify-center shadow-lg"
+                                >
+                                    {loading ? (
+                                        <ActivityIndicator color="white" />
+                                    ) : (
+                                        <View className="flex-row items-center gap-2">
+                                            <Ionicons name="checkmark-done-circle" size={22} color="white" />
+                                            <Text className="text-white font-bold text-base">
+                                                Confirmar Pago Recibido (${fareAmount.toFixed(2)})
+                                            </Text>
+                                        </View>
+                                    )}
+                                </Pressable>
+
+                                <Pressable
+                                    onPress={() => handleConfirmDriverPayment(false)}
+                                    disabled={loading}
+                                    className="bg-slate-800 h-12 rounded-xl items-center justify-center border border-rose-500/50"
+                                >
+                                    <View className="flex-row items-center gap-2">
+                                        <Ionicons name="alert-circle-outline" size={18} color="#f43f5e" />
+                                        <Text className="text-rose-400 font-bold text-sm">
+                                            Reportar Pasajero No Pagó
+                                        </Text>
+                                    </View>
+                                </Pressable>
+                            </View>
                         ) : (
-                            /* Paso 2: Deslizador de Confirmación de Abordaje */
+                            /* Paso 2 para Punto de Encuentro: Deslizador de Confirmación de Abordaje */
                             <View className="mb-2">
                                 <SlideToConfirmButton
                                     onConfirm={handleBoardPassengerStep2}

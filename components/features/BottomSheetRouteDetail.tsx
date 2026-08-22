@@ -312,7 +312,7 @@ export default function BottomSheetRouteDetail({
                       console.log(pSession?.status === 'pending_approval' || pSession?.status === 'joined');
                       if (!user?.driver_mode || !pSession) return;
 
-                      const canProcess = pSession.status === 'pending_approval' || pSession.status === 'joined' || pSession.status === 'pending';
+                      const canProcess = ['pending_approval', 'joined', 'pending', 'completed'].includes(pSession.status);
                       if (!canProcess) return;
 
                       // Delegate to parent/modal
@@ -350,6 +350,27 @@ export default function BottomSheetRouteDetail({
                   nestedScrollEnabled
                 />
               </View>
+
+              {/* Información del Vehículo asignado */}
+              {session?.vehicle && (
+                <View className="mt-4 p-3.5 rounded-2xl flex-row items-center border border-white/10" style={{ backgroundColor: "rgba(255, 255, 255, 0.05)" }}>
+                  <View className="p-2.5 rounded-xl mr-3 justify-center items-center" style={{ backgroundColor: "rgba(18, 182, 234, 0.15)" }}>
+                    <Ionicons name="car-sport-outline" size={22} color={Colors.light.secondary} />
+                  </View>
+                  <View className="flex-1">
+                    <ThemedText className="text-[10px] font-bold uppercase tracking-wider" style={{ color: Colors.light.secondary }}>
+                      Vehículo del Viaje
+                    </ThemedText>
+                    <ThemedText className="text-sm font-bold">
+                      {session.vehicle.brand} {session.vehicle.model} ({session.vehicle.year})
+                    </ThemedText>
+                    <ThemedText className="text-xs opacity-70 mt-0.5">
+                      {`Placa: ${session.vehicle.plate}  •  Color: ${session.vehicle.color}`}
+                    </ThemedText>
+                  </View>
+                </View>
+              )}
+
               {/* Acciones del viaje */}
               <View className="my-6">
                 <ScrollView

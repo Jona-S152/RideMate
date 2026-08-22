@@ -1,3 +1,5 @@
+import { Vehicle } from "./driver";
+
 // 1. Tipos base para las paradas (stops)
 
 // Paradas de la tabla 'routes' (estáticas)
@@ -58,6 +60,8 @@ export interface SessionData {
     id: number;
     route_id: number;
     driver_id: string; // UUID
+    vehicle_id?: string | null;
+    vehicle?: Vehicle | null;
     status: string;
     start_location: string;
     end_location: string;
@@ -95,6 +99,10 @@ export interface PassengerTripSession {
   rejected: boolean;
   rejection_reason?: string | null;
   created_at: string;
+  payment_status?: string | null;
+  passenger_paid_at?: string | null;
+  driver_confirmed_at?: string | null;
+  fare_amount?: number | null;
 }
 
 export interface UserData {

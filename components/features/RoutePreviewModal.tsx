@@ -1,5 +1,7 @@
 import { useAuth } from "@/app/context/AuthContext";
 import { Colors } from "@/constants/Colors";
+import { Vehicle } from "@/interfaces/driver";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
@@ -15,6 +17,7 @@ interface RoutePreviewModalProps {
     imageUrl?: string;
     passengers?: number;
     passengersData?: { id: string; avatar: string }[];
+    vehicle?: Vehicle | null;
     // Actions
     onJoin?: () => void;
     onStartTrip?: () => void;
@@ -31,6 +34,7 @@ export default function RoutePreviewModal({
     imageUrl,
     passengers = 0,
     passengersData = [],
+    vehicle,
     onJoin,
     onStartTrip,
 }: RoutePreviewModalProps) {
@@ -39,6 +43,7 @@ export default function RoutePreviewModal({
     const isDriver = user?.driver_mode === true;
 
     const occupiedCount = passengersData.length > 0 ? passengersData.length : passengers;
+    const maxSeats = vehicle?.seats_capacity || 4;
 
     return (
         <Modal
@@ -129,13 +134,35 @@ export default function RoutePreviewModal({
                             </View>
                         </View>
 
+                        {/* Vehicle Card Section */}
+                        {vehicle && (
+                            <View className="mb-4 bg-surfaceAlt p-4 rounded-2xl flex-row items-center justify-between border border-white/5">
+                                <View className="flex-row items-center gap-3 flex-1">
+                                    <View className="w-10 h-10 rounded-xl items-center justify-center bg-white/10">
+                                        <Ionicons name="car-sport-outline" size={22} color={Colors.light.secondary} />
+                                    </View>
+                                    <View className="flex-1">
+                                        <Text className="text-textSecondary text-[10px] uppercase font-bold tracking-wider">
+                                            Vehículo Asignado
+                                        </Text>
+                                        <Text className="text-white font-bold text-sm">
+                                            {vehicle.brand} {vehicle.model} ({vehicle.year})
+                                        </Text>
+                                        <Text className="text-textSecondary text-xs">
+                                            Placa: {vehicle.plate} | Color: {vehicle.color}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+                        )}
+
                         {/* Seats section — only for passengers */}
                         {!isDriver && (
                             <View className="mb-5 bg-surfaceAlt p-4 rounded-2xl">
                                 <Text className="text-textSecondary text-xs mb-3 uppercase tracking-wider">Asientos disponibles</Text>
                                 <View className="flex-row items-center" style={{ gap: 10 }}>
                                     <View className="flex-row" style={{ gap: 6 }}>
-                                        {[0, 1, 2, 3].map((index) => {
+                                        {Array.from({ length: maxSeats }).map((_, index) => {
                                             const isOccupied = index < occupiedCount;
                                             return (
                                                 <MaterialCommunityIcons
@@ -148,7 +175,7 @@ export default function RoutePreviewModal({
                                         })}
                                     </View>
                                     <Text className="text-white text-sm font-medium ml-2">
-                                        {4 - occupiedCount} Libres
+                                        {Math.max(0, maxSeats - occupiedCount)} Libres
                                     </Text>
                                 </View>
                             </View>

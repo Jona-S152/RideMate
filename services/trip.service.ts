@@ -1,5 +1,6 @@
 import { RouteData, SessionData, UserData } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
+import { configService } from "@/services/config.service";
 import { sendPushNotification } from "@/services/notifications.service";
 import { ratingsService } from "@/services/ratings.service";
 
@@ -55,6 +56,9 @@ export const tripService = {
           name,
           avatar_profile
         ),
+        vehicle:vehicles!vehicle_id (
+          *
+        ),
         routes (
           image_url,
           organization_id
@@ -99,10 +103,11 @@ export const tripService = {
       }
     }
 
-    // 3. Filter routes with capacity < 4 passengers joined
+    // 3. Filter routes with capacity < vehicle's seats_capacity passengers joined
     const availableRoutes = (data || []).filter((session) => {
-      const joinedPassengers = session.passengers?.filter((p: any) => p.status === "joined") || [];
-      if (joinedPassengers.length >= 4) return false;
+      const joinedPassengers = session.passengers?.filter((p: any) => p.status === "joined" || p.status === "pending") || [];
+      const seatsCapacity = session.vehicle?.seats_capacity ?? 4;
+      if (joinedPassengers.length >= seatsCapacity) return false;
       
       // Excluir si el pasajero actual ya está unido al viaje
       const isAlreadyJoined = session.passengers?.some((p: any) => p.passenger_id === userId && p.status === "joined");
@@ -324,7 +329,7 @@ export const tripService = {
       .from("passenger_trip_sessions")
       .update({ status: "cancelled" })
       .eq("trip_session_id", sessionId)
-      .eq("status", "joined");
+      .in("status", ["joined", "pending"]);
 
     if(errorSessionId) {
       console.error("[tripService.cancelTripSession] error:", errorSessionId);
@@ -390,14 +395,99 @@ export const tripService = {
   },
 
   async updateArriveStop(sessionId: number, passengerId: string, passenger_stop_id: number): Promise<boolean> {
-    // Logica para omitir mp y stops del pasajero mediante funcion rpc en supabase
+    // 1. Ejecutar función rpc arrive_passenger_stop
     const { data, error } = await supabase
       .rpc('arrive_passenger_stop', { p_trip_session_id: sessionId, p_passenger_id: passengerId, p_passenger_stop_id: passenger_stop_id });
     if (error) {
       console.error("[tripService.updateArriveStop] error:", error);
       throw error;
     }
+
+    // 2. Asignar la tarifa estándar configurada en passenger_trip_sessions si no ha sido asignada
+    try {
+      const fare = await configService.getStandardPassengerFare();
+      await supabase
+        .from('passenger_trip_sessions')
+        .update({ fare_amount: fare })
+        .eq('trip_session_id', sessionId)
+        .eq('passenger_id', passengerId);
+    } catch (e) {
+      console.warn("[tripService.updateArriveStop] Could not assign fare_amount:", e);
+    }
+
     return data;
+  },
+
+  /**
+   * Confirm passenger payment from the passenger's app.
+   */
+  async confirmPassengerPayment(sessionId: number, passengerId: string): Promise<boolean> {
+    const now = new Date().toISOString();
+
+    // 1. Check existing record
+    const { data: sessionData } = await supabase
+      .from('passenger_trip_sessions')
+      .select('driver_confirmed_at, payment_status')
+      .eq('trip_session_id', sessionId)
+      .eq('passenger_id', passengerId)
+      .maybeSingle();
+
+    const isDriverConfirmed = !!sessionData?.driver_confirmed_at;
+    const newStatus = isDriverConfirmed ? 'confirmed' : 'paid_by_passenger';
+
+    const { error } = await supabase
+      .from('passenger_trip_sessions')
+      .update({
+        passenger_paid_at: now,
+        payment_status: newStatus,
+      })
+      .eq('trip_session_id', sessionId)
+      .eq('passenger_id', passengerId);
+
+    if (error) {
+      console.error("[tripService.confirmPassengerPayment] error:", error);
+      throw error;
+    }
+    return true;
+  },
+
+  /**
+   * Confirm or dispute passenger payment from the driver's app.
+   */
+  async confirmDriverPayment(sessionId: number, passengerId: string, isReceived: boolean): Promise<boolean> {
+    const now = new Date().toISOString();
+
+    // 1. Check existing record
+    const { data: sessionData } = await supabase
+      .from('passenger_trip_sessions')
+      .select('passenger_paid_at, payment_status')
+      .eq('trip_session_id', sessionId)
+      .eq('passenger_id', passengerId)
+      .maybeSingle();
+
+    const isPassengerPaid = !!sessionData?.passenger_paid_at;
+    let newStatus = 'pending';
+
+    if (isReceived) {
+      newStatus = isPassengerPaid ? 'confirmed' : 'confirmed_by_driver';
+    } else {
+      newStatus = isPassengerPaid ? 'disputed' : 'unpaid';
+    }
+
+    const { error } = await supabase
+      .from('passenger_trip_sessions')
+      .update({
+        driver_confirmed_at: now,
+        payment_status: newStatus,
+      })
+      .eq('trip_session_id', sessionId)
+      .eq('passenger_id', passengerId);
+
+    if (error) {
+      console.error("[tripService.confirmDriverPayment] error:", error);
+      throw error;
+    }
+    return true;
   },
 
   /**
@@ -964,6 +1054,10 @@ export const tripService = {
       trip_session_id: p.trip_session_id,
       passenger_id: p.passenger_id,
       status: p.status,
+      payment_status: p.payment_status,
+      passenger_paid_at: p.passenger_paid_at,
+      driver_confirmed_at: p.driver_confirmed_at,
+      fare_amount: p.fare_amount,
       rejected: false,
       created_at: p.created_at || new Date().toISOString(),
     }));
@@ -1031,11 +1125,11 @@ export const tripService = {
       .in("trip_session_meeting_points.status", ["pending", "visited"]);
 
     if (error) {
-      console.error("[tripService.getActiveSessionStops] error:", error);
+      console.error("[tripService.getActiveMeetingPoints] error:", error);
       throw error;
     }
 
-    return data?.map(({ trip_session_stops, ...passenger_mp }) => ({
+    return data?.map(({ trip_session_meeting_points, ...passenger_mp }) => ({
       ...passenger_mp,
       coords: {
         latitude: Number(passenger_mp.coords?.coordinates?.[1] ?? passenger_mp.coords?.latitude ?? 0),
@@ -1092,7 +1186,24 @@ export const tripService = {
       .from('passenger_trip_sessions')
       .select("id")
       .eq("passenger_id", passengerId)
-      .in("status", ["joined"])
+      .in("status", ["joined", "pending"])
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[tripService.hasActiveTripSession] error:", error);
+      throw error;
+    }
+    return !!data;
+  },
+
+  async hasCompletedTripSession(passengerId: string, sessionId: number): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('passenger_trip_sessions')
+      .select("id")
+      .eq("passenger_id", passengerId)
+      .eq("trip_session_id", sessionId)
+      .in("status", ["completed"])
       .limit(1)
       .maybeSingle();
 
@@ -1138,5 +1249,39 @@ export const tripService = {
       console.error('[tripService.clearDriverLocation] error:', error);
       throw error;
     }
+  },
+
+  /**
+   * Subscribes to passenger_trip_sessions changes for a specific passenger.
+   * Fires onCompleted with the trip_session_id when status changes to 'completed'.
+   * Returns an unsubscribe function to clean up.
+   */
+  subscribeToPassengerTripCompleted(
+    passengerId: string,
+    onCompleted: (tripSessionId: number) => void
+  ): () => void {
+    const channel = supabase
+      .channel(`passenger-trip-completed-${passengerId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'passenger_trip_sessions',
+          filter: `passenger_id=eq.${passengerId}`,
+        },
+        (payload) => {
+          const updated = payload.new as any;
+          if (updated?.status === 'completed') {
+            console.log('[tripService] Passenger trip completed:', updated.trip_session_id);
+            onCompleted(updated.trip_session_id);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }
 };

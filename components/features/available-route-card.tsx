@@ -36,6 +36,7 @@ interface DriverRouteCardProps {
     status?: string;
     user_pending_request?: boolean;
     pendingRequestsCount?: number;
+    seatsCapacity?: number;
     onPress?: () => void;
 }
 
@@ -53,6 +54,7 @@ export default function AvailableRouteCard({
     status,
     user_pending_request = false,
     pendingRequestsCount = 0,
+    seatsCapacity,
     onPress,
 }: DriverRouteCardProps) {
 
@@ -194,10 +196,10 @@ export default function AvailableRouteCard({
                             {isDriver ? "Toca para iniciar" : ""}
                         </Text>
 
-                        {/* Seat Icons — only for passengers */}
+                        {/* Seat Icons — only for passengers, count based on vehicle capacity */}
                         {!isDriver && (
                             <View className="flex-row" style={{ gap: 4 }}>
-                                {[0, 1, 2, 3].map((index) => (
+                                {Array.from({ length: seatsCapacity ?? 4 }, (_, i) => i).map((index) => (
                                     <MaterialCommunityIcons
                                         key={index}
                                         name="car-seat"

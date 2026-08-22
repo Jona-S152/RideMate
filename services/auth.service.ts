@@ -349,5 +349,60 @@ export const authService = {
     if (error) {
       console.error("[authService.signOut] Error:", error.message);
     }
+  },
+
+  /**
+   * Fetches fresh user details from the database for a given userId.
+   */
+  async fetchFreshUserRecord(userId: string): Promise<Partial<UserRecord> | null> {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, email, is_driver, name, last_name, avatar_profile')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return {
+      id: data.id,
+      email: data.email,
+      is_driver: data.is_driver ?? false,
+      name: data.name ?? 'Usuario',
+      avatar_profile: data.avatar_profile,
+    };
+  },
+
+  /**
+   * Subscribes to real-time changes on the current user's record in 'users' table.
+   * Calls onUpdate callback whenever 'is_driver' or profile fields are updated in DB.
+   */
+  subscribeToUserChanges(userId: string, onUpdate: (updatedFields: Partial<UserRecord>) => void) {
+    const channel = supabase
+      .channel(`public:users:${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'users',
+          filter: `id=eq.${userId}`,
+        },
+        (payload) => {
+          const newData = payload.new as any;
+          if (newData) {
+            onUpdate({
+              id: newData.id,
+              email: newData.email,
+              is_driver: newData.is_driver ?? false,
+              name: newData.name,
+              avatar_profile: newData.avatar_profile,
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }
 };

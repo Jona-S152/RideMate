@@ -96,6 +96,7 @@ interface Waypoint {
   stopId?: number;
   status?: string;
   visitTime?: string | null;
+  paymentStatus?: string;
 }
 
 export default function RouteDetail() {
@@ -129,6 +130,8 @@ export default function RouteDetail() {
   const { driverLocation } = useDriverLocation(Number(id));
   const { meetingPoints: rtMeetingPoints } = useTripMeetingPoints(Number(id));
 
+  const isDriver = !!(user?.driver_mode || (session && user && session.driver_id === user.id));
+
   const [region, setRegion] = useState<MapRegion | null>(null);
   const [hasCenteredOnDriver, setHasCenteredOnDriver] = useState(false);
   const [isCameraCenteredOnDriver, setIsCameraCenteredOnDriver] = useState(false);
@@ -160,14 +163,12 @@ export default function RouteDetail() {
 
   useEffect(() => {
     // 🛡️ SEGURIDAD: Solo abrir el modal de acción si el usuario actual es el CONDUCTOR
-    const isDriver = session && user && session.driver_id === user.id;
-
     if (params.autoOpenModal === "true" && params.passenger_id && isDriver) {
       // Abrir modal automáticamente
       setPassengerIdToProcess(params.passenger_id);
       setModalVisible(true);
     }
-  }, [params.autoOpenModal, params.passenger_id, session, user]);
+  }, [params.autoOpenModal, params.passenger_id, isDriver]);
 
   useEffect(() => {
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
@@ -242,7 +243,7 @@ export default function RouteDetail() {
 
   // Cuando cambia el realtime de stops, refrescar por si hay cambios de estado
   useEffect(() => {
-    if (stops && stops.length > 0) {
+    if (stops) {
       fetchActiveSessionStops();
     }
   }, [stops]);
@@ -254,7 +255,7 @@ export default function RouteDetail() {
 
   // Cuando cambia el realtime de meeting points, refrescar
   useEffect(() => {
-    if (rtMeetingPoints && rtMeetingPoints.length > 0) {
+    if (rtMeetingPoints) {
       fetchMeetingPoints();
     }
   }, [rtMeetingPoints]);
@@ -285,6 +286,13 @@ export default function RouteDetail() {
     // 4. Fetch waypoint statuses
     const { stopStatuses, meetingStatuses } = await tripService.getTripSessionWaypointStatuses(Number(id));
 
+    // Obtenemos los pasajeros activos de la sesión
+    const activePassengerIds = new Set(
+      passengers
+        .filter(p => !['left', 'cancelled', 'rejected'].includes(p.status))
+        .map(p => p.passenger_id)
+    );
+
     // Combine stops and meeting points
     const combined = [
       ...stopsData.map((stop) => {
@@ -309,7 +317,13 @@ export default function RouteDetail() {
           visitTime: statusInfo?.visit_time,
         };
       }),
-    ];
+    ].filter(item => {
+      // 🛡️ Filtro de seguridad: excluir waypoints omitidos, abandonados o cancelados
+      const isStatusInactive = ['skipped', 'left', 'cancelled'].includes(item.status);
+      // 🛡️ Filtro de seguridad: excluir waypoints de pasajeros que abandonaron o fueron cancelados
+      const isPassengerActive = !item.passengerId || activePassengerIds.size === 0 || activePassengerIds.has(item.passengerId);
+      return !isStatusInactive && isPassengerActive;
+    });
 
     console.log("buildWaypoints: combined items", combined);
 
@@ -395,6 +409,8 @@ export default function RouteDetail() {
       setCheckedInWaypoints((prev) => new Set(prev).add(waypointToCheckIn.id));
       setCheckInModalVisible(false);
       setWaypointToCheckIn(null);
+      await fetchActiveSessionStops();
+      await fetchMeetingPoints();
       await buildWaypoints();
     }
   };
@@ -464,9 +480,8 @@ export default function RouteDetail() {
       if (waypointToCheckIn) {
         setCheckedInWaypoints((prev) => new Set(prev).add(waypointToCheckIn.id));
       }
-      setCheckInModalVisible(false);
-      setWaypointToCheckIn(null);
       await buildWaypoints();
+      fetchPassengers();
     }
   };
 
@@ -1060,8 +1075,9 @@ export default function RouteDetail() {
             if (data) {
               setPassengers(data);
               fetchSessionUsers(data);
-              // Also refresh meeting points when passengers change
+              // Refresh meeting points and active stops when passengers change (e.g. leave trip)
               fetchMeetingPoints();
+              fetchActiveSessionStops();
             }
           });
         },
@@ -1598,6 +1614,9 @@ export default function RouteDetail() {
                             // Siempre realizar focus de cámara al punto seleccionado
                             changeLocation(waypoint.coords.latitude, waypoint.coords.longitude);
 
+                            // 🛡️ SEGURIDAD PASAJERO: Si el usuario NO es el conductor, NO abrir ningún modal
+                            if (!isDriver) return;
+
                             const p = passengers.find(px => px.passenger_id === waypoint.passengerId);
 
                             if (waypoint.type === "meeting_point") {
@@ -1607,10 +1626,20 @@ export default function RouteDetail() {
                                 setCheckInModalVisible(true);
                               }
                             } else if (waypoint.type === "stop") {
-                              // Solo abrir modal si el pasajero YA está a bordo (status === 'joined') y la parada no está visitada
-                              const isUnvisited = waypoint.status !== "visited" && waypoint.status !== "completed";
-                              if (p?.status === "joined" && isUnvisited) {
-                                setWaypointToCheckIn(waypoint);
+                              // 🛡️ REGLA DE NEGOCIO: La parada solo se gestiona si el pasajero YA ABORDÓ ('joined' o 'completed')
+                              const isPassengerOnBoard = p?.status === "joined" || p?.status === "completed";
+                              if (!isPassengerOnBoard) return;
+
+                              const isStopVisited = waypoint.status === "visited" || waypoint.status === "completed" || p?.status === "completed";
+                              const isPaymentConfirmed = !!p?.driver_confirmed_at || p?.payment_status === "confirmed" || p?.payment_status === "disputed";
+
+                              if (!isStopVisited) {
+                                // Paso 1: Marcar llegada (pasajero está a bordo y aún no se llega a su destino)
+                                setWaypointToCheckIn({ ...waypoint, paymentStatus: undefined });
+                                setCheckInModalVisible(true);
+                              } else if (!isPaymentConfirmed) {
+                                // Paso 2: Llegada ya confirmada, cobro pendiente (Persistencia de Paso 2)
+                                setWaypointToCheckIn({ ...waypoint, paymentStatus: p?.payment_status || 'pending' });
                                 setCheckInModalVisible(true);
                               }
                             }
@@ -1695,6 +1724,9 @@ export default function RouteDetail() {
           onNavigate={handleOpenNavigation}
           onPassengerPress={(pId) => {
             console.warn("PASSENGER PRESSED: ", pId);
+            // 🛡️ SEGURIDAD PASAJERO: Si el usuario NO es el conductor, NO abrir ningún modal de gestión
+            if (!isDriver) return;
+
             const p = passengers.find(px => px.passenger_id === pId);
             console.warn("PASSENGER DATA: ", p);
 
@@ -1716,14 +1748,31 @@ export default function RouteDetail() {
                   text2: 'No se encontró el punto de encuentro del pasajero.',
                 });
               }
-            } else if (p?.status === 'joined') {
-              // Pasajero a bordo: Buscar STRICTAMENTE su parada de destino (stop)
+            } else if (p?.status === 'joined' || p?.status === 'completed') {
+              // Pasajero a bordo o recién completado: Buscar su parada de destino (stop)
               const targetWaypoint = waypoints.find(wp => wp.passengerId === pId && wp.type === 'stop');
 
-              if (targetWaypoint && targetWaypoint.status !== 'visited' && targetWaypoint.status !== 'completed') {
-                changeLocation(targetWaypoint.coords.latitude, targetWaypoint.coords.longitude);
-                setWaypointToCheckIn(targetWaypoint);
-                setCheckInModalVisible(true);
+              if (targetWaypoint) {
+                const isStopVisited = targetWaypoint.status === 'visited' || targetWaypoint.status === 'completed' || p?.status === 'completed';
+                const isPaymentConfirmed = !!p?.driver_confirmed_at || p?.payment_status === 'confirmed' || p?.payment_status === 'disputed';
+
+                if (!isStopVisited) {
+                  // Paso 1: Marcar llegada (aún no visitado)
+                  changeLocation(targetWaypoint.coords.latitude, targetWaypoint.coords.longitude);
+                  setWaypointToCheckIn({ ...targetWaypoint, paymentStatus: undefined });
+                  setCheckInModalVisible(true);
+                } else if (!isPaymentConfirmed) {
+                  // Paso 2: Llegada ya marcada, cobro pendiente (Persistencia de Paso 2 desde BottomSheet)
+                  changeLocation(targetWaypoint.coords.latitude, targetWaypoint.coords.longitude);
+                  setWaypointToCheckIn({ ...targetWaypoint, paymentStatus: p?.payment_status || 'pending' });
+                  setCheckInModalVisible(true);
+                } else {
+                  Toast.show({
+                    type: 'info',
+                    text1: 'Información',
+                    text2: 'El pasajero ya completó su viaje y el cobro.',
+                  });
+                }
               } else {
                 Toast.show({
                   type: 'info',
@@ -1756,6 +1805,7 @@ export default function RouteDetail() {
           visible={checkInModalVisible}
           waypoint={waypointToCheckIn}
           users={sessionUsers}
+          tripSessionId={Number(id)}
           onArriveStop={handleArriveStopByList}
           onSkip={handleSkipPointByList}
           onArriveMeetingPoint={handleArriveMeetingPoint}

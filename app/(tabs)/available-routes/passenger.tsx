@@ -103,6 +103,17 @@ export default function PassengerRoutesScreen() {
         return;
       }
 
+      // 3. Verificar si el usuario ya tiene el viaje completado pero la sesión sigue activa
+      const hasCompletedSession = await tripService.hasCompletedTripSession(user.id, route.id);
+      if (hasCompletedSession) {
+        Toast.show({
+          type: "warning",
+          text1: "Viaje completado",
+          text2: "Ya tienes el viaje completado.",
+        });
+        return;
+      }
+
       // Si no hay solicitudes existentes o fue rechazada, permitir navegación
       router.push({
         pathname: "/(tabs)/available-routes/route-preview",
@@ -260,6 +271,7 @@ export default function PassengerRoutesScreen() {
                   user_pending_request={(item as any).user_pending_request}
                   pendingRequestsCount={(item as any).pending_requests_count || 0}
                   isDriver={false}
+                  seatsCapacity={(item as any).vehicle?.seats_capacity}
                   imageUrl={
                     Array.isArray((item as any).routes)
                       ? ((item as any).routes[0] as any)?.image_url

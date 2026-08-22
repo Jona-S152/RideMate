@@ -16,13 +16,13 @@ export const useTripRealtimeById = (sessionId: number) => {
         try {
             const { data, error } = await supabase
                 .from("trip_sessions")
-                .select("*")
+                .select("*, vehicle:vehicles!vehicle_id (*)")
                 .eq("id", sessionId)
                 .maybeSingle();
 
             if (error) setSession(null);
 
-            setSession(data as SessionData);
+            setSession(data as unknown as SessionData);
         } catch (error) {
             setSession(null);
         }
@@ -42,9 +42,8 @@ export const useTripRealtimeById = (sessionId: number) => {
                         table: 'trip_sessions',
                         filter: `id=eq.${sessionId}`,
                     },
-                    (payload) => {
-                        const newData = payload.new as SessionData;
-                        setSession(newData);
+                    () => {
+                        refreshSession();
                     }
                 )
                 .subscribe();
@@ -138,7 +137,7 @@ export const useActiveSession = (user: User | null) => {
                 // Conductor: busca sesión activa propia
                 const { data } = await supabase
                     .from('trip_sessions')
-                    .select("*, routes(image_url)")
+                    .select("*, vehicle:vehicles!vehicle_id(*), routes(image_url)")
                     .eq('driver_id', user.id)
                     .in('status', ["pending", "active"])
                     .is('end_time', null)
@@ -160,7 +159,7 @@ export const useActiveSession = (user: User | null) => {
                 if (pSession) {
                     const { data: trip } = await supabase
                         .from('trip_sessions')
-                        .select('*, routes(image_url)')
+                        .select('*, vehicle:vehicles!vehicle_id(*), routes(image_url)')
                         .eq('id', pSession.trip_session_id)
                         .in('status', ['pending', 'active'])
                         .is('end_time', null)

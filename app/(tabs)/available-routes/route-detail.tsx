@@ -26,7 +26,6 @@ export default function RouteDetail() {
     const { user } = useAuth();
     const router = useRouter();
     const { startTracking, stopTracking } = useTripTrackingStore();
-    const sessionId = useMemo(() => Number(params.sessionId), [params.sessionId]);
     const [driver, setDriver] = useState<DriverInfo | null>(null);
     const [passengers, setPassengers] = useState<PassengerTripSession[]>([]);
     //const [meetingPoints, setMeetingPoints] = useState<MeetingPoint[]>([]);
@@ -40,9 +39,19 @@ export default function RouteDetail() {
     const [sortedItinerary, setSortedItinerary] = useState<any[]>([]);
     const [loadingItinerary, setLoadingItinerary] = useState(true);
 
-    const { session } = useTripRealtimeById(Number(params.sessionId));
-    const { stops: sessionStops } = useTripStops(Number(params.sessionId));
-    const { meetingPoints: sessionMeetingPoints } = useTripMeetingPoints(Number(params.sessionId));
+    // Unificar el ID: el link de la lista de pasajeros pasa el trip_session_id en 'id',
+    // mientras que otras pantallas lo pasan en 'sessionId'.
+    const sessionId = useMemo(() => Number(params.sessionId || params.id), [params.sessionId, params.id]);
+
+    const { session } = useTripRealtimeById(sessionId);
+    const { stops: sessionStops } = useTripStops(sessionId);
+    const { meetingPoints: sessionMeetingPoints } = useTripMeetingPoints(sessionId);
+
+    const isPassengerActive = useMemo(() => {
+        const userPassenger = passengers.find(p => p.passenger_id === user?.id);
+        if (!userPassenger) return false;
+        return ['joined', 'pending', 'pending_approval', 'approved'].includes(userPassenger.status);
+    }, [passengers, user?.id]);
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -125,7 +134,9 @@ export default function RouteDetail() {
     };
 
     const fetchSessionUsers = async (passengerSessions: PassengerTripSession[]) => {
-        if (!passengerSessions.length) {
+        const activeSessions = passengerSessions.filter(p => !['left', 'cancelled', 'rejected'].includes(p.status));
+
+        if (!activeSessions.length) {
             setSessionUsers([]);
             return [];
         }
@@ -133,7 +144,7 @@ export default function RouteDetail() {
         const { data, error } = await supabase
             .from("users")
             .select("*")
-            .in('id', passengerSessions.map(p => p.passenger_id));
+            .in('id', activeSessions.map(p => p.passenger_id));
 
         if (error) {
             console.error("Error fetching session users:", error);
@@ -192,11 +203,13 @@ export default function RouteDetail() {
     }, [params.id, session, sessionMeetingPoints]);
 
     useEffect(() => {
-        console.warn("SESSION", JSON.stringify(session, null, 2));
-        if (session?.status === 'active' && user?.driver_mode === false) {
+        console.warn("SESSION status changed:", session?.status, "| sessionId:", sessionId, "| driver_mode:", user?.driver_mode);
+        // Redirigir al pasajero a la pantalla de ruta activa cuando el conductor inicia el viaje
+        if (session?.status === 'active' && !user?.driver_mode) {
+            console.warn(`[route-detail] Redirecting passenger to active route: /(tabs)/home/route-detail?id=${sessionId}`);
             router.replace(`/(tabs)/home/route-detail?id=${sessionId}`);
         }
-    }, [session?.status]);
+    }, [session?.status, sessionId, user?.driver_mode]);
 
 
     const handleStartTrip = async () => {
@@ -714,53 +727,60 @@ export default function RouteDetail() {
                                 </View>
                             </View>
                         </View>
-                        <View className="flex-row pr-4">
+                        {/* <View className="flex-row pr-4">
                             <Pressable onPress={() => console.log("Llamando...")} className="p-3 mr-2 justify-center items-center" style={{ borderWidth: 1, borderColor: Colors.dark.borderSecondary, borderRadius: 100 }}>
                                 <Ionicons name="call" color={Colors.dark.secondary} size={20} />
                             </Pressable>
                             <Pressable onPress={() => console.log("Mensaje...")} className="p-3 justify-center items-center" style={{ borderWidth: 1, borderColor: Colors.dark.borderSecondary, borderRadius: 100 }}>
                                 <Ionicons name="chatbubble-ellipses" color={Colors.dark.secondary} size={20} />
                             </Pressable>
+                        </View> */}
+                    </ThemedView>
+                )}
+                {session?.vehicle && (
+                    <ThemedView className="flex-row gap-x-3 items-center justify-between py-4 mx-4 rounded-2xl px-4"
+                        lightColor={Colors.light.background}
+                        darkColor={Colors.dark.background}
+                        style={{
+                            borderColor: Colors.dark.borderSecondary,
+                            borderWidth: 1
+                        }}
+                    >
+                        <View className="flex-row items-center flex-1">
+                            <View className="justify-center items-center mr-3">
+                                <Ionicons name="car-sport" color={Colors.dark.text} size={36} />
+                            </View>
+                            <View className="flex-col justify-center flex-1">
+                                <ThemedText className="text-base font-semibold">
+                                    {session.vehicle.brand} {session.vehicle.model} ({session.vehicle.year})
+                                </ThemedText>
+                                <ThemedText className="text-sm text-textSecondary">
+                                    {`Placa: ${session.vehicle.plate}  •  Color: ${session.vehicle.color}`}
+                                </ThemedText>
+                            </View>
                         </View>
                     </ThemedView>
                 )}
-                <ThemedView className="flex-row gap-x-3 items-center justify-between py-4 mx-4 rounded-2xl"
-                    lightColor={Colors.light.background}
-                    darkColor={Colors.dark.background}
-                    style={{
-                        borderColor: Colors.dark.borderSecondary,
-                        borderWidth: 1
-                    }}
-                >
-                    <View className="flex-row">
-                        <View className="justify-center items-center">
-                            <Ionicons name="car-sport" color={Colors.dark.text} size={40} />
-                        </View>
-                        <View className="flex-col justify-center mx-4">
-                            <ThemedText className="text-base font-semibold">
-                                Chevrolet Onix 2020
-                            </ThemedText>
-                            <ThemedText className="text-sm text-textSecondary">
-                                {`Placa: GBB-1234  •  Color: Gris`}
-                            </ThemedText>
-                        </View>
-                    </View>
-                </ThemedView>
                 <View className="m-4">
                     <View className="flex-row justify-between items-center mb-4">
                         <ThemedText className="font-semibold text-base">
                             Pasajeros
                         </ThemedText>
-                        <View className="flex-row items-center bg-blue-500/10 px-2 py-1 rounded-full">
-                            <Ionicons name="people" size={14} color={Colors.dark.secondary} />
-                            <ThemedText className="text-xs font-bold ml-1" lightColor={Colors.light.secondary} darkColor={Colors.dark.secondary}>
-                                {`${passengers.filter(p => p.status === 'pending' || p.status === 'joined').length} APROBADOS`}
-                            </ThemedText>
-                        </View>
+                        {session?.status !== 'completed' && (
+                            <View className="flex-row items-center bg-blue-500/10 px-2 py-1 rounded-full">
+                                <Ionicons name="people" size={14} color={Colors.dark.secondary} />
+                                <ThemedText className="text-xs font-bold ml-1" lightColor={Colors.light.secondary} darkColor={Colors.dark.secondary}>
+                                    {`${passengers.filter(p => !['left', 'cancelled', 'rejected'].includes(p.status) && (p.status === 'pending' || p.status === 'joined')).length} APROBADOS`}
+                                </ThemedText>
+                            </View>
+                        )}
                     </View>
 
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-                        {sessionUsers.map((passenger) => {
+                        {sessionUsers.filter(u => {
+                            const sessionInfo = passengers.find(p => p.passenger_id === u.id);
+                            return sessionInfo && !['left', 'cancelled', 'rejected'].includes(sessionInfo.status);
+                        }).map((passenger) => {
                             const sessionInfo = passengers.find(p => p.passenger_id === passenger.id);
                             const isApproved = (sessionInfo?.status === 'pending' || sessionInfo?.status === 'joined');
 
@@ -793,7 +813,10 @@ export default function RouteDetail() {
                                 </View>
                             );
                         })}
-                        {sessionUsers.length === 0 && (
+                        {sessionUsers.filter(u => {
+                            const sessionInfo = passengers.find(p => p.passenger_id === u.id);
+                            return sessionInfo && !['left', 'cancelled', 'rejected'].includes(sessionInfo.status);
+                        }).length === 0 && (
                             <ThemedText className="text-sm text-textSecondary italic">
                                 No hay pasajeros unidos todavía
                             </ThemedText>
@@ -802,7 +825,9 @@ export default function RouteDetail() {
                 </View>
             </ScrollView>
             {
-                (session?.status !== 'completed' && session?.status !== 'cancelled') && (user?.driver_mode === false || user?.is_driver === false) && (
+                (session?.status !== 'completed' && session?.status !== 'cancelled') &&
+                (!user?.driver_mode && !user?.is_driver) &&
+                isPassengerActive && (
                     <Pressable onPress={() => handleLeaveTrip()}>
                         <ThemedView className="flex-row justify-center items-center py-4 m-8 rounded-full"
                             lightColor={Colors.light.secondary}

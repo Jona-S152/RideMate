@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
 import { createContext, useContext, useEffect, useState } from "react";
+import { authService } from "@/services/auth.service";
 
 export type User = {
   id: string;
@@ -18,6 +19,7 @@ type AuthContextType = {
   login: (token: string, user: User) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (user: Partial<User>) => Promise<void>;
+  refreshUser: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -78,8 +80,37 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     });
   };
 
+  const refreshUser = async () => {
+    if (!user?.id) return;
+    try {
+      const fresh = await authService.fetchFreshUserRecord(user.id);
+      if (fresh) {
+        await updateUser(fresh);
+      }
+    } catch (e) {
+      console.error("[AuthContext] refreshUser error:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // Refresh user details from DB on mount
+    refreshUser();
+
+    // Subscribe to DB updates in real time via authService
+    const unsubscribe = authService.subscribeToUserChanges(user.id, (updatedFields) => {
+      console.log("[AuthContext] Realtime user update received:", updatedFields);
+      updateUser(updatedFields);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [user?.id]);
+
   return (
-    <AuthContext.Provider value={{ token, user, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ token, user, login, logout, updateUser, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

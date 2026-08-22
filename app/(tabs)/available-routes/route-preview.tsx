@@ -3,6 +3,8 @@ import { useSession } from "@/app/context/SessionContext";
 import { ThemedText } from "@/components/ui/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { Coords } from "@/interfaces/available-routes";
+import { Vehicle } from "@/interfaces/driver";
+import { VehicleSelectorDropdown } from "@/components/driver/VehicleSelectorDropdown";
 import { supabase } from "@/lib/supabase";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
@@ -25,9 +27,13 @@ export default function RoutePreviewScreen() {
     const [routeGeoJSON, setRouteGeoJSON] = useState<any>(null);
     const [actionLoading, setActionLoading] = useState(false);
 
+    // Selected vehicle state for drivers
+    const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
+    const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+
     const bottomSheetRef = useRef<BottomSheet>(null);
     const cameraRef = useRef<Mapbox.Camera>(null);
-    const snapPoints = useMemo(() => ["45%", "85%"], []);
+    const snapPoints = useMemo(() => ["50%", "88%"], []);
 
     useEffect(() => {
         fetchRouteDetails();
@@ -47,7 +53,6 @@ export default function RoutePreviewScreen() {
 
                 if (error) throw error;
 
-                // CORREGIR DATA.STOPS POR SESSION_STOPS
                 console.log("Route Data (Driver | company route):", data.id, "Stops count:", data.stops?.length);
                 setRouteData(data);
                 if (data.start_coords && data.end_coords) {
@@ -62,7 +67,6 @@ export default function RoutePreviewScreen() {
 
                 if (error) throw error;
 
-                // CORREGIR DATA.STOPS POR SESSION_STOPS
                 console.log("Route Data (Driver | driver route):", data.id);
                 setRouteData(data);
                 if (data.start_coords && data.end_coords) {
@@ -77,6 +81,9 @@ export default function RoutePreviewScreen() {
                         driver:users!driver_id (
                             name,
                             avatar_profile
+                        ),
+                        vehicle:vehicles!vehicle_id (
+                            *
                         ),
                         routes (
                             image_url
@@ -104,6 +111,7 @@ export default function RoutePreviewScreen() {
                     driver_name: data.driver?.name,
                     driver_avatar: data.driver?.avatar_profile,
                     driver_rating: data.driver?.rating,
+                    vehicle: data.vehicle,
                     passengers_data: data.passengers?.map((p: any) => ({
                         id: p.passenger?.id,
                         avatar: p.passenger?.avatar_profile
@@ -116,7 +124,7 @@ export default function RoutePreviewScreen() {
                             && ["pending", "visited"].includes(tss.status))
                     )
                 };
-                console.log("Formatted Route Data (Passenger):", formatted.id, "Stops count:", formatted.stops.length);
+                console.log("Formatted Route Data (Passenger):", formatted.id, "Vehicle:", formatted.vehicle);
                 setRouteData(formatted);
                 if (data.start_coords && data.end_coords) {
                     fetchMapboxRoute(data.start_coords, data.end_coords, formatted.stops);
@@ -176,6 +184,16 @@ export default function RoutePreviewScreen() {
 
         try {
             if (user.driver_mode) {
+                if (!selectedVehicleId) {
+                    Toast.show({
+                        type: "warning",
+                        text1: "Selecciona un vehículo",
+                        text2: "Por favor selecciona el vehículo que utilizarás para esta sesión.",
+                    });
+                    setActionLoading(false);
+                    return;
+                }
+
                 const { data: activeSession } = await supabase
                     .from("trip_sessions")
                     .select("*")
@@ -190,6 +208,7 @@ export default function RoutePreviewScreen() {
                         text1: "Viaje activo",
                         text2: "Ya tienes un viaje en curso",
                     });
+                    setActionLoading(false);
                     return;
                 }
 
@@ -198,6 +217,7 @@ export default function RoutePreviewScreen() {
                     .insert([{
                         route_id: routeData.id,
                         driver_id: user.id,
+                        vehicle_id: selectedVehicleId,
                         status: 'pending',
                         start_location: routeData.start_location,
                         end_location: routeData.end_location,
@@ -257,6 +277,7 @@ export default function RoutePreviewScreen() {
 
     const stops = routeData?.stops || [];
     const sortedStops = [...stops].sort((a: any, b: any) => (a.stop_order || 0) - (b.stop_order || 0));
+    const activeVehicle: Vehicle | null = routeData?.vehicle || selectedVehicle;
 
     const CustomHandle = () => (
         <View style={styles.handleContainer}>
@@ -295,7 +316,6 @@ export default function RoutePreviewScreen() {
                                 <View className="bg-slate-800 p-1 rounded-full shadow-md">
                                     <Ionicons name="flag" size={24} color={Colors.light.success} />
                                 </View>
-                                {/* <ThemedText className="bg-white/80 px-1 text-[8px] font-bold">Inicio</ThemedText> */}
                             </View>
                         </MarkerView>
                     )}
@@ -325,7 +345,6 @@ export default function RoutePreviewScreen() {
                                 <View className="bg-slate-800 p-1 rounded-full shadow-md">
                                     <Ionicons name="location" size={24} color={Colors.light.danger} />
                                 </View>
-                                {/* <ThemedText className="bg-white/80 px-1 text-[8px] font-bold">Fin</ThemedText> */}
                             </View>
                         </MarkerView>
                     )}
@@ -398,12 +417,51 @@ export default function RoutePreviewScreen() {
                             </View>
                         </View>
 
+                        {/* Driver Card */}
                         {routeData?.driver_name && (
-                            <View className="flex-row items-center my-6 bg-white/10 p-4 rounded-3xl">
+                            <View className="flex-row items-center my-3 bg-white/10 p-4 rounded-3xl">
                                 <Image source={{ uri: routeData.driver_avatar }} className="w-12 h-12 rounded-full border border-white/20" />
                                 <View className="ml-3">
                                     <ThemedText className="font-bold">{routeData.driver_name}</ThemedText>
                                     <ThemedText className="text-xs font-light">Conductor • ★ {routeData.driver_rating?.toFixed(1) || "0.0"}</ThemedText>
+                                </View>
+                            </View>
+                        )}
+
+                        {/* Driver Mode Vehicle Selector Dropdown */}
+                        {user?.driver_mode && (
+                            <VehicleSelectorDropdown
+                                userId={user.id}
+                                onVehicleSelected={(vehId, veh) => {
+                                    setSelectedVehicleId(vehId);
+                                    setSelectedVehicle(veh);
+                                }}
+                            />
+                        )}
+
+                        {/* Session Vehicle Card Display */}
+                        {activeVehicle && !user?.driver_mode && (
+                            <View className="my-3 p-4 rounded-3xl border flex-row items-center justify-between" style={{ backgroundColor: Colors.dark.glassSoft, borderColor: Colors.dark.border }}>
+                                <View className="flex-row items-center gap-3 flex-1">
+                                    {activeVehicle.vehicle_image_url ? (
+                                        <Image source={{ uri: activeVehicle.vehicle_image_url }} className="w-14 h-14 rounded-2xl border border-white/10" resizeMode="cover" />
+                                    ) : (
+                                        <View className="w-12 h-12 rounded-2xl items-center justify-center" style={{ backgroundColor: "rgba(18, 182, 234, 0.15)" }}>
+                                            <Ionicons name="car-sport-outline" size={24} color={Colors.light.secondary} />
+                                        </View>
+                                    )}
+
+                                    <View className="flex-1">
+                                        <ThemedText className="text-xs font-bold uppercase" style={{ color: Colors.light.secondary }}>
+                                            Vehículo del Viaje
+                                        </ThemedText>
+                                        <ThemedText className="text-base font-bold">
+                                            {activeVehicle.brand} {activeVehicle.model} ({activeVehicle.year})
+                                        </ThemedText>
+                                        <ThemedText className="text-xs opacity-70 mt-0.5" style={{ color: Colors.dark.textSecondary }}>
+                                            Placa: {activeVehicle.plate} | Color: {activeVehicle.color}
+                                        </ThemedText>
+                                    </View>
                                 </View>
                             </View>
                         )}

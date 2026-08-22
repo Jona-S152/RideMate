@@ -3,6 +3,7 @@ import RatingModal from "@/components/Modals/RatingModal";
 import { Colors } from "@/constants/Colors";
 import { supabase } from "@/lib/supabase";
 import { ratingsService } from "@/services/ratings.service";
+import { tripService } from "@/services/trip.service";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Linking from "expo-linking";
 import * as Notifications from "expo-notifications";
@@ -35,6 +36,8 @@ function MainApp() {
     trip_session_id: number;
     driver_id: string;
     driver_name: string;
+    fare_amount?: number;
+    payment_status?: string;
   } | null>(null);
 
   // Estados para el Modal Global de Acción de Pasajero
@@ -48,6 +51,60 @@ function MainApp() {
       registerDeviceToken(user.id);
     }
   }, [user?.id]);
+
+  // Realtime fallback: subscribe to passenger trip completion so the rating
+  // modal fires immediately even if the push notification is delayed.
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const unsubscribe = tripService.subscribeToPassengerTripCompleted(
+      user.id,
+      async (tripSessionId) => {
+        try {
+          // Avoid double-showing if push notification already triggered the modal
+          if (ratingModalVisible) return;
+
+          // Avoid showing if user already rated this session
+          const alreadyRated = await ratingsService.hasUserRatedTrip(tripSessionId, user.id);
+          if (alreadyRated) return;
+
+          // Fetch the driver info & fare details from the trip session
+          const { data: sessionData, error } = await supabase
+            .from('passenger_trip_sessions')
+            .select('trip_session_id, fare_amount, payment_status, trip_sessions(driver_id, driver_profiles(full_name))')
+            .eq('trip_session_id', tripSessionId)
+            .eq('passenger_id', user.id)
+            .maybeSingle();
+
+          if (error || !sessionData) {
+            console.warn('[_layout] Could not fetch session for rating modal:', error);
+            return;
+          }
+
+          const tripSession = (sessionData as any).trip_sessions;
+          const driverId: string = tripSession?.driver_id || '';
+          const driverName: string = tripSession?.driver_profiles?.full_name || 'tu conductor';
+          const fareAmount: number = Number((sessionData as any).fare_amount) || 1.25;
+          const paymentStatus: string = (sessionData as any).payment_status || 'pending';
+
+          setRatingData({
+            trip_session_id: tripSessionId,
+            driver_id: driverId,
+            driver_name: driverName,
+            fare_amount: fareAmount,
+            payment_status: paymentStatus,
+          });
+          setRatingModalVisible(true);
+        } catch (e) {
+          console.error('[_layout] Error in subscribeToPassengerTripCompleted handler:', e);
+        }
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [user?.id, ratingModalVisible]);
 
   useEffect(() => {
     // Definimos la estructura esperada de los datos de la notificación
@@ -84,10 +141,6 @@ function MainApp() {
         const data = notification.request.content.data as NotificationData;
 
         if (data.type === "NEW_PASSENGER") {
-          // When the app is in foreground, the conductor can see the passenger
-          // directly in the route-detail list. We do NOT open the modal here
-          // to avoid having two modal instances simultaneously (which caused
-          // duplicate records in trip_session_meeting_points).
           console.log("[_layout] NEW_PASSENGER notification received in foreground – handled via route-detail list.");
           return;
         } else if (data.type === "RATE_DRIVER") {
@@ -155,7 +208,7 @@ function MainApp() {
         <Stack.Screen name="(auth)" />
       </Stack>
 
-      {/* Modal Global para calificar conductor */}
+      {/* Modal Global para calificar conductor y confirmar pago */}
       {ratingData && (
         <RatingModal
           visible={ratingModalVisible}
@@ -163,6 +216,13 @@ function MainApp() {
           title="Califica a tu conductor"
           subtitle="¿Cómo fue tu experiencia en este viaje?"
           userName={ratingData.driver_name}
+          fareAmount={ratingData.fare_amount}
+          paymentStatus={ratingData.payment_status}
+          onConfirmPayment={async () => {
+            if (user?.id && ratingData) {
+              await tripService.confirmPassengerPayment(ratingData.trip_session_id, user.id);
+            }
+          }}
           onSubmit={async (rating, comment) => {
             await ratingsService.saveRating({
               trip_session_id: ratingData.trip_session_id,
