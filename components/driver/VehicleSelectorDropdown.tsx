@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from "react";
-import { View, Pressable, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, View } from "react-native";
 
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
-import { driverService } from "@/services/driver.service";
 import { Vehicle } from "@/interfaces/driver";
+import { driverService } from "@/services/driver.service";
 
 interface VehicleSelectorDropdownProps {
   userId: string;
@@ -113,17 +113,31 @@ export const VehicleSelectorDropdown: React.FC<VehicleSelectorDropdownProps> = (
 
           {selectedVehicle ? (
             <View className="flex-1">
-              <View className="flex-row items-center gap-2">
-                <ThemedText className="text-sm font-bold">
+              {/* Fila de título y Badge */}
+              <View className="flex-row items-center gap-2 flex-1">
+                <ThemedText
+                  className="text-sm font-bold flex-shrink"
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
                   {selectedVehicle.brand} {selectedVehicle.model} ({selectedVehicle.year})
                 </ThemedText>
+
                 {selectedVehicle.is_default && (
-                  <View className="px-2 py-0.5 rounded-full bg-sky-500/20 border border-sky-400">
-                    <ThemedText className="text-[9px] font-bold text-sky-400">PREDETERMINADO</ThemedText>
+                  <View className="px-2 py-0.5 rounded-full bg-sky-500/20 border border-sky-400 shrink-0">
+                    <ThemedText className="text-[9px] font-bold text-sky-400">
+                      PREDETERMINADO
+                    </ThemedText>
                   </View>
                 )}
               </View>
-              <ThemedText className="text-xs opacity-70 mt-0.5" style={{ color: Colors.dark.textSecondary }}>
+
+              <ThemedText
+                className="text-xs opacity-70 mt-0.5"
+                style={{ color: Colors.dark.textSecondary }}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
                 Placa: {selectedVehicle.plate} | Color: {selectedVehicle.color} | Capacidad: {selectedVehicle.seats_capacity} asientos
               </ThemedText>
             </View>

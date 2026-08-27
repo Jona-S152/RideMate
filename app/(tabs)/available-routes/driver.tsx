@@ -51,6 +51,13 @@ export default function DriverRoutesScreen() {
     fetchInitialData();
   }, [user?.driver_mode, isFocused]);
 
+  function handleCreateRoute(): void {
+    router.push({
+      pathname: "/(tabs)/available-routes/create-route-screen",
+      params: { activeModeP: "start" },
+    });
+  }
+
   const fetchInitialData = async () => {
     setRefreshing(true);
     await Promise.all([fetchUserProfile(), fetchRoutes()]);
@@ -225,7 +232,7 @@ export default function DriverRoutesScreen() {
           }
         >
           {/* INPUT DE CREACIÓN DE RUTA */}
-          <Pressable
+          {/* <Pressable
             onPress={() => router.push("/(tabs)/available-routes/create-route-screen")}
             className="mx-2 mt-4 mb-4 p-3 rounded-3xl shadow-sm flex-row items-center justify-between border border-black/5"
             style={({ pressed }) => [{ backgroundColor: Colors.light.glassSoft }, { opacity: pressed ? 0.9 : 1 }]}
@@ -238,44 +245,46 @@ export default function DriverRoutesScreen() {
               ¿A dónde quieres ir hoy?
             </ThemedText>
             <Ionicons name="search" size={22} color={Colors.light.textSecondary} className="opacity-60" />
-          </Pressable>
+          </Pressable> */}
 
           {/* SECCIÓN DE MIS RUTAS */}
           {filteredMyRoutes.length > 0 && (
-            <MasonryGrid
-              data={filteredMyRoutes}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={(item: RouteData) => (
-                <AvailableRouteCard
-                  key={item.id}
-                  trip_session_id={item.id}
-                  routeScreen={`/(tabs)/available-routes/route-detail?id=${item.id}`}
-                  start={item.start_location}
-                  end={item.end_location}
-                  routeId={item.id}
-                  startCoords={item.start_coords}
-                  endCoords={item.end_coords}
-                  stops={item.stops.map((stop: RouteStop) => ({
-                    stop_id: stop.id,
-                    status: "pending",
-                  }))}
-                  isDriver={true}
-                  imageUrl={(item as any).image_url}
-                  driverName={userProfile?.name || user?.name}
-                  driverAvatar={userProfile?.avatar_profile}
-                  onPress={() => {
-                    router.push({
-                      pathname: "/(tabs)/available-routes/route-preview",
-                      params: { id: item.id, type: "driver_route" },
-                    });
-                  }}
-                />
-              )}
-            />
+            <View className="w-full my-4">
+              <MasonryGrid
+                data={filteredMyRoutes}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={(item: RouteData) => (
+                  <AvailableRouteCard
+                    key={item.id}
+                    trip_session_id={item.id}
+                    routeScreen={`/(tabs)/available-routes/route-detail?id=${item.id}`}
+                    start={item.start_location}
+                    end={item.end_location}
+                    routeId={item.id}
+                    startCoords={item.start_coords}
+                    endCoords={item.end_coords}
+                    stops={item.stops.map((stop: RouteStop) => ({
+                      stop_id: stop.id,
+                      status: "pending",
+                    }))}
+                    isDriver={true}
+                    imageUrl={(item as any).image_url}
+                    driverName={userProfile?.name || user?.name}
+                    driverAvatar={userProfile?.avatar_profile}
+                    onPress={() => {
+                      router.push({
+                        pathname: "/(tabs)/available-routes/route-preview",
+                        params: { id: item.id, type: "driver_route" },
+                      });
+                    }}
+                  />
+                )}
+              />
+            </View>
           )}
 
           {/* SECCIÓN DE RUTAS INSTITUCIONALES */}
-          <SectionHeader title="Rutas Institucionales" centered={true} />
+          {/* <SectionHeader title="Rutas Institucionales" centered={true} />
           {filteredAdminRoutes.length === 0 ? (
             <View className="items-center justify-center py-10 bg-white/5 rounded-3xl border border-dashed border-white/20">
               <Ionicons name="information-circle-outline" size={40} color={tirdColor} />
@@ -314,11 +323,43 @@ export default function DriverRoutesScreen() {
                 />
               )}
             />
-          )}
+          )} */}
 
           <View className="h-10" />
         </ScrollView>
       </View>
+      {/* BOTÓN FLOTANTE (FAB) PARA CREAR RUTA */}
+      <Pressable
+        onPress={() => handleCreateRoute()}
+        className="absolute bottom-28 right-6 w-16 h-16 rounded-full items-center justify-center shadow-lg"
+        style={
+          {
+            backgroundColor: secondaryColor,
+            elevation: 8, // Sombra para Android
+            shadowColor: "#000", // Sombra para iOS
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.35,
+            shadowRadius: 6,
+            transform: [{ scale: 1 }],
+          }
+        }
+      >
+        <View className="relative items-center justify-center">
+          {/* Icono Principal: Agregar */}
+          <Ionicons name="add" size={40} color="white" />
+
+          {/* Sub-icono de Auto/Ruta indicativo */}
+          <View
+            className="absolute -bottom-3 -right-3 p-1 rounded-full border"
+            style={{
+              backgroundColor: Colors.dark.primary,
+              borderColor: secondaryColor
+            }}
+          >
+            <Ionicons name="car" size={16} color="white" />
+          </View>
+        </View>
+      </Pressable>
     </View>
   );
 }

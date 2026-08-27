@@ -448,7 +448,7 @@ export const useAvailableRoutesSubscription = (onUpdate: () => void) => {
                     event: "*",
                     schema: "public",
                     table: "trip_sessions",
-                    filter: "status=in.(pending,active)",
+                    // filter: "status=in.(pending,active)",
                 },
                 () => {
                     onUpdate();

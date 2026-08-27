@@ -1,10 +1,10 @@
-import React from "react";
-import { View, Pressable, Alert } from "react-native";
-import { Image } from "expo-image";
-import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
-import { Colors } from "@/constants/Colors";
 import { ThemedText } from "@/components/ThemedText";
+import { Colors } from "@/constants/Colors";
+import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
+import React from "react";
+import { Alert, Pressable, View } from "react-native";
 
 interface ImageUploadPickerProps {
   label: string;
@@ -99,11 +99,15 @@ export const ImageUploadPicker: React.FC<ImageUploadPickerProps> = ({
           <View className="absolute bottom-2 right-2 flex-row gap-2">
             <Pressable
               onPress={handlePressOptions}
-              className="p-2.5 rounded-full flex-row items-center gap-1 shadow-md"
+              className="p-2.5 rounded-full flex-row justify-center items-center shadow-md"
               style={{ backgroundColor: Colors.light.secondary }}
             >
-              <Ionicons name="camera-outline" size={16} color="white" />
-              <ThemedText className="text-white text-xs font-bold">Cambiar</ThemedText>
+              <View className="pl-2">
+                <Ionicons name="camera-outline" size={16} color="white" />
+              </View>
+              <View className="px-2">
+                <ThemedText className="text-white text-center text-xs font-bold">Cambiar</ThemedText>
+              </View>
             </Pressable>
 
             {onImageRemoved && (

@@ -154,7 +154,7 @@ export default function RegisterScreen() {
         className="w-full px-4 pt-6 rounded-bl-[40px]"
       >
         <View className="items-center justify-center flex-1">
-          <Image className="h-36" style={{ resizeMode: "contain" }} source={require('../../assets/images/TitleApp.png')} />
+          <Image className="h-36" style={{ resizeMode: "contain" }} source={require('../../assets/brand-assets/SplashScreen_DarkMode.png')} />
         </View>
       </AnimatedThemedView>
 

@@ -1,29 +1,29 @@
 import { useAuth } from "@/app/context/AuthContext";
 import { ThemedText } from "@/components/ThemedText";
-import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { UserData } from "@/interfaces/available-routes";
+import { DriverApplicationStatus } from "@/interfaces/driver";
+import { driverService } from "@/services/driver.service";
 import { ratingsService } from "@/services/ratings.service";
 import { userService } from "@/services/user.service";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { Link, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 
 export default function ProfileScreen() {
     const { user, logout } = useAuth();
 
     const [userData, setUserData] = useState<UserData | null>(null);
+    const [driverStatus, setDriverStatus] = useState<DriverApplicationStatus | null>(null);
+    const [loadingProfile, setLoadingProfile] = useState(true);
 
     const fetchUser = async () => {
         if (!user?.id) return;
-        
-        console.log("Recargando datos del usuario en ProfileScreen...");
-
+        setLoadingProfile(true);
         try {
             const data = await userService.getUserProfile(user.id);
-            console.log("Datos obtenidos de Supabase:", data?.avatar_profile);
             if (data) {
                 const ratingInfo = await ratingsService.getUserRating(user.id);
                 setUserData({
@@ -32,10 +32,15 @@ export default function ProfileScreen() {
                     rating_count: ratingInfo.count
                 });
             }
+
+            const driverAppStatus = await driverService.getDriverApplicationStatus(user.id);
+            setDriverStatus(driverAppStatus);
         } catch (error) {
             console.error("Error fetching user profile:", error);
+        } finally {
+            setLoadingProfile(false);
         }
-    }
+    };
 
     useFocusEffect(
         useCallback(() => {
@@ -43,138 +48,324 @@ export default function ProfileScreen() {
         }, [user?.id])
     );
 
-    const contentTextColor = Colors.dark.text;
+    const isDriver = userData?.is_driver ?? false;
+    const hasPendingApplication = driverStatus?.hasApplied && driverStatus?.profile?.status === 'pending';
+    const getRoleLabel = () => {
+        if (isDriver) return "Conductor verificado";
+        if (hasPendingApplication) return "Verificación pendiente";
+        return "Pasajero";
+    };
+    const getRoleColor = () => {
+        if (isDriver) return "#10B981";
+        if (hasPendingApplication) return "#F59E0B";
+        return Colors.light.textSecondary;
+    };
+    const getRoleIcon = (): keyof typeof Ionicons.glyphMap => {
+        if (isDriver) return "checkmark-circle";
+        if (hasPendingApplication) return "time";
+        return "person";
+    };
+
+    const showEditDriver = driverStatus?.hasApplied ?? false;
+    const showBecomeDriver = !isDriver && !driverStatus?.hasApplied;
 
     return (
-        <ThemedView lightColor={Colors.dark.background} darkColor={Colors.dark.background} className="flex-1">
-            <ThemedView lightColor={Colors.light.glass} darkColor={Colors.dark.glass} className="w-full px-4 py-6 rounded-bl-[40px]">
-                <ThemedText
-                    className="text-3xl mt-6">
-                    Perfil
-                </ThemedText>
-                <View className="items-center">
-                    <ThemedText
-                        className="text-2xl mt-6">
-                        {userData?.name}
-                    </ThemedText>
-                    <View className="relative w-60 h-60 my-3">
-                        {userData?.avatar_profile || user?.avatar_profile ?
-                            (
-                                <Image
-                                    className="rounded-full w-60 h-60 my-3"
-                                    source={{ uri: userData?.avatar_profile || user?.avatar_profile }}
-                                    contentFit="cover"
-                                />
-                            )
-                            :
-                            (
-                                <View className="rounded-full" >
-                                    <Ionicons
-                                        name="person-circle"
-                                        size={256}
-                                        color={Colors.dark.text}
-                                    />
-                                </View>
-                            )
-                        }
+        <View style={styles.container}>
+            {/* ── HEADER ─────────────────────────────────────────── */}
+            <View style={styles.header}>
+                <View style={styles.avatarSection}>
+                    <View style={styles.avatarContainer}>
+                        {userData?.avatar_profile || user?.avatar_profile ? (
+                            <Image
+                                source={{ uri: userData?.avatar_profile || user?.avatar_profile }}
+                                style={styles.avatar}
+                                contentFit="cover"
+                            />
+                        ) : (
+                            <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                                <Ionicons name="person" size={48} color={Colors.light.textSecondary} />
+                            </View>
+                        )}
+                        {isDriver && (
+                            <View style={styles.verifiedBadge}>
+                                <Ionicons name="checkmark-circle" size={28} color="#10B981" />
+                            </View>
+                        )}
                     </View>
-                    <ThemedText
-                        className="text-2xl mt-4">
-                        {userData?.rating || '5.0'}
+
+                    <ThemedText lightColor={Colors.light.text} darkColor={Colors.light.text} style={styles.userName}>
+                        {userData ? `${userData.name} ${userData.last_name || ""}`.trim() : user?.name || "Usuario"}
                     </ThemedText>
+
+                    <View style={styles.roleBadge}>
+                        <Ionicons name={getRoleIcon()} size={14} color={getRoleColor()} />
+                        <ThemedText style={[styles.roleText, { color: getRoleColor() }]}>
+                            {getRoleLabel()}
+                        </ThemedText>
+                    </View>
                 </View>
-            </ThemedView>
-            <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-4">
-                <Link href="/(tabs)/profile/edit-profile" asChild>
-                    <Pressable
-                        className="w-full rounded-2xl mb-3"
-                        style={({ pressed }) => [{
-                            backgroundColor: pressed ? "rgba(12,22,42,0.95)" : Colors.dark.glassSoft,
-                            borderWidth: 1,
-                            borderColor: Colors.dark.border,
-                            shadowColor: "#000",
-                            shadowOffset: { width: 0, height: 8 },
-                            shadowOpacity: 0.22,
-                            shadowRadius: 14,
-                            elevation: 6,
-                        }]}
-                    >
-                        <ThemedText
-                            style={{ color: contentTextColor }}
-                            className="py-6 px-4">
-                            Editar perfil
-                        </ThemedText>
-                    </Pressable>
-                </Link>
-                <Link href="/(tabs)/profile/activity" asChild>
-                    <Pressable
-                        className="rounded-2xl mb-3"
-                        style={({ pressed }) => [{
-                            backgroundColor: pressed ? "rgba(12,22,42,0.95)" : Colors.dark.glassSoft,
-                            borderWidth: 1,
-                            borderColor: Colors.dark.border,
-                            shadowColor: "#000",
-                            shadowOffset: { width: 0, height: 8 },
-                            shadowOpacity: 0.22,
-                            shadowRadius: 14,
-                            elevation: 6,
-                        }]}
-                    >
-                        <ThemedText
-                            style={{ color: contentTextColor }}
-                            className="py-6 px-4">
-                            Mi actividad
-                        </ThemedText>
-                    </Pressable>
-                </Link>
-                {!user?.is_driver &&
-                    <Link href="/(tabs)/profile/become-driver" asChild>
-                        <Pressable
-                            className="rounded-2xl mb-3"
-                            style={({ pressed }) => [{
-                                backgroundColor: pressed ? "rgba(12,22,42,0.95)" : Colors.dark.glassSoft,
-                                borderWidth: 1,
-                                borderColor: Colors.dark.border,
-                                shadowColor: "#000",
-                                shadowOffset: { width: 0, height: 8 },
-                                shadowOpacity: 0.22,
-                                shadowRadius: 14,
-                                elevation: 6,
-                            }]}
-                        >
-                            <ThemedText
-                                style={{ color: contentTextColor }}
-                                className="py-6 px-4">
-                                Convertirme en conductor
+
+                {/* ── METRICS ──────────────────────────────────────── */}
+                <View style={styles.metricsRow}>
+                    <View style={styles.metricItem}>
+                        <View style={styles.metricIconRow}>
+                            <Ionicons name="star" size={18} color="#F59E0B" />
+                            <ThemedText lightColor={Colors.light.text} darkColor={Colors.light.text} style={styles.metricValue}>
+                                {userData?.rating?.toFixed(1) || "5.0"}
                             </ThemedText>
+                        </View>
+                        <ThemedText lightColor={Colors.light.textSecondary} darkColor={Colors.light.textSecondary} style={styles.metricLabel}>
+                            {userData?.rating_count ?? 0} {(userData?.rating_count ?? 0) === 1 ? "viaje" : "viajes"}
+                        </ThemedText>
+                    </View>
+
+                    <View style={styles.metricDivider} />
+
+                    <View style={styles.metricItem}>
+                        <View style={styles.metricIconRow}>
+                            <Ionicons name="car-sport" size={18} color={Colors.light.secondary} />
+                            <ThemedText lightColor={Colors.light.text} darkColor={Colors.light.text} style={styles.metricValue}>
+                                {userData?.rating_count ?? 0}
+                            </ThemedText>
+                        </View>
+                        <ThemedText lightColor={Colors.light.textSecondary} darkColor={Colors.light.textSecondary} style={styles.metricLabel}>
+                            Completados
+                        </ThemedText>
+                    </View>
+                </View>
+            </View>
+
+            {/* ── MENU OPTIONS ─────────────────────────────────── */}
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.menuScroll} contentContainerStyle={styles.menuContent}>
+                {loadingProfile ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="small" color={Colors.light.secondary} />
+                    </View>
+                ) : (
+                    <>
+                        <Link href="/(tabs)/profile/edit-profile" asChild>
+                            <Pressable className='flex-row items-center py-4'>
+                                <View className="w-12 h-12 justify-center items-center mr-5 rounded-xl" style={{ backgroundColor: "rgba(37,99,235,0.12)" }}>
+                                    <Ionicons name="person-outline" size={20} color={Colors.light.secondary} />
+                                </View>
+                                <View className="flex-1">
+                                    <ThemedText lightColor={Colors.light.text} darkColor={Colors.light.text} style={styles.menuTitle}>Editar perfil</ThemedText>
+                                    <ThemedText lightColor={Colors.light.textSecondary} darkColor={Colors.light.textSecondary} style={styles.menuSubtitle}>Nombre, foto y datos personales</ThemedText>
+                                </View>
+                                <Ionicons name="chevron-forward" size={18} color={Colors.light.textSecondary} />
+                            </Pressable>
+                        </Link>
+
+                        {showEditDriver && (
+                            <Link href="/(tabs)/profile/become-driver" asChild>
+                                <Pressable className='flex-row items-center py-4'>
+                                    <View className="w-12 h-12 justify-center items-center mr-5 rounded-xl" style={{ backgroundColor: "rgba(16,185,129,0.12)" }}>
+                                        <Ionicons name="car-outline" size={20} color="#10B981" />
+                                    </View>
+                                    <View className="flex-1">
+                                        <ThemedText lightColor={Colors.light.text} darkColor={Colors.light.text} style={styles.menuTitle}>Datos de conductor</ThemedText>
+                                        <ThemedText lightColor={Colors.light.textSecondary} darkColor={Colors.light.textSecondary} style={styles.menuSubtitle}>Licencia y vehículo</ThemedText>
+                                    </View>
+                                    <Ionicons name="chevron-forward" size={18} color={Colors.light.textSecondary} />
+                                </Pressable>
+                            </Link>
+                        )}
+
+                        <Link href="/(tabs)/profile/activity" asChild>
+                            <Pressable className='flex-row items-center py-4'>
+                                <View className="w-12 h-12 justify-center items-center mr-5 rounded-xl" style={{ backgroundColor: "rgba(245,158,11,0.12)" }}>
+                                    <Ionicons name="time-outline" size={20} color="#F59E0B" />
+                                </View>
+                                <View className="flex-1">
+                                    <ThemedText lightColor={Colors.light.text} darkColor={Colors.light.text} style={styles.menuTitle}>Mi actividad</ThemedText>
+                                    <ThemedText lightColor={Colors.light.textSecondary} darkColor={Colors.light.textSecondary} style={styles.menuSubtitle}>Historial de viajes</ThemedText>
+                                </View>
+                                <Ionicons name="chevron-forward" size={18} color={Colors.light.textSecondary} />
+                            </Pressable>
+                        </Link>
+
+                        {showBecomeDriver && (
+                            <Link href="/(tabs)/profile/become-driver" asChild>
+                                <Pressable className='flex-row items-center py-4'>
+                                    <View className="w-12 h-12 justify-center items-center mr-5 rounded-xl" style={{ backgroundColor: "rgba(37,99,235,0.12)" }}>
+                                        <Ionicons name="shield-checkmark-outline" size={20} color={Colors.light.secondary} />
+                                    </View>
+                                    <View className="flex-1">
+                                        <ThemedText lightColor={Colors.light.text} darkColor={Colors.light.text} style={styles.menuTitle}>Convertirme en conductor</ThemedText>
+                                        <ThemedText lightColor={Colors.light.textSecondary} darkColor={Colors.light.textSecondary} style={styles.menuSubtitle}>Registra tu licencia y vehículo</ThemedText>
+                                    </View>
+                                    <Ionicons name="chevron-forward" size={18} color={Colors.light.textSecondary} />
+                                </Pressable>
+                            </Link>
+                        )}
+
+                        <Pressable
+                            onPress={() => { logout(); }}
+                            style={({ pressed }) => [styles.menuItem, styles.logoutItem, pressed && styles.logoutItemPressed]}
+                        >
+                            <View className="w-12 h-12 justify-center items-center mr-5 rounded-xl" style={{ backgroundColor: "rgba(239,68,68,0.12)" }}>
+                                <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+                            </View>
+                            <View className="flex-1">
+                                <ThemedText style={[styles.menuTitle, { color: "#EF4444" }]}>Cerrar sesión</ThemedText>
+                            </View>
                         </Pressable>
-                    </Link>
-                }
-                {/* <Pressable className="active:bg-slate-300">
-                    <ThemedText
-                        style={{ color: contentTextColor }}
-                        className="py-6 px-4">
-                        Editar vehículo
-                    </ThemedText>
-                </Pressable> */}
-                <Pressable
-                    onPress={() => { logout() }}
-                    className="rounded-2xl mt-2"
-                    style={({ pressed }) => [{
-                        backgroundColor: pressed ? "rgba(245,158,11,0.22)" : "rgba(245,158,11,0.12)",
-                        borderWidth: 1,
-                        borderColor: "rgba(245,158,11,0.38)",
-                    }]}
-                >
-                    <ThemedText
-                        lightColor={Colors.dark.secondary}
-                        darkColor={Colors.dark.secondary}
-                        className="py-6 px-4">
-                        Cerrar sesion
-                    </ThemedText>
-                </Pressable>
+                    </>
+                )}
             </ScrollView>
-            <View className="h-28 w-full" />
-        </ThemedView>
+
+            <View style={{ height: 100 }} />
+        </View>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: Colors.light.background,
+    },
+    header: {
+        paddingTop: 56,
+        paddingBottom: 24,
+        paddingHorizontal: 20,
+        backgroundColor: Colors.light.glass,
+        borderBottomLeftRadius: 32,
+        borderBottomRightRadius: 32,
+    },
+    avatarSection: {
+        alignItems: "center",
+        marginBottom: 20,
+    },
+    avatarContainer: {
+        position: "relative",
+        width: 110,
+        height: 110,
+        marginBottom: 14,
+    },
+    avatar: {
+        width: 110,
+        height: 110,
+        borderRadius: 55,
+        borderWidth: 3,
+        borderColor: "rgba(226,235,240,0.18)",
+    },
+    avatarPlaceholder: {
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: Colors.light.glassSoft,
+    },
+    verifiedBadge: {
+        position: "absolute",
+        bottom: 2,
+        right: 2,
+        backgroundColor: Colors.light.background,
+        borderRadius: 15,
+        padding: 2,
+    },
+    userName: {
+        fontSize: 22,
+        fontWeight: "700",
+        marginBottom: 6,
+    },
+    roleBadge: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+        paddingHorizontal: 14,
+        paddingVertical: 5,
+        borderRadius: 20,
+        backgroundColor: "rgba(255,255,255,0.06)",
+    },
+    roleText: {
+        fontSize: 13,
+        fontWeight: "600",
+    },
+    metricsRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "rgba(255,255,255,0.05)",
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: Colors.light.border,
+        paddingVertical: 16,
+        paddingHorizontal: 24,
+    },
+    metricItem: {
+        flex: 1,
+        alignItems: "center",
+    },
+    metricIconRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        marginBottom: 3,
+    },
+    metricValue: {
+        fontSize: 18,
+        fontWeight: "700",
+    },
+    metricLabel: {
+        fontSize: 11,
+        fontWeight: "500",
+    },
+    metricDivider: {
+        width: 1,
+        height: 34,
+        backgroundColor: Colors.light.border,
+        marginHorizontal: 16,
+    },
+    menuScroll: {
+        flex: 1,
+        paddingHorizontal: 16,
+    },
+    menuContent: {
+        paddingTop: 20,
+        paddingBottom: 20,
+    },
+    loadingContainer: {
+        paddingVertical: 40,
+        alignItems: "center",
+    },
+    menuItem: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderRadius: 16,
+        marginBottom: 8,
+        backgroundColor: Colors.light.glassSoft,
+        borderWidth: 1,
+        borderColor: Colors.light.border,
+    },
+    menuItemPressed: {
+        backgroundColor: Colors.light.surface,
+    },
+    menuIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        alignItems: "center",
+        justifyContent: "center",
+        marginRight: 14,
+    },
+    menuTextContainer: {
+        flex: 1,
+    },
+    menuTitle: {
+        fontSize: 15,
+        fontWeight: "600",
+    },
+    menuSubtitle: {
+        fontSize: 12,
+        marginTop: 2,
+    },
+    logoutItem: {
+        marginTop: 8,
+        backgroundColor: "rgba(239,68,68,0.06)",
+        borderColor: "rgba(239,68,68,0.18)",
+    },
+    logoutItemPressed: {
+        backgroundColor: "rgba(239,68,68,0.14)",
+    },
+});

@@ -164,6 +164,47 @@ export default function SelectionMapScreen() {
       const sessionId = Number(trip_session_id);
       if (!user?.id || !sessionId || isNaN(sessionId)) return;
 
+      const hasLeft = await tripService.hasLeftTripSession(user.id, sessionId);
+      if (hasLeft) {
+        Toast.show({
+          type: "warning",
+          text1: "No puedes unirte",
+          text2: "Has abandonado este viaje anteriormente y no puedes volver a solicitar unirte.",
+        });
+        router.replace("/(tabs)/available-routes");
+        return;
+      }
+
+      const activeState = await tripService.hasAnyActiveTripOrRequest(user.id);
+      if (activeState.hasActive) {
+        if (activeState.reason === 'driver') {
+          Toast.show({
+            type: "warning",
+            text1: "No puedes unirte",
+            text2: "Tienes un viaje activo como conductor.",
+          });
+          router.replace("/(tabs)/available-routes");
+          return;
+        } else if (activeState.reason === 'pending_request') {
+          setHasPendingRequest(true);
+          Toast.show({
+            type: "info",
+            text1: "Solicitud en curso",
+            text2: "Ya tienes una solicitud pendiente de aprobación.",
+          });
+          router.replace("/(tabs)/available-routes");
+          return;
+        } else if (activeState.reason === 'passenger_active') {
+          Toast.show({
+            type: "warning",
+            text1: "Viaje en curso",
+            text2: "Ya estás participando en un viaje activo.",
+          });
+          router.replace("/(tabs)/available-routes");
+          return;
+        }
+      }
+
       const { data, error } = await supabase
         .from("passenger_requests")
         .select("status")

@@ -1,5 +1,5 @@
-import { Redirect, Tabs, usePathname } from "expo-router";
 import { CommonActions } from "@react-navigation/native";
+import { Redirect, Tabs, usePathname } from "expo-router";
 import React from "react";
 
 import { HapticTab } from "@/components/HapticTab";
@@ -22,6 +22,8 @@ export default function TabLayout() {
     "create-route-screen",
     "navigation-screen",
     "edit-profile",
+    "edit-driver",
+    "activity",
     "become-driver"
   ].some((route) =>
     pathName.includes(route),

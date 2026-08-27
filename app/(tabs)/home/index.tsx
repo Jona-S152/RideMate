@@ -1,131 +1,73 @@
 import { useAuth } from "@/app/context/AuthContext";
 import { useSession } from "@/app/context/SessionContext";
+import FeedbackModal from "@/components/features/FeedbackModal";
 import RouteCard from "@/components/features/history-route-card";
+import DriverRequestsModal from "@/components/Modals/DriverRequestsModal";
+import PassengerActionModal from "@/components/Modals/PassengerActionModal";
 import { ThemedText } from "@/components/ThemedText";
-import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { useActiveSession } from "@/hooks/useRealTime";
-import { useEffect, useRef, useState } from "react";
-import { Animated, Pressable, ScrollView, Switch, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Linking, Pressable, ScrollView, View } from "react-native";
 
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { Vehicle } from "@/interfaces/driver";
 import { supabase } from "@/lib/supabase";
 import { registerDeviceToken } from "@/services/notifications.service";
 import { ratingsService } from "@/services/ratings.service";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-// ... imports
+
+// Reemplaza con el número real de WhatsApp Business cuando esté disponible
+const WHATSAPP_SUPPORT_URL =
+  "https://wa.me/593999999999?text=Hola,%20necesito%20soporte%20con%20RideMate";
 
 export default function HomeScreen() {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, refreshUser } = useAuth();
   const { sessionChanged, setSessionChanged } = useSession();
   const { activeSession, loading } = useActiveSession(user);
 
-  // Theme hooks
-  const primaryColor = useThemeColor({}, 'primary');
-  const textColor = useThemeColor({}, 'text');
-  const tirdColor = useThemeColor({}, 'tird');
-  const secondaryColor = useThemeColor({}, 'secondary');
-  const dangerColor = useThemeColor({}, 'danger');
-
   const [isEnabled, setIsEnabled] = useState(user?.driver_mode ?? false);
-  const toggleSwitch = () => {
-    setIsEnabled((previousState) => !previousState);
-  };
-
   const [history, setHistory] = useState<any[]>([]);
+  const [feedbackVisible, setFeedbackVisible] = useState(false);
 
-  const slideStudent = useRef(new Animated.Value(0)).current; // 0 visible, 300 fuera
-  const opacityAnimStudent = useRef(new Animated.Value(0)).current;
-  const slideCar = useRef(new Animated.Value(300)).current; // 300 fuera, 0 visible
-  const opacityAnimCar = useRef(new Animated.Value(0)).current;
+  // ── Driver Requests & Passenger Action Modals ──────────────────────────────
+  const [driverRequestsModalVisible, setDriverRequestsModalVisible] = useState(false);
+  const [passengerActionModalVisible, setPassengerActionModalVisible] = useState(false);
+  const [selectedPassengerId, setSelectedPassengerId] = useState<string | null>(null);
 
-  const slideAnim = useRef(new Animated.Value(300)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
-
+  // ── Auth / device token ──────────────────────────────────────────────────
   useEffect(() => {
-    const checkUser = async () => {
-      if (user) {
-        await registerDeviceToken(user.id);
-      }
-    };
-
-    checkUser();
+    if (user) registerDeviceToken(user.id);
   }, [user]);
 
+  // ── Session change flag ──────────────────────────────────────────────────
   useEffect(() => {
     if (sessionChanged) {
       console.log("Detectado cambio de sesión → recargando datos");
-
-      setSessionChanged(false); // reset bandera
+      setSessionChanged(false);
     }
   }, [sessionChanged]);
 
+  // ── Sync driver_mode from user store ─────────────────────────────────────
   useEffect(() => {
-    if (user) {
-      setIsEnabled(user.driver_mode);
-    }
+    if (user) setIsEnabled(user.driver_mode);
   }, [user?.driver_mode]);
 
+  // ── Persist driver_mode to Supabase ──────────────────────────────────────
   useEffect(() => {
     if (user && user.driver_mode !== isEnabled) {
       updateUser({ driver_mode: isEnabled });
     }
-    if (isEnabled) {
-      // Student se mueve a la derecha y Car entra desde la izquierda
-      Animated.timing(slideStudent, {
-        toValue: 300, // fuera
-        duration: 500,
-        useNativeDriver: true,
-      }).start();
-
-      Animated.timing(slideCar, {
-        toValue: 0, // visible
-        duration: 500,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      // Student entra y Car sale
-      Animated.timing(slideStudent, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-      }).start();
-
-      Animated.timing(slideCar, {
-        toValue: 300,
-        duration: 500,
-        useNativeDriver: true,
-      }).start();
-    }
   }, [isEnabled]);
 
+  // ── History ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    Animated.timing(opacityAnimStudent, {
-      toValue: isEnabled ? 0 : 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
-  }, [isEnabled]);
-
-  useEffect(() => {
-    Animated.timing(opacityAnimCar, {
-      toValue: isEnabled ? 1 : 0,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
-  }, [isEnabled]);
-
-  useEffect(() => {
+    refreshUser();
     fetchHistory();
   }, [user?.id, user?.driver_mode]);
 
-
-
   const fetchHistory = async () => {
     if (!user?.id) return;
-
-    console.log(`Fetching history for user ${user.name}`);
 
     const { data: historyData, error } = await supabase
       .from("passenger_route_history")
@@ -139,402 +81,542 @@ export default function HomeScreen() {
       return;
     }
 
-    // Enrich history data with driver and passengers
-    const enrichedHistory = await Promise.all(historyData.map(async (item) => {
-      // 1. Fetch Driver info for this trip
-      // Note: passenger_route_history might not have driver_id directly if it's a view or simple table.
-      // If it doesn't, we need to join or fetch from trip_sessions.
-      // Assuming item.trip_session_id exists.
-
-      // Fetch trip session to get Driver ID (if not in history)
-      const { data: session } = await supabase
-        .from('trip_sessions')
-        .select('driver_id, route_id, routes(image_url)')
-        .eq('id', item.trip_session_id)
-        .single();
-
-      let driverInfo = undefined;
-      if (session?.driver_id) {
-        const { data: driverUser } = await supabase
-          .from('users')
-          .select('name, avatar_profile')
-          .eq('id', session.driver_id)
+    const enrichedHistory = await Promise.all(
+      historyData.map(async (item) => {
+        const { data: session } = await supabase
+          .from("trip_sessions")
+          .select("driver_id, route_id, routes(image_url)")
+          .eq("id", item.trip_session_id)
           .single();
 
-        if (driverUser) {
-          const ratingInfo = await ratingsService.getUserRating(session.driver_id);
-          driverInfo = {
-            name: driverUser.name,
-            avatar: driverUser.avatar_profile,
-            rating: ratingInfo.rating
-          };
+        let driverInfo = undefined;
+        if (session?.driver_id) {
+          const { data: driverUser } = await supabase
+            .from("users")
+            .select("name, avatar_profile")
+            .eq("id", session.driver_id)
+            .single();
+
+          if (driverUser) {
+            const ratingInfo = await ratingsService.getUserRating(session.driver_id);
+            driverInfo = {
+              name: driverUser.name,
+              avatar: driverUser.avatar_profile,
+              rating: ratingInfo.rating,
+            };
+          }
         }
-      }
 
-      // 2. Fetch Passengers for this trip
-      // We want passengers who were part of this COMPLETED session
-      const { data: passengers } = await supabase
-        .from('passenger_trip_sessions')
-        .select('passenger_id')
-        .eq('trip_session_id', item.trip_session_id)
-        .in('status', ['completed', 'joined']); // Include completed as well
+        const { data: passengers } = await supabase
+          .from("passenger_trip_sessions")
+          .select("passenger_id")
+          .eq("trip_session_id", item.trip_session_id)
+          .in("status", ["completed", "joined"]);
 
-      let passengersData: any[] = [];
-      if (passengers && passengers.length > 0) {
-        const pIds = passengers.map(p => p.passenger_id);
-        const { data: users } = await supabase
-          .from('users')
-          .select('id, avatar_profile')
-          .in('id', pIds);
-
-        if (users) {
-          passengersData = users.map(u => ({ id: u.id, avatar: u.avatar_profile }));
+        let passengersData: any[] = [];
+        if (passengers && passengers.length > 0) {
+          const pIds = passengers.map((p) => p.passenger_id);
+          const { data: users } = await supabase
+            .from("users")
+            .select("id, avatar_profile")
+            .in("id", pIds);
+          if (users) {
+            passengersData = users.map((u) => ({ id: u.id, avatar: u.avatar_profile }));
+          }
         }
-      }
 
-      return {
-        ...item,
-        driver_details: driverInfo,
-        passengers_data: passengersData,
-        route_id: session?.route_id,
-        image_url: Array.isArray(session?.routes)
-          ? (session.routes[0] as any)?.image_url
-          : (session?.routes as any)?.image_url
-      };
-    }));
+        return {
+          ...item,
+          driver_details: driverInfo,
+          passengers_data: passengersData,
+          route_id: session?.route_id,
+          image_url: Array.isArray(session?.routes)
+            ? (session.routes[0] as any)?.image_url
+            : (session?.routes as any)?.image_url,
+        };
+      })
+    );
 
     setHistory(enrichedHistory);
   };
 
-  const [driverDetails, setDriverDetails] = useState<{ name: string; avatar: string; rating: number } | undefined>(undefined);
+  // ── Active session details ───────────────────────────────────────────────
+  const [driverDetails, setDriverDetails] = useState<
+    { name: string; avatar: string; rating: number } | undefined
+  >(undefined);
   const [passengerDetails, setPassengerDetails] = useState<{ id: string; avatar: string }[]>([]);
   const [activePendingRequestsCount, setActivePendingRequestsCount] = useState<number>(0);
 
-  // Fetch details for active session
-  useEffect(() => {
-    const fetchSessionDetails = async () => {
-      if (!activeSession) {
-        setDriverDetails(undefined);
+  const fetchSessionDetails = async () => {
+    if (!activeSession) {
+      setDriverDetails(undefined);
+      setPassengerDetails([]);
+      setActivePendingRequestsCount(0);
+      return;
+    }
+
+    try {
+      if (activeSession.driver_id) {
+        const { data: driverUser } = await supabase
+          .from("users")
+          .select("name, avatar_profile")
+          .eq("id", activeSession.driver_id)
+          .single();
+
+        if (driverUser) {
+          const ratingInfo = await ratingsService.getUserRating(activeSession.driver_id);
+          setDriverDetails({
+            name: driverUser.name,
+            avatar: driverUser.avatar_profile,
+            rating: ratingInfo.rating,
+          });
+        }
+      }
+
+      const { data: passengers } = await supabase
+        .from("passenger_trip_sessions")
+        .select("passenger_id")
+        .eq("trip_session_id", activeSession.id)
+        .in("status", ["joined", "pending"]);
+
+      if (passengers && passengers.length > 0) {
+        const passengerIds = passengers.map((p) => p.passenger_id);
+        const { data: usersData } = await supabase
+          .from("users")
+          .select("id, avatar_profile")
+          .in("id", passengerIds);
+        if (usersData) {
+          setPassengerDetails(usersData.map((u) => ({ id: u.id, avatar: u.avatar_profile })));
+        }
+      } else {
         setPassengerDetails([]);
-        setActivePendingRequestsCount(0);
-        return;
       }
 
-      try {
-        // 1. Fetch Driver Details
-        if (activeSession.driver_id) {
-          const { data: driverUser } = await supabase
-            .from("users")
-            .select("name, avatar_profile")
-            .eq("id", activeSession.driver_id)
-            .single();
+      const { data: pendingRequests } = await supabase
+        .from("passenger_requests")
+        .select("id")
+        .eq("trip_session_id", activeSession.id)
+        .eq("status", "pending");
 
-          if (driverUser) {
-            const ratingInfo = await ratingsService.getUserRating(activeSession.driver_id);
-            setDriverDetails({
-              name: driverUser.name,
-              avatar: driverUser.avatar_profile,
-              rating: ratingInfo.rating,
-            });
-          }
-        }
+      setActivePendingRequestsCount(pendingRequests?.length || 0);
+    } catch (error) {
+      console.error("Error fetching session details:", error);
+    }
+  };
 
-        // 2. Fetch Passenger Details (only joined)
-        const { data: passengers } = await supabase
-          .from("passenger_trip_sessions")
-          .select("passenger_id")
-          .eq("trip_session_id", activeSession.id)
-          .eq("status", "joined");
-
-        if (passengers && passengers.length > 0) {
-          const passengerIds = passengers.map(p => p.passenger_id);
-          const { data: usersData } = await supabase
-            .from("users")
-            .select("id, avatar_profile")
-            .in("id", passengerIds);
-
-          if (usersData) {
-            setPassengerDetails(usersData.map(u => ({
-              id: u.id,
-              avatar: u.avatar_profile
-            })));
-          }
-        } else {
-          setPassengerDetails([]);
-        }
-
-        const { data: pendingRequests } = await supabase
-          .from('passenger_requests')
-          .select('id')
-          .eq('trip_session_id', activeSession.id)
-          .eq('status', 'pending');
-
-        setActivePendingRequestsCount(pendingRequests?.length || 0);
-      } catch (error) {
-        console.error("Error fetching session details:", error);
-      }
-    };
-
+  useEffect(() => {
     fetchSessionDetails();
   }, [activeSession]);
 
-  function handleInputPress(activeMode: string): void {
-    console.log('Modo activo: ', activeMode);
-    if (user?.is_driver && isEnabled) {
-      router.push({
-        pathname: "/(tabs)/available-routes/create-route-screen",
-        params: {
-          activeModeP: activeMode,
+  // ── Realtime subscription for requests & passenger sessions ─────────────
+  useEffect(() => {
+    if (!activeSession?.id) return;
+
+    const channel = supabase
+      .channel(`home-session-realtime-${activeSession.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "passenger_requests",
+          filter: `trip_session_id=eq.${activeSession.id}`,
+        },
+        () => {
+          fetchSessionDetails();
         }
-      });
-    } else {
-      router.push("/(tabs)/available-routes");
-    }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "passenger_trip_sessions",
+          filter: `trip_session_id=eq.${activeSession.id}`,
+        },
+        () => {
+          fetchSessionDetails();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeSession?.id]);
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  const hasActiveOrPendingTrip =
+    !!activeSession &&
+    (activeSession.status === "active" || activeSession.status === "pending");
+
+  function handlePublishRoute(): void {
+    router.push({
+      pathname: "/(tabs)/available-routes/create-route-screen",
+      params: { activeModeP: "start" },
+    });
   }
 
+  function handleOpenWhatsAppSupport(): void {
+    Linking.openURL(WHATSAPP_SUPPORT_URL).catch(() =>
+      console.warn("No se pudo abrir WhatsApp")
+    );
+  }
+
+  // ─── Render ──────────────────────────────────────────────────────────────
   return (
-    <View className="flex-1"
-      style={{
-        backgroundColor: Colors.dark.background,
-      }}
-    >
-      <ThemedView
-        lightColor={Colors.light.secondary}
-        darkColor={Colors.dark.secondary}
-        className="flex-col mx-4 mt-12 mb-4 rounded-2xl"
-      >
-        <View className="flex-row justify-between mx-4 mt-4">
-          <View>
-            <ThemedText
-              className="font-semibold text-4xl"
-            >
-              Hola, {user?.name}
-            </ThemedText>
-            <ThemedText
-              className="font-light text-sm"
-            >
-              ¿A dónde vamos hoy?
-            </ThemedText>
-          </View>
-          {user?.is_driver && (
-            <View className="justify-center items-center">
-              <Switch
-                trackColor={{ false: tirdColor, true: tirdColor }}
-                thumbColor={
-                  isEnabled ? dangerColor : primaryColor // Dynamic colors
-                }
-                ios_backgroundColor={textColor}
-                value={isEnabled}
-                onValueChange={toggleSwitch}
-              ></Switch>
-            </View>
-          )}
+    <View className="flex-1" style={{ backgroundColor: Colors.dark.background }}>
+
+      {/* ── FEEDBACK MODAL ─────────────────────────────────────────────── */}
+      <FeedbackModal
+        visible={feedbackVisible}
+        onClose={() => setFeedbackVisible(false)}
+        screenName="Home"
+      />
+
+      {/* ── DRIVER REQUESTS MODAL ──────────────────────────────────────── */}
+      <DriverRequestsModal
+        visible={driverRequestsModalVisible}
+        tripSessionId={activeSession?.id ?? null}
+        onClose={() => setDriverRequestsModalVisible(false)}
+        onSelectPendingPassenger={(passengerId) => {
+          setSelectedPassengerId(passengerId);
+          setPassengerActionModalVisible(true);
+        }}
+      />
+
+      {/* ── PASSENGER ACTION MODAL (APPROVE / REJECT) ──────────────────── */}
+      <PassengerActionModal
+        visible={passengerActionModalVisible}
+        passengerId={selectedPassengerId}
+        tripSessionId={activeSession?.id ?? 0}
+        onClose={() => {
+          setPassengerActionModalVisible(false);
+          setSelectedPassengerId(null);
+        }}
+        onActionComplete={() => {
+          fetchSessionDetails();
+        }}
+      />
+
+      {/* ── HEADER ─────────────────────────────────────────────────────── */}
+      <View className="flex-row justify-between items-center mx-4 mt-12 mb-4">
+        {/* Greeting */}
+        <View className="flex-1 mr-3">
+          <ThemedText className="font-bold text-4xl" style={{ color: "#E2EBF0" }}>
+            Hola,
+          </ThemedText>
+          <ThemedText className="font-bold text-4xl" style={{ color: "#E2EBF0" }}>
+            {user?.name}
+          </ThemedText>
         </View>
-        <View className="flex-col m-4">
-          <Pressable
-            onPress={() => handleInputPress('start')}
-            className={`p-3 rounded-t-2xl flex-row items-center`}
+
+        {/* Role selector */}
+        {user?.is_driver ? (
+          /* ── Segmented Control: Pasajero | Conductor ── */
+          <View
+            className="flex-row rounded-2xl overflow-hidden pl-2 pr-1 py-1"
             style={{
-              backgroundColor: Colors.dark.background,
-              borderBottomColor: Colors.dark.primary,
-              borderBottomWidth: 1,
+              backgroundColor: Colors.dark.primary,
+              borderWidth: 1,
+              borderColor: Colors.dark.borderSecondary,
             }}
           >
-            {<Ionicons name="location-sharp" size={18} color="#2563EB" />}
-            <ThemedText
-              numberOfLines={1}
-              className={`text-base flex-1 text-textSecondary ml-2`}
-            >
-              {"Ubicación actual"}
-            </ThemedText>
-          </Pressable>
-
-          <Pressable
-            onPress={() => handleInputPress('end')}
-            className={`p-3 rounded-b-2xl flex-row items-center`}
-            style={{
-              backgroundColor: Colors.dark.background,
-              // borderBottomColor: Colors.dark.background,
-              // borderBottomWidth: 1,
-            }}
-          >
-            {<Ionicons name="location-sharp" size={18} color="#EF4444" />}
-            <ThemedText
-              numberOfLines={1}
-              className={`text-base flex-1 text-textSecondary ml-2`}
-            >
-              {"¿A dónde vas?"}
-            </ThemedText>
-          </Pressable>
-        </View>
-      </ThemedView>
-
-      <View className="flex-1 mx-4">
-        <ScrollView className="flex-col gap-4" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-          <View className="flex-row mb-2 justify-between items-center">
-            <ThemedText className="text-xl font-semibold">
-              Próximos viajes
-            </ThemedText>
-            <Pressable onPress={() => router.push('/(tabs)/profile/activity')}>
-              <ThemedText className="text-base font-semibold"
-                lightColor={Colors.light.secondary}
-                darkColor={Colors.dark.secondary}
-              >
-                Ver todos
-              </ThemedText>
-            </Pressable>
-          </View>
-          {activeSession ? (
-            <View>
-              <RouteCard
-                key={`active-${activeSession.id}`}
-                sessionId={activeSession.id}
-                routeId={activeSession.route_id}
-                title={`${activeSession.start_location} - ${activeSession.end_location}`}
-                isActive={activeSession.status}
-                routeScreen={activeSession.status == 'active' ? `/(tabs)/home/route-detail?id=${activeSession.id}` : `/(tabs)/available-routes/route-detail?id=${activeSession.route_id}&sessionId=${activeSession.id}`}
-                startLocation={activeSession.start_location.split(",")[0].trim()}
-                endLocation={activeSession.end_location.split(",")[0].trim()}
-                passengerCount={passengerDetails.length}
-                driver={driverDetails}
-                passengersData={passengerDetails}
-                pendingRequestsCount={activePendingRequestsCount}
-                imageUrl={(activeSession as any).routes?.image_url}
-              />
-            </View>
-          ) :
-            (
-              history.length > 0 ? (
-                <View>
-                  <RouteCard
-                    sessionId={history[0].id}
-                    routeId={(history[0] as any).route_id}
-                    title={`${history[0].start_location} - ${history[0].end_location}`}
-                    isActive={"completed"}
-                    routeScreen={`/(tabs)/available-routes/route-detail?id=${history[0].route_id}&sessionId=${history[0].trip_session_id}`}
-                    startLocation={history[0].start_location.split(",")[0].trim()}
-                    endLocation={history[0].end_location.split(",")[0].trim()}
-                    passengerCount={(history[0] as any).passengers_data?.length || 0}
-                    driver={(history[0] as any).driver_details}
-                    passengersData={(history[0] as any).passengers_data}
-                    imageUrl={(history[0] as any).image_url}
-                  />
-                </View>
-              )
-                : (
-                  <ThemedText className="text-center mt-10 text-textSecondary">
-                    No tienes rutas en tu historial.
-                  </ThemedText>
-                )
-            )
-          }
-
-          {/* Botones de Acción Rápidos (Crear/Buscar o Favoritas/Buscar) */}
-          <View className="flex-row gap-2 justify-between items-center">
-            {/* Botón izquierdo: dinámico según modo */}
-            {user?.is_driver && isEnabled ? (
-              /* MODO CONDUCTOR: Crear viaje */
-              <Pressable className="flex-1 pr-1"
-                onPress={() => handleInputPress('start')}
-              >
-                <ThemedView
-                  className="flex-row items-center rounded-2xl gap-x-2 py-4"
-                  style={{
-                    backgroundColor: Colors.dark.primary,
-                    borderColor: Colors.dark.borderSecondary,
-                    borderWidth: 1
-                  }}
-                >
-                  <View>
-                    <Ionicons name="car-sport" size={30} color="#2563EB" />
-                  </View>
-                  <View className="flex-col">
-                    <ThemedText className="text-base font-semibold">
-                      Crear viaje
-                    </ThemedText>
-                    <ThemedText className="text-sm text-textsecondary">
-                      Como conductor
-                    </ThemedText>
-                  </View>
-                </ThemedView>
-              </Pressable>
-            ) : (
-              /* MODO PASAJERO: Rutas favoritas → redirige a actividad */
-              <Pressable className="flex-1 pr-1"
-                onPress={() => router.push('/(tabs)/profile/activity')}
-              >
-                <ThemedView
-                  className="flex-row items-center rounded-2xl gap-x-2 py-4"
-                  style={{
-                    backgroundColor: Colors.dark.primary,
-                    borderColor: Colors.dark.borderSecondary,
-                    borderWidth: 1
-                  }}
-                >
-                  <View>
-                    <Ionicons name="bookmark" size={30} color="#2563EB" />
-                  </View>
-                  <View className="flex-col">
-                    <ThemedText className="text-base font-semibold">
-                      Rutas favoritas
-                    </ThemedText>
-                    <ThemedText className="text-sm text-textsecondary">
-                      Ver historial
-                    </ThemedText>
-                  </View>
-                </ThemedView>
-              </Pressable>
-            )}
-
-            {/* Botón derecho: siempre buscar viaje */}
+            {/* Pasajero tab */}
             <Pressable
-              className="flex-1 pl-1"
-              onPress={() => router.push('/(tabs)/available-routes')}
+              onPress={() => setIsEnabled(false)}
+              className="flex-row items-center justify-center gap-x-1 px-3 py-2 rounded-xl"
+              style={{
+                backgroundColor: !isEnabled ? "#2563EB" : "transparent",
+                minWidth: 44,
+              }}
             >
-              <ThemedView className="flex-row items-center gap-x-2 rounded-2xl py-4"
-                style={{
-                  backgroundColor: Colors.dark.primary,
-                  borderColor: Colors.dark.borderSecondary,
-                  borderWidth: 1
-                }}
-              >
-                <View>
-                  <Ionicons name="people" size={30} color="#2563EB" />
-                </View>
-                <View className="flex-col">
-                  <ThemedText className="text-base font-semibold">
-                    Buscar viaje
-                  </ThemedText>
-                  <ThemedText className="text-sm text-textsecondary">
-                    Como pasajero
-                  </ThemedText>
-                </View>
-              </ThemedView>
+              <Ionicons
+                name="person"
+                size={18}
+                color={!isEnabled ? "#fff" : Colors.dark.textSecondary}
+              />
+              {!isEnabled && (
+                <ThemedText className="text-xs font-bold" style={{ color: "#fff" }}>
+                  Pasajero
+                </ThemedText>
+              )}
+            </Pressable>
+
+            {/* Conductor tab */}
+            <Pressable
+              onPress={() => setIsEnabled(true)}
+              className="flex-row items-center justify-center gap-x-1 px-3 py-2 rounded-xl"
+              style={{
+                backgroundColor: isEnabled ? "#2563EB" : "transparent",
+                minWidth: 44,
+              }}
+            >
+              <Ionicons
+                name="car-sport"
+                size={18}
+                color={isEnabled ? "#fff" : Colors.dark.textSecondary}
+              />
+              {isEnabled && (
+                <ThemedText className="text-xs font-bold" style={{ color: "#fff" }}>
+                  Conductor
+                </ThemedText>
+              )}
             </Pressable>
           </View>
-
-
-          {/* Sección de seguridad */}
-          <View className="flex-row gap-x-2 items-center py-4 mb-4 rounded-2xl"
+        ) : (
+          /* ── Botón Ser Conductor ── */
+          <Pressable
+            onPress={() => router.push("/(tabs)/profile/become-driver")}
+            className="flex-row items-center gap-x-1 rounded-xl px-3 py-2"
             style={{
               backgroundColor: Colors.dark.warning,
               borderColor: Colors.dark.borderWarning,
-              borderWidth: 1
+              borderWidth: 1,
             }}
           >
-            <Ionicons name="shield-checkmark-outline" size={50} color="#2563EB" />
-            <View className="flex-1">
-              <ThemedText className="text-base font-bold">
-                Tu seguridad es prioridad
-              </ThemedText>
-              <ThemedText className="text-xs text-textSecondary leading-4">
-                Comparte tu viaje en tiempo real con tus contactos de confianza.
+            <Ionicons name="car-sport-outline" size={18} color={Colors.dark.secondary} />
+            <ThemedText className="text-xs font-bold" style={{ color: "#fff" }}>
+              Ser Conductor
+            </ThemedText>
+          </Pressable>
+        )}
+      </View>
+
+      {/* ── CONTENT ────────────────────────────────────────────────────── */}
+      <View className="flex-1 mx-4">
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 100, gap: 12 }}
+        >
+          {/* ── Route Card ── */}
+          {activeSession ? (
+            <RouteCard
+              key={`active-${activeSession.id}`}
+              sessionId={activeSession.id}
+              routeId={activeSession.route_id}
+              title={`${activeSession.start_location} - ${activeSession.end_location}`}
+              isActive={activeSession.status}
+              routeScreen={
+                activeSession.status === "active"
+                  ? `/(tabs)/home/route-detail?id=${activeSession.id}`
+                  : `/(tabs)/available-routes/route-detail?id=${activeSession.route_id}&sessionId=${activeSession.id}`
+              }
+              startLocation={activeSession.start_location.split(",")[0].trim()}
+              endLocation={activeSession.end_location.split(",")[0].trim()}
+              passengerCount={passengerDetails.length}
+              driver={driverDetails}
+              passengersData={passengerDetails}
+              pendingRequestsCount={activePendingRequestsCount}
+              imageUrl={(activeSession as any).routes?.image_url}
+              vehicle={activeSession.vehicle as Vehicle | undefined}
+            />
+          ) : history.length > 0 ? (
+            <RouteCard
+              sessionId={history[0].id}
+              routeId={(history[0] as any).route_id}
+              title={`${history[0].start_location} - ${history[0].end_location}`}
+              isActive={"completed"}
+              routeScreen={`/(tabs)/available-routes/route-detail?id=${history[0].route_id}&sessionId=${history[0].trip_session_id}`}
+              startLocation={history[0].start_location.split(",")[0].trim()}
+              endLocation={history[0].end_location.split(",")[0].trim()}
+              passengerCount={(history[0] as any).passengers_data?.length || 0}
+              driver={(history[0] as any).driver_details}
+              passengersData={(history[0] as any).passengers_data}
+              imageUrl={(history[0] as any).image_url}
+            />
+          ) : (
+            <View
+              className="rounded-2xl py-10 items-center justify-center"
+              style={{
+                backgroundColor: Colors.dark.primary,
+                borderWidth: 1,
+                borderColor: Colors.dark.borderSecondary,
+              }}
+            >
+              <Ionicons name="map-outline" size={40} color={Colors.dark.textSecondary} />
+              <ThemedText
+                className="text-sm mt-3"
+                style={{ color: Colors.dark.textSecondary }}
+              >
+                No tienes rutas en tu historial.
               </ThemedText>
             </View>
+          )}
+
+          {/* ── Acciones rápidas header ── */}
+          <View className="flex-row justify-between items-center mt-2">
+            <ThemedText className="text-xl font-bold" style={{ color: "#E2EBF0" }}>
+              Acciones Rápidas
+            </ThemedText>
           </View>
+
+          {/* ── Botones de Acción ── */}
+          <View className="flex-row justify-around">
+            {/* 1. Modo Conductor con Viaje Activo/Pendiente */}
+            {isEnabled && user?.is_driver && hasActiveOrPendingTrip && (
+              <ActionButton
+                icon="clipboard-outline"
+                label="Mis Solicitudes"
+                badge={activePendingRequestsCount}
+                onPress={() => setDriverRequestsModalVisible(true)}
+              />
+            )}
+
+            {/* 2. Botón de Feedback (Se renderiza siempre en Modo Pasajero o en Conductor con Viaje Activo) */}
+            {(!isEnabled || !user?.is_driver || hasActiveOrPendingTrip) && (
+              <ActionButton
+                icon="chatbubble-ellipses-outline"
+                label="Feedback"
+                color="#8B5CF6"
+                onPress={() => setFeedbackVisible(true)}
+              />
+            )}
+
+            {/* 3. Modo Conductor Sin Viaje Activo: Feedback primero */}
+            {isEnabled && user?.is_driver && !hasActiveOrPendingTrip && (
+              <ActionButton
+                icon="chatbubble-ellipses-outline"
+                label="Feedback"
+                color="#8B5CF6"
+                onPress={() => setFeedbackVisible(true)}
+              />
+            )}
+
+            {/* 4. Modo Conductor Sin Viaje Activo: Publicar Viaje */}
+            {isEnabled && user?.is_driver && !hasActiveOrPendingTrip && (
+              <ActionButton
+                icon="add-circle-outline"
+                label={"Publicar\nNuevo Viaje"}
+                solidColor="#2563EB"
+                onPress={handlePublishRoute}
+              />
+            )}
+
+            {/* 5. Modo Pasajero: Buscar Nuevo Viaje */}
+            {(!isEnabled || !user?.is_driver) && (
+              <ActionButton
+                icon="search-outline"
+                label={"Buscar\nNuevo Viaje"}
+                solidColor="#10B981"
+                onPress={() => router.push("/(tabs)/available-routes")}
+              />
+            )}
+          </View>
+
+          {/* ── Banner de Soporte WhatsApp ── */}
+          <Pressable
+            onPress={handleOpenWhatsAppSupport}
+            className="flex-row items-center py-4 px-4 mb-2 rounded-2xl"
+            style={{
+              backgroundColor: Colors.dark.warning,
+              borderColor: Colors.dark.borderWarning,
+              borderWidth: 1,
+            }}
+          >
+            <Ionicons name="shield-checkmark" size={32} color="#2563EB" />
+            <View className="flex-1">
+              <ThemedText className="text-sm font-bold" style={{ color: "#E2EBF0" }}>
+                Contacta a soporte
+              </ThemedText>
+              <ThemedText
+                className="text-xs leading-4 mt-0.5"
+                style={{ color: Colors.dark.textSecondary }}
+              >
+                Toca aquí para contactar Soporte Técnico vía WhatsApp.
+              </ThemedText>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={Colors.dark.textSecondary} />
+          </Pressable>
         </ScrollView>
       </View>
-      {/* <View className="h-48 bg-fuchsia-500"/> */}
     </View>
+  );
+}
+
+// ─── Shared Action Button ─────────────────────────────────────────────────────
+
+interface ActionButtonProps {
+  icon: string;
+  label: string;
+  onPress: () => void;
+  /** Badge count (shown as red dot) */
+  badge?: number;
+  /** Icon tint when button is dark-background style */
+  color?: string;
+  /** Full background color (pill style) */
+  solidColor?: string;
+}
+
+function ActionButton({
+  icon,
+  label,
+  onPress,
+  badge = 0,
+  color = "#E2EBF0",
+  solidColor,
+}: ActionButtonProps) {
+  const isSolid = !!solidColor;
+
+  return (
+    <Pressable className="flex-1" onPress={onPress}>
+      <View
+        style={{
+          flex: 1,
+          minHeight: 72,
+          borderRadius: 20,
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          paddingVertical: 18,
+          paddingHorizontal: 12,
+          marginHorizontal: 5,
+          backgroundColor: isSolid ? solidColor : Colors.dark.primary,
+          ...(!isSolid && {
+            borderWidth: 1,
+            borderColor: Colors.dark.borderSecondary,
+          }),
+        }}
+      >
+        {/* Icon + optional badge */}
+        <View style={{ position: "relative", marginBottom: 10 }}>
+          <Ionicons
+            name={icon as any}
+            size={35}
+            color={isSolid ? "#fff" : color}
+          />
+          {badge > 0 && (
+            <View
+              style={{
+                position: "absolute",
+                top: -4,
+                right: -8,
+                backgroundColor: "#EF4444",
+                borderRadius: 10,
+                minWidth: 18,
+                height: 18,
+                alignItems: "center",
+                justifyContent: "center",
+                paddingHorizontal: 3,
+              }}
+            >
+              <ThemedText className="text-xs text-font-bold text-center" style={{ color: "#fff" }}>
+                {badge}
+              </ThemedText>
+            </View>
+          )}
+        </View>
+
+        {/* Label */}
+        <ThemedText
+          className="text-center text-sm font-bold"
+          style={{
+            color: isSolid ? "#fff" : "#E2EBF0",
+          }}
+        >
+          {label.replace('\n', ' ')}
+        </ThemedText>
+      </View>
+    </Pressable>
   );
 }

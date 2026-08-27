@@ -1,8 +1,8 @@
+import { Colors } from "@/constants/Colors";
 import { useThemeColor } from "@/hooks/useThemeColor";
+import { BlurView } from "expo-blur";
 import { Pressable, StyleSheet, View } from "react-native";
 import { ThemedText } from "../ui/ThemedText";
-import { Colors } from "@/constants/Colors";
-import { BlurView } from "expo-blur";
 
 interface FilterCardProps {
     title: string,
@@ -17,13 +17,13 @@ export default function FilterCard({ title, value, isSelected = false, onPress }
     return (
         <Pressable
             onPress={() => onPress?.(value)}
-            style={({ pressed }) => [{
-                backgroundColor: isSelected ? secondaryColor as string : Colors.dark.glassSoft,
+            style={{
+                backgroundColor: isSelected ? Colors.dark.secondary : Colors.dark.glassSoft,
                 borderWidth: 1,
-                borderColor: isSelected ? "rgba(0, 10, 28, 0.45)" : Colors.dark.border,
-                opacity: pressed ? 0.92 : 1,
+                borderColor: Colors.dark.border,
+                opacity: 1,
                 overflow: "hidden",
-            }]}
+            }}
             className="rounded-full py-1 px-4 items-center mr-2">
             {!isSelected && (
                 <>
@@ -33,7 +33,7 @@ export default function FilterCard({ title, value, isSelected = false, onPress }
             )}
             <ThemedText
                 className="text-lg font-normal"
-                style={{ color: isSelected ? Colors.dark.primary : Colors.dark.text }}>
+                style={{ color: Colors.dark.text }}>
                 {title}
             </ThemedText>
         </Pressable>

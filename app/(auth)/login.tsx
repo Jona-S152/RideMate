@@ -71,7 +71,7 @@ export default function LoginScreen() {
                     <Image
                         className="h-36"
                         style={{ resizeMode: "contain" }}
-                        source={require('../../assets/images/TitleApp.png')} />
+                        source={require('../../assets/brand-assets/SplashScreen_DarkMode.png')} />
                 </View>
                 {/* <Image
                     className="mb-1"

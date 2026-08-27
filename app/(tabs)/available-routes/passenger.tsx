@@ -70,37 +70,42 @@ export default function PassengerRoutesScreen() {
     if (!user) return;
 
     try {
-      // 1. Verificar si el usuario ya está unido a este viaje en passenger_trip_sessions
-      const existingJoinStatus = await tripService.checkPassengerSessionStatus(user.id, route.id);
-      if (existingJoinStatus === 'joined') {
-        Toast.show({
-          type: "info",
-          text1: "Ya estás en este viaje",
-          text2: "Ya estás participando en este viaje.",
-        });
-        return;
-      }
-
-      // 2. Verificar si el usuario ya tiene una solicitud pendiente en passenger_requests
-      const pendingRequest = await tripService.checkPassengerRequestStatus(user.id, route.id);
-      if (pendingRequest?.status === 'pending') {
-        Toast.show({
-          type: "info",
-          text1: "Solicitud pendiente",
-          text2: "Ya has enviado una solicitud para este viaje. Espera a que el conductor la apruebe.",
-        });
-        return;
-      }
-
-      // 3. Verificar si el usuario ya tiene algún viaje activo (cualquiera con status joined)
-      const hasActiveSession = await tripService.hasActiveTripSession(user.id);
-      if (hasActiveSession) {
+      // 0. Verificar si el usuario ya abandonó este viaje anteriormente
+      const hasLeft = await tripService.hasLeftTripSession(user.id, route.id);
+      if (hasLeft) {
         Toast.show({
           type: "warning",
-          text1: "Viaje activo",
-          text2: "Ya tienes un viaje en curso.",
+          text1: "No puedes unirte",
+          text2: "Has abandonado este viaje anteriormente y no puedes volver a solicitar unirte.",
         });
         return;
+      }
+
+      // 1. Verificar si el usuario ya tiene un viaje activo o solicitud activa en el sistema
+      const activeState = await tripService.hasAnyActiveTripOrRequest(user.id);
+      if (activeState.hasActive) {
+        if (activeState.reason === 'driver') {
+          Toast.show({
+            type: "warning",
+            text1: "No puedes unirte",
+            text2: "Tienes un viaje activo como conductor. Finalízalo antes de unirte a otra ruta.",
+          });
+          return;
+        } else if (activeState.reason === 'pending_request') {
+          Toast.show({
+            type: "info",
+            text1: "Solicitud en curso",
+            text2: "Ya tienes una solicitud pendiente de aprobación por el conductor.",
+          });
+          return;
+        } else if (activeState.reason === 'passenger_active') {
+          Toast.show({
+            type: "warning",
+            text1: "Viaje en curso",
+            text2: "Ya estás participando en un viaje activo.",
+          });
+          return;
+        }
       }
 
       // 3. Verificar si el usuario ya tiene el viaje completado pero la sesión sigue activa

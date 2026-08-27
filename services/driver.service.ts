@@ -1,4 +1,3 @@
-import { supabase } from "@/lib/supabase";
 import {
   AddVehicleFormData,
   BecomeDriverFormData,
@@ -7,6 +6,9 @@ import {
   UpdateDriverProfileData,
   Vehicle,
 } from "@/interfaces/driver";
+import { supabase } from "@/lib/supabase";
+import { decode } from 'base64-arraybuffer';
+import * as FileSystem from 'expo-file-system';
 
 export const driverService = {
   /**
@@ -21,15 +23,19 @@ export const driverService = {
     }
 
     try {
-      const response = await fetch(fileUri);
-      const blob = await response.blob();
       const fileExt = fileUri.split(".").pop()?.toLowerCase() || "jpg";
       const fullPath = `${path}_${Date.now()}.${fileExt}`;
 
+      // 1. Leer el archivo local como string en Base64
+      const base64 = await FileSystem.readAsStringAsync(fileUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // 2. Subir a Supabase decodificando el Base64 a ArrayBuffer
       const { data, error } = await supabase.storage
         .from(bucket)
-        .upload(fullPath, blob, {
-          contentType: blob.type || `image/${fileExt === "png" ? "png" : "jpeg"}`,
+        .upload(fullPath, decode(base64), {
+          contentType: `image/${fileExt === "png" ? "png" : "jpeg"}`,
           upsert: true,
         });
 
@@ -162,7 +168,11 @@ export const driverService = {
       p_vehicle_image_url: vehicleImageUrl || null,
     };
 
+    console.warn("PAYLOAD: ", JSON.stringify(payload, null, 2));
     const { data, error } = await supabase.rpc("update_driver_profile_for_reverification", payload);
+
+    console.warn("DATA: ", JSON.stringify(data, null, 2));
+    console.warn("ERROR: ", JSON.stringify(error, null, 2));
 
     if (error) {
       console.error("[driverService.updateDriverProfileForReverification] RPC Error:", error.message);

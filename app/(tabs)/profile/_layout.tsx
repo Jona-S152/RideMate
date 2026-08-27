@@ -18,6 +18,7 @@ export default function ProfileStackLayout() {
       <Stack.Screen name="activity" options={{ headerShown: false }} />
       <Stack.Screen name="edit-profile" options={{ headerShown: false }} />
       <Stack.Screen name="become-driver" options={{ headerShown: false }} />
+      <Stack.Screen name="edit-driver" options={{ headerShown: false }} />
     </Stack>
   );
 }

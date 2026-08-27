@@ -1,25 +1,26 @@
-import React, { useEffect, useState } from "react";
-import { View, Pressable, ActivityIndicator, ScrollView } from "react-native";
-import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import Toast from "react-native-toast-message";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import Toast from "react-native-toast-message";
 
 import { useAuth } from "@/app/context/AuthContext";
+import { AddVehicleModal } from "@/components/driver/AddVehicleModal";
+import { ImageUploadPicker } from "@/components/driver/ImageUploadPicker";
+import { StepIndicator } from "@/components/driver/StepIndicator";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
-import { StepIndicator } from "@/components/driver/StepIndicator";
-import { ImageUploadPicker } from "@/components/driver/ImageUploadPicker";
-import { AddVehicleModal } from "@/components/driver/AddVehicleModal";
-import { driverService } from "@/services/driver.service";
 import {
   BecomeDriverFormData,
   DriverProfile,
   UpdateDriverProfileData,
   Vehicle,
 } from "@/interfaces/driver";
+import { driverService } from "@/services/driver.service";
+import { formatDateInput, isValidDate } from "@/utils/formatDate";
 
 export default function BecomeDriverScreen() {
   const { user } = useAuth();
@@ -245,6 +246,18 @@ export default function BecomeDriverScreen() {
       return;
     }
 
+    if (formData.license_expiration_date) {
+      const dateCheck = isValidDate(formData.license_expiration_date);
+      if (!dateCheck.isValid) {
+        Toast.show({
+          type: "error",
+          text1: "Fecha inválida",
+          text2: dateCheck.message,
+        });
+        return;
+      }
+    }
+
     try {
       setSubmitting(true);
       await driverService.submitDriverApplication(user.id, formData);
@@ -273,6 +286,18 @@ export default function BecomeDriverScreen() {
     if (!editFormData.license_number.trim()) {
       Toast.show({ type: "error", text1: "Campo Requerido", text2: "Ingresa el número de licencia." });
       return;
+    }
+
+    if (editFormData.license_expiration_date) {
+      const dateCheck = isValidDate(editFormData.license_expiration_date);
+      if (!dateCheck.isValid) {
+        Toast.show({
+          type: "error",
+          text1: "Fecha inválida",
+          text2: dateCheck.message,
+        });
+        return;
+      }
     }
 
     try {
@@ -369,7 +394,12 @@ export default function BecomeDriverScreen() {
               className="py-3 px-4 rounded-2xl border text-white"
               style={{ borderColor: Colors.dark.border }}
               value={editFormData.license_expiration_date || ""}
-              onChangeText={(val) => updateEditFormField("license_expiration_date", val)}
+              maxLength={10}
+              keyboardType="number-pad"
+              onChangeText={(val) => {
+                const formatted = formatDateInput(val);
+                updateEditFormField("license_expiration_date", formatted);
+              }}
             />
           </View>
 
@@ -551,10 +581,19 @@ export default function BecomeDriverScreen() {
             {isApproved && (
               <Pressable
                 onPress={handleStartEditApproved}
-                className="px-3 py-1.5 rounded-full border border-sky-400/50 bg-sky-500/10 flex-row items-center gap-1"
+                className="px-3 py-1 rounded-full border border-sky-400/50 bg-sky-500/10 flex-row items-center justify-center"
               >
-                <Ionicons name="create-outline" size={14} color={Colors.light.secondary} />
-                <ThemedText className="text-xs font-bold text-sky-400">Editar Datos</ThemedText>
+                <View className="items-center justify-center">
+                  <Ionicons name="create-outline" size={14} color={Colors.light.secondary} />
+                </View>
+                <View className="items-center justify-center">
+                  <ThemedText
+                    className="text-xs font-bold text-sky-400 leading-none"
+                    style={{ includeFontPadding: false, textAlignVertical: "center" }}
+                  >
+                    Editar Datos
+                  </ThemedText>
+                </View>
               </Pressable>
             )}
           </View>
@@ -587,11 +626,15 @@ export default function BecomeDriverScreen() {
               {isApproved && (
                 <Pressable
                   onPress={() => setAddVehicleModalVisible(true)}
-                  className="flex-row items-center gap-1 px-3 py-1.5 rounded-full"
+                  className="flex-row items-center px-3 py-1.5 rounded-full"
                   style={{ backgroundColor: Colors.light.secondary }}
                 >
-                  <Ionicons name="add" size={16} color="white" />
-                  <ThemedText className="text-white text-xs font-bold">Agregar Auto</ThemedText>
+                  <View className="items-center justify-center">
+                    <Ionicons name="add" size={16} color="white" />
+                  </View>
+                  <View className="items-center justify-center">
+                    <ThemedText className="text-white text-xs font-bold">Agregar Auto</ThemedText>
+                  </View>
                 </Pressable>
               )}
             </View>
@@ -602,7 +645,7 @@ export default function BecomeDriverScreen() {
               vehiclesList.map((item) => (
                 <View
                   key={item.id}
-                  className="p-4 rounded-2xl mb-3 flex-row items-center justify-between"
+                  className="p-4 rounded-2xl mb-3 flex-row items-center justify-between gap-2"
                   style={{
                     backgroundColor: Colors.dark.glassSoft,
                     borderColor: item.is_default ? Colors.light.secondary : Colors.dark.border,
@@ -610,17 +653,29 @@ export default function BecomeDriverScreen() {
                   }}
                 >
                   <View className="flex-1">
-                    <View className="flex-row items-center gap-2">
-                      <ThemedText className="text-base font-bold">
+                    {/* Fila de título y Badge */}
+                    <View className="flex-row items-center gap-2 flex-1">
+                      <ThemedText
+                        className="text-base font-bold flex-shrink"
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
                         {item.brand} {item.model} ({item.year})
                       </ThemedText>
+
                       {item.is_default && (
-                        <View className="px-2 py-0.5 rounded-full bg-sky-500/20 border border-sky-400">
+                        <View className="px-2 py-0.5 rounded-full bg-sky-500/20 border border-sky-400 shrink-0">
                           <ThemedText className="text-[10px] font-bold text-sky-400">PREDETERMINADO</ThemedText>
                         </View>
                       )}
                     </View>
-                    <ThemedText className="text-xs opacity-70 mt-1" style={{ color: Colors.dark.textSecondary }}>
+
+                    <ThemedText
+                      className="text-xs opacity-70 mt-1"
+                      style={{ color: Colors.dark.textSecondary }}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
                       Placa: {item.plate} | Color: {item.color} | Asientos: {item.seats_capacity}
                     </ThemedText>
                   </View>
@@ -628,9 +683,14 @@ export default function BecomeDriverScreen() {
                   {!item.is_default && isApproved && (
                     <Pressable
                       onPress={() => handleSetDefaultVehicle(item.id)}
-                      className="ml-2 px-3 py-2 rounded-xl bg-white/10"
+                      className="ml-2 px-3 py-2 rounded-xl bg-white/10 shrink-0 self-center items-center justify-center"
                     >
-                      <ThemedText className="text-xs font-semibold text-sky-400">Usar por defecto</ThemedText>
+                      <ThemedText
+                        className="text-xs font-semibold text-sky-400 leading-none"
+                        style={{ includeFontPadding: false }}
+                      >
+                        Usar por defecto
+                      </ThemedText>
                     </Pressable>
                   )}
                 </View>
@@ -727,8 +787,13 @@ export default function BecomeDriverScreen() {
                 className="py-3.5 px-4 rounded-2xl border text-white"
                 style={{ borderColor: Colors.dark.border }}
                 placeholder="Ej. 2028-12-31"
+                maxLength={10}
+                keyboardType="number-pad"
                 value={formData.license_expiration_date}
-                onChangeText={(val) => updateFormField("license_expiration_date", val)}
+                onChangeText={(val) => {
+                  const formatted = formatDateInput(val);
+                  updateFormField("license_expiration_date", formatted);
+                }}
               />
             </View>
 
@@ -847,7 +912,10 @@ export default function BecomeDriverScreen() {
                   placeholder="Ej. 4"
                   keyboardType="numeric"
                   value={String(formData.seats_capacity)}
-                  onChangeText={(val) => updateFormField("seats_capacity", Number(val) || 1)}
+                  onChangeText={(val) => {
+                    const cleanVal = val.replace(/[^0-9]/g, "");
+                    updateEditFormField("seats_capacity", cleanVal === "" ? 0 : parseInt(cleanVal, 10));
+                  }}
                 />
               </View>
             </View>

@@ -15,7 +15,7 @@ import Toast from "react-native-toast-message";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 export default function EditProfileScreen() {
-    const { user, updateUser } = useAuth();
+    const { user, updateUser, refreshUser } = useAuth();
     const router = useRouter();
     const [changePassVisibleModal, setChangePassVisibleModal] = useState<boolean>(false);
 
@@ -132,6 +132,9 @@ export default function EditProfileScreen() {
                 avatar_profile: avatarUrl || undefined,
                 phone_number: fullPhoneNumber
             });
+
+            // Refresh full user data from DB
+            await refreshUser();
 
             Toast.show({
                 type: "success",

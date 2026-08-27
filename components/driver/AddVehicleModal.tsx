@@ -1,14 +1,14 @@
-import React, { useState } from "react";
-import { Modal, View, Pressable, ScrollView, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import React, { useState } from "react";
+import { ActivityIndicator, Modal, Pressable, ScrollView, View } from "react-native";
 import Toast from "react-native-toast-message";
 
+import { ImageUploadPicker } from "@/components/driver/ImageUploadPicker";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { Colors } from "@/constants/Colors";
-import { ImageUploadPicker } from "@/components/driver/ImageUploadPicker";
-import { driverService } from "@/services/driver.service";
 import { AddVehicleFormData } from "@/interfaces/driver";
+import { driverService } from "@/services/driver.service";
 
 interface AddVehicleModalProps {
   visible: boolean;
@@ -215,7 +215,12 @@ export const AddVehicleModal: React.FC<AddVehicleModalProps> = ({
                   placeholder="Ej. 4"
                   keyboardType="numeric"
                   value={String(formData.seats_capacity)}
-                  onChangeText={(val) => updateField("seats_capacity", Number(val) || 1)}
+                  onChangeText={(val) => {
+                    // Remover cualquier carácter no numérico
+                    const cleanVal = val.replace(/[^0-9]/g, "");
+                    // Si está vacío, guardamos 0 temporalmente para permitir borrar; de lo contrario, convertimos a número
+                    updateField("seats_capacity", cleanVal === "" ? 0 : parseInt(cleanVal, 10));
+                  }}
                 />
               </View>
             </View>

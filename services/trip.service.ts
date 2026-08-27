@@ -105,12 +105,15 @@ export const tripService = {
 
     // 3. Filter routes with capacity < vehicle's seats_capacity passengers joined
     const availableRoutes = (data || []).filter((session) => {
+      // Excluir la propia sesión creada por el usuario cuando actúa como conductor
+      if (session.driver_id === userId) return false;
+
       const joinedPassengers = session.passengers?.filter((p: any) => p.status === "joined" || p.status === "pending") || [];
       const seatsCapacity = session.vehicle?.seats_capacity ?? 4;
       if (joinedPassengers.length >= seatsCapacity) return false;
       
       // Excluir si el pasajero actual ya está unido al viaje
-      const isAlreadyJoined = session.passengers?.some((p: any) => p.passenger_id === userId && p.status === "joined");
+      const isAlreadyJoined = session.passengers?.some((p: any) => p.passenger_id === userId && (p.status === "joined" || p.status === "pending"));
 
       if (isAlreadyJoined) return false;
 
@@ -828,6 +831,66 @@ export const tripService = {
   },
 
   /**
+   * Fetches all passenger requests for a given trip session (pending, approved, rejected).
+   */
+  async getTripSessionRequests(tripSessionId: number) {
+    const { data: requests, error } = await supabase
+      .from("passenger_requests")
+      .select(`
+        id,
+        passenger_id,
+        status,
+        rejection_reason,
+        created_at,
+        pickup_address,
+        destination_address,
+        passenger:users!passenger_id (
+          id,
+          name,
+          avatar_profile
+        )
+      `)
+      .eq("trip_session_id", tripSessionId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[tripService.getTripSessionRequests] error:", error);
+      throw error;
+    }
+
+    if (!requests || requests.length === 0) return [];
+
+    const enriched = await Promise.all(
+      requests.map(async (req: any) => {
+        const passengerObj = Array.isArray(req.passenger)
+          ? req.passenger[0]
+          : req.passenger;
+
+        let rating = 0;
+        if (req.passenger_id) {
+          const ratingInfo = await ratingsService.getUserRating(req.passenger_id);
+          rating = ratingInfo.rating;
+        }
+
+        return {
+          id: req.id,
+          passenger_id: req.passenger_id,
+          status: req.status,
+          rejection_reason: req.rejection_reason,
+          created_at: req.created_at,
+          pickup_address: req.pickup_address,
+          destination_address: req.destination_address,
+          passenger_name: passengerObj?.name || "Pasajero",
+          passenger_avatar: passengerObj?.avatar_profile || "",
+          passenger_rating: rating,
+        };
+      })
+    );
+
+    return enriched;
+  },
+
+  /**
    * Fetches stop records by stop IDs, formatting coordinates.
    */
   async getStops(stopIds: number[]): Promise<any[]> {
@@ -1283,5 +1346,85 @@ export const tripService = {
     return () => {
       supabase.removeChannel(channel);
     };
+  },
+
+  /**
+   * Checks if a passenger has left/abandoned a specific trip session.
+   */
+  async hasLeftTripSession(passengerId: string, sessionId: number): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('passenger_trip_sessions')
+      .select("id")
+      .eq("passenger_id", passengerId)
+      .eq("trip_session_id", sessionId)
+      .eq("status", "left")
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[tripService.hasLeftTripSession] error:", error);
+      throw error;
+    }
+    return !!data;
+  },
+
+  /**
+   * Checks if a user has any active trip as driver or passenger, or a pending request.
+   */
+  async hasAnyActiveTripOrRequest(userId: string): Promise<{
+    hasActive: boolean;
+    reason?: 'driver' | 'pending_request' | 'passenger_active';
+  }> {
+    // 1. Check if user is an active driver of a trip session
+    const { data: driverSession } = await supabase
+      .from('trip_sessions')
+      .select('id')
+      .eq('driver_id', userId)
+      .in('status', ['pending', 'active'])
+      .is('end_time', null)
+      .limit(1)
+      .maybeSingle();
+
+    if (driverSession) {
+      return { hasActive: true, reason: 'driver' };
+    }
+
+    // 2. Check if user has a pending request in passenger_requests
+    const { data: pendingRequest } = await supabase
+      .from('passenger_requests')
+      .select('id')
+      .eq('passenger_id', userId)
+      .eq('status', 'pending')
+      .limit(1)
+      .maybeSingle();
+
+    if (pendingRequest) {
+      return { hasActive: true, reason: 'pending_request' };
+    }
+
+    // 3. Check if user is an active passenger in passenger_trip_sessions (joined, pending, approved)
+    const { data: passengerSessions } = await supabase
+      .from('passenger_trip_sessions')
+      .select('trip_session_id')
+      .eq('passenger_id', userId)
+      .in('status', ['joined', 'pending', 'approved']);
+
+    if (passengerSessions && passengerSessions.length > 0) {
+      const tripSessionIds = passengerSessions.map((ps) => ps.trip_session_id);
+      const { data: activeTrip } = await supabase
+        .from('trip_sessions')
+        .select('id')
+        .in('id', tripSessionIds)
+        .in('status', ['pending', 'active'])
+        .is('end_time', null)
+        .limit(1)
+        .maybeSingle();
+
+      if (activeTrip) {
+        return { hasActive: true, reason: 'passenger_active' };
+      }
+    }
+
+    return { hasActive: false };
   }
 };
