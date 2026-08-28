@@ -119,7 +119,7 @@ export interface UserData {
     rating?: number;
     rating_count?: number;
     city_id?: number | null;
-    status?: 'active' | 'inactive' | 'blocked' | null;
+    status?: 'active' | 'inactive' | 'blocked' | 'deleted' | null;
     last_seen_at?: string | null;
 }
 

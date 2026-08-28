@@ -282,7 +282,7 @@ export default function BottomSheetRouteDetail({
                 <View className=" mr-4">
                   <View className="items-center">
                     <View className="w-16 h-24 rounded-full border-2 border-tird overflow-hidden">
-                      <Image source={{ uri: driverData?.avatar_profile }}
+                      <Image source={{ uri: driverData?.avatar_profile || "https://via.placeholder.com/150" }}
                         resizeMode="cover"
                         className="w-full h-full"
                       />
@@ -329,7 +329,7 @@ export default function BottomSheetRouteDetail({
                               }`}
                           >
                             <Image
-                              source={{ uri: item.avatar_profile }}
+                              source={{ uri: item.avatar_profile || "https://via.placeholder.com/150" }}
                               resizeMode="cover"
                               className="w-full h-full"
                             />

@@ -96,15 +96,25 @@ export default function RouteDetail() {
         const { data, error } = await supabase
             .from("passenger_trip_sessions")
             .select("*")
-            .eq("trip_session_id", sessionId);
+            .eq("trip_session_id", sessionId)
+            .order("id", { ascending: false });
 
         if (error) {
             console.error("Error fetching passengers:", error);
             return;
         }
 
-        setPassengers(data || []);
-        return data || [];
+        // Deduplicate by passenger_id keeping the latest session entry
+        const latestPassengersMap = new Map<string, PassengerTripSession>();
+        (data || []).forEach(p => {
+            if (!latestPassengersMap.has(p.passenger_id)) {
+                latestPassengersMap.set(p.passenger_id, p);
+            }
+        });
+        const deduplicatedPassengers = Array.from(latestPassengersMap.values());
+
+        setPassengers(deduplicatedPassengers);
+        return deduplicatedPassengers;
     };
 
     const fetchMeetingPoints = async () => {
@@ -124,13 +134,9 @@ export default function RouteDetail() {
             sessionMeetingPoints.some(smp =>
                 smp.passenger_mp_id === mp.id && ["pending", "visited"].includes(smp.status)
             )
-            // VALIDAR MEETING_POINTS DE LA SESION POR PASAJEROS 
-            // VERIFICAR SI SE PUEDE REPLICAR COMO LA LÓGICA DE PARADAS
-            // && passengers.some(p => p.passenger_id === mp.passenger_id)
         ) || [];
 
         console.log('MP available: ', mp_available);
-        //setMeetingPoints(mp_available || []);
     };
 
     const fetchSessionUsers = async (passengerSessions: PassengerTripSession[]) => {
@@ -172,16 +178,21 @@ export default function RouteDetail() {
         if (sessionData?.driver_id) {
             const { data: driverUser } = await supabase
                 .from('users')
-                .select('name, avatar_profile')
+                .select('name, last_name, avatar_profile, status')
                 .eq('id', sessionData.driver_id)
-                .single();
+                .maybeSingle();
 
             console.log('Driver USER: ', driverUser);
 
             if (driverUser) {
                 const ratingInfo = await ratingsService.getUserRating(sessionData.driver_id);
+                const isDeleted = driverUser.status === 'deleted' || driverUser.last_name === 'Eliminado';
+                const fullName = isDeleted
+                    ? "Usuario Eliminado"
+                    : `${driverUser.name || "Usuario"} ${driverUser.last_name || ""}`.trim();
+
                 driverInfo = {
-                    name: driverUser.name,
+                    name: fullName,
                     avatar: driverUser.avatar_profile,
                     rating: ratingInfo.rating
                 };
@@ -770,7 +781,7 @@ export default function RouteDetail() {
                             <View className="flex-row items-center bg-blue-500/10 px-2 py-1 rounded-full">
                                 <Ionicons name="people" size={14} color={Colors.dark.secondary} />
                                 <ThemedText className="text-xs font-bold ml-1" lightColor={Colors.light.secondary} darkColor={Colors.dark.secondary}>
-                                    {`${passengers.filter(p => !['left', 'cancelled', 'rejected'].includes(p.status) && (p.status === 'pending' || p.status === 'joined')).length} APROBADOS`}
+                                    {`${passengers.filter(p => !['left', 'cancelled', 'rejected'].includes(p.status) && ['pending', 'joined', 'completed'].includes(p.status)).length} APROBADOS`}
                                 </ThemedText>
                             </View>
                         )}
@@ -782,16 +793,24 @@ export default function RouteDetail() {
                             return sessionInfo && !['left', 'cancelled', 'rejected'].includes(sessionInfo.status);
                         }).map((passenger) => {
                             const sessionInfo = passengers.find(p => p.passenger_id === passenger.id);
-                            const isApproved = (sessionInfo?.status === 'pending' || sessionInfo?.status === 'joined');
+                            const isApproved = ['pending', 'joined', 'completed'].includes(sessionInfo?.status || '');
+                            const isDeleted = passenger.status === 'deleted' || passenger.last_name === 'Eliminado';
+                            const displayName = isDeleted
+                                ? "Usuario Eliminado"
+                                : `${passenger.name || "Usuario"} ${passenger.last_name || ''}`.trim();
 
                             return (
                                 <View key={passenger.id} className="items-center mr-4">
                                     <View className="relative">
-                                        <Image
-                                            source={{ uri: passenger.avatar_profile || "https://via.placeholder.com/150" }}
-                                            className="w-12 h-12 rounded-full border-2"
-                                            style={{ borderColor: isApproved ? Colors.dark.secondary : Colors.dark.borderSecondary }}
-                                        />
+                                        {passenger.avatar_profile ? (
+                                            <Image
+                                                source={{ uri: passenger.avatar_profile }}
+                                                className="w-12 h-12 rounded-full border-2"
+                                                style={{ borderColor: isApproved ? Colors.dark.secondary : Colors.dark.borderSecondary }}
+                                            />
+                                        ) : (
+                                            <Ionicons name="person" size={45} color={isApproved ? Colors.dark.secondary : Colors.dark.borderSecondary} />
+                                        )}
                                         <View
                                             className="absolute -bottom-1 -right-1 bg-white rounded-full px-1.5 flex-row items-center shadow-sm"
                                             style={{ elevation: 2 }}
@@ -807,8 +826,8 @@ export default function RouteDetail() {
                                             </View>
                                         )}
                                     </View>
-                                    <ThemedText className="text-xs mt-2 font-medium" numberOfLines={1} style={{ width: 64, textAlign: 'center' }}>
-                                        {passenger.name.split(' ')[0]}
+                                    <ThemedText className="text-xs mt-2 font-medium" numberOfLines={2} style={{ width: 72, textAlign: 'center' }}>
+                                        {displayName}
                                     </ThemedText>
                                 </View>
                             );
@@ -817,10 +836,10 @@ export default function RouteDetail() {
                             const sessionInfo = passengers.find(p => p.passenger_id === u.id);
                             return sessionInfo && !['left', 'cancelled', 'rejected'].includes(sessionInfo.status);
                         }).length === 0 && (
-                            <ThemedText className="text-sm text-textSecondary italic">
-                                No hay pasajeros unidos todavía
-                            </ThemedText>
-                        )}
+                                <ThemedText className="text-sm text-textSecondary italic">
+                                    No hay pasajeros unidos todavía
+                                </ThemedText>
+                            )}
                     </ScrollView>
                 </View>
             </ScrollView>

@@ -111,16 +111,16 @@ export const authService = {
     });
 
     if (signInError) {
-        if (
-          signInError.message.includes("Email not confirmed")
-        ) {
-          throw new Error("Tu correo electrónico aún no ha sido confirmado. Por favor revisa tu bandeja de entrada y haz clic en el enlace de confirmación.");
-        } else if (signInError.message.includes("Invalid login credentials")){
-          throw new Error("Email o contraseña incorrectos");
-        } else{
-          throw new Error("No se pudo iniciar sesión después de la confirmación: " + signInError.message);
-        }
+      if (signInError.message.includes("Email not confirmed")) {
+        throw new Error("Tu correo electrónico aún no ha sido confirmado. Por favor revisa tu bandeja de entrada y haz clic en el enlace de confirmación.");
+      } else if (signInError.message.includes("Invalid login credentials")) {
+        throw new Error("Usuario no encontrado o contraseña incorrecta.");
+      } else if (signInError.message.toLowerCase().includes("banned") || signInError.message.toLowerCase().includes("blocked")) {
+        throw new Error("Tu cuenta ha sido suspendida o bloqueada por la administración.");
+      } else {
+        throw new Error("No se pudo iniciar sesión: " + signInError.message);
       }
+    }
 
     const userId = data.user?.id;
     if (!userId) throw new Error("No se pudo obtener el ID del usuario.");
@@ -128,13 +128,22 @@ export const authService = {
     // Fetch user record from database
     const { data: userDataRaw, error: userError } = await supabase
       .from('users')
-      .select('id, email, is_driver, role_id, name, last_name, city_id')
+      .select('id, email, is_driver, role_id, name, last_name, city_id, status')
       .eq('id', userId);
 
     if (userError) throw userError;
-    if (!userDataRaw || userDataRaw.length === 0) throw new Error("Usuario no encontrado.");
+    if (!userDataRaw || userDataRaw.length === 0) {
+      await supabase.auth.signOut().catch(() => {});
+      throw new Error("Usuario no encontrado.");
+    }
 
     const userRecord = userDataRaw[0];
+
+    // Check if user account is banned / blocked
+    if (userRecord.status === 'blocked' || userRecord.status === 'banned' || userRecord.status === 'suspended') {
+      await supabase.auth.signOut().catch(() => {});
+      throw new Error("Tu cuenta ha sido suspendida o bloqueada por la administración.");
+    }
     let cityId = userRecord.city_id;
 
     // Auto-assign tenant if missing

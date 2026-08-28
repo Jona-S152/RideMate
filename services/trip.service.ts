@@ -794,13 +794,22 @@ export const tripService = {
    */
   async getPassengerRequestDetails(tripSessionId: number, passengerId: string) {
     // 1. User profile data
-    const { data: userData, error: userError } = await supabase
+    const { data: rawUserData, error: userError } = await supabase
       .from("users")
-      .select("id, name, avatar_profile")
+      .select("id, name, last_name, avatar_profile, status")
       .eq("id", passengerId)
       .single();
 
     if (userError) throw userError;
+
+    // Format name for deleted users
+    const isDeleted = rawUserData?.status === 'deleted' || rawUserData?.last_name === 'Eliminado';
+    const userData = {
+      ...rawUserData,
+      name: isDeleted
+        ? "Usuario Eliminado"
+        : `${rawUserData?.name || "Usuario"} ${rawUserData?.last_name || ""}`.trim(),
+    };
 
     // 2. Pending request data
     const { data: requestData, error: requestError } = await supabase
@@ -847,7 +856,9 @@ export const tripService = {
         passenger:users!passenger_id (
           id,
           name,
-          avatar_profile
+          last_name,
+          avatar_profile,
+          status
         )
       `)
       .eq("trip_session_id", tripSessionId)
@@ -872,6 +883,11 @@ export const tripService = {
           rating = ratingInfo.rating;
         }
 
+        const isDeleted = passengerObj?.status === 'deleted' || passengerObj?.last_name === 'Eliminado';
+        const passengerName = isDeleted
+          ? "Usuario Eliminado"
+          : `${passengerObj?.name || "Pasajero"} ${passengerObj?.last_name || ""}`.trim();
+
         return {
           id: req.id,
           passenger_id: req.passenger_id,
@@ -880,7 +896,7 @@ export const tripService = {
           created_at: req.created_at,
           pickup_address: req.pickup_address,
           destination_address: req.destination_address,
-          passenger_name: passengerObj?.name || "Pasajero",
+          passenger_name: passengerName,
           passenger_avatar: passengerObj?.avatar_profile || "",
           passenger_rating: rating,
         };

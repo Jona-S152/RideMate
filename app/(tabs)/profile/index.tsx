@@ -1,4 +1,5 @@
 import { useAuth } from "@/app/context/AuthContext";
+import ConfirmActionModal from "@/components/Modals/ConfirmActionModal";
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { UserData } from "@/interfaces/available-routes";
@@ -11,6 +12,7 @@ import { Image } from "expo-image";
 import { Link, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import Toast from "react-native-toast-message";
 
 export default function ProfileScreen() {
     const { user, logout } = useAuth();
@@ -18,6 +20,31 @@ export default function ProfileScreen() {
     const [userData, setUserData] = useState<UserData | null>(null);
     const [driverStatus, setDriverStatus] = useState<DriverApplicationStatus | null>(null);
     const [loadingProfile, setLoadingProfile] = useState(true);
+    const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+    const [deletingAccount, setDeletingAccount] = useState(false);
+
+    const handleDeleteAccountConfirm = async () => {
+        if (!user?.id) return;
+        setDeletingAccount(true);
+        try {
+            await userService.deleteAccount(user.id);
+            Toast.show({
+                type: "info",
+                text1: "Cuenta eliminada",
+                text2: "Tu cuenta ha sido eliminada exitosamente.",
+            });
+            setDeleteModalVisible(false);
+            await logout();
+        } catch (error: any) {
+            Toast.show({
+                type: "error",
+                text1: "Error",
+                text2: error.message || "No se pudo eliminar la cuenta.",
+            });
+        } finally {
+            setDeletingAccount(false);
+        }
+    };
 
     const fetchUser = async () => {
         if (!user?.id) return;
@@ -210,9 +237,34 @@ export default function ProfileScreen() {
                                 <ThemedText style={[styles.menuTitle, { color: "#EF4444" }]}>Cerrar sesión</ThemedText>
                             </View>
                         </Pressable>
+
+                        <Pressable
+                            onPress={() => setDeleteModalVisible(true)}
+                            style={({ pressed }) => [styles.menuItem, styles.deleteItem, pressed && styles.deleteItemPressed]}
+                        >
+                            <View className="w-12 h-12 justify-center items-center mr-5 rounded-xl" style={{ backgroundColor: "rgba(239,68,68,0.18)" }}>
+                                <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                            </View>
+                            <View className="flex-1">
+                                <ThemedText style={[styles.menuTitle, { color: "#EF4444" }]}>Eliminar cuenta</ThemedText>
+                            </View>
+                        </Pressable>
                     </>
                 )}
             </ScrollView>
+
+            <ConfirmActionModal
+                visible={deleteModalVisible}
+                title="¿Eliminar cuenta?"
+                description="Tu perfil y datos personales serán eliminados de la plataforma de forma permanente. Esta acción no se puede deshacer."
+                confirmText="Sí, eliminar cuenta"
+                cancelText="Cancelar"
+                confirmType="danger"
+                iconName="trash-outline"
+                loading={deletingAccount}
+                onConfirm={handleDeleteAccountConfirm}
+                onCancel={() => setDeleteModalVisible(false)}
+            />
 
             <View style={{ height: 100 }} />
         </View>
@@ -367,5 +419,13 @@ const styles = StyleSheet.create({
     },
     logoutItemPressed: {
         backgroundColor: "rgba(239,68,68,0.14)",
+    },
+    deleteItem: {
+        marginTop: 4,
+        backgroundColor: "rgba(239,68,68,0.06)",
+        borderColor: "rgba(239,68,68,0.22)",
+    },
+    deleteItemPressed: {
+        backgroundColor: "rgba(239,68,68,0.16)",
     },
 });

@@ -153,5 +153,21 @@ export const userService = {
         role: 'driver'
       }));
     }
+  },
+
+  /**
+   * Soft deletes a user account by calling Supabase RPC 'soft_delete_user_account'.
+   */
+  async deleteAccount(userId: string): Promise<boolean> {
+    const { data, error } = await supabase.rpc("soft_delete_user_account", {
+      p_user_id: userId,
+    });
+
+    if (error) {
+      console.error("[userService.deleteAccount] RPC Error:", error.message);
+      throw new Error(error.message || "No se pudo eliminar la cuenta.");
+    }
+
+    return !!data;
   }
 };

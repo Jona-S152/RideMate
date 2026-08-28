@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { ThemedView } from "@/components/ThemedView";
@@ -7,6 +8,7 @@ import { Link } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Image, Keyboard, Pressable, Text, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import Toast from "react-native-toast-message";
 import { useAuth } from "../context/AuthContext";
 
 export default function LoginScreen() {
@@ -14,6 +16,7 @@ export default function LoginScreen() {
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
 
     const HEADER_EXPANDED = 400;
     const HEADER_COLLAPSED = 185;
@@ -56,7 +59,11 @@ export default function LoginScreen() {
 
         } catch (error: any) {
             console.error("Error iniciando sesión:", error.message);
-            alert("Email o contraseña incorrectos");
+            Toast.show({
+                type: "error",
+                text1: "Error de Inicio de Sesión",
+                text2: error.message || "Usuario no encontrado o credenciales incorrectas",
+            });
         }
     };
 
@@ -86,14 +93,26 @@ export default function LoginScreen() {
                     onChangeText={setEmail}
                 />
 
-                <ThemedTextInput
-                    lightColor={Colors.light.glassSoft}
-                    className="py-6 px-4 mb-4 w-full"
-                    secureTextEntry={true}
-                    placeholder="Contraseña"
-                    value={password}
-                    onChangeText={setPassword}
-                />
+                <View className="relative w-full mb-4 justify-center">
+                    <ThemedTextInput
+                        lightColor={Colors.light.glassSoft}
+                        className="py-6 pl-4 pr-12 w-full"
+                        secureTextEntry={!showPassword}
+                        placeholder="Contraseña"
+                        value={password}
+                        onChangeText={setPassword}
+                    />
+                    <Pressable
+                        onPress={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 p-2 z-10"
+                    >
+                        <Ionicons
+                            name={showPassword ? "eye-off-outline" : "eye-outline"}
+                            size={22}
+                            color={Colors.light.textSecondary}
+                        />
+                    </Pressable>
+                </View>
 
                 <Pressable
                     style={{ backgroundColor: Colors.light.secondary }}
