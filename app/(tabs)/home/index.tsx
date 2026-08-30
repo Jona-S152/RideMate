@@ -8,7 +8,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { useActiveSession } from "@/hooks/useRealTime";
 import { useEffect, useState } from "react";
-import { Linking, Pressable, ScrollView, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, ScrollView, View } from "react-native";
 
 import { Vehicle } from "@/interfaces/driver";
 import { supabase } from "@/lib/supabase";
@@ -16,6 +16,7 @@ import { registerDeviceToken } from "@/services/notifications.service";
 import { ratingsService } from "@/services/ratings.service";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useModeNavigation } from "@/hooks/useModeNavigation";
 
 // Reemplaza con el número real de WhatsApp Business cuando esté disponible
 const WHATSAPP_SUPPORT_URL =
@@ -25,9 +26,11 @@ export default function HomeScreen() {
   const { user, updateUser, refreshUser } = useAuth();
   const { sessionChanged, setSessionChanged } = useSession();
   const { activeSession, loading } = useActiveSession(user);
+  const { navigateToTab, sanitizeStacksOnModeSwitch } = useModeNavigation();
 
   const [isEnabled, setIsEnabled] = useState(user?.driver_mode ?? false);
   const [history, setHistory] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const [feedbackVisible, setFeedbackVisible] = useState(false);
 
   // ── Driver Requests & Passenger Action Modals ──────────────────────────────
@@ -53,10 +56,11 @@ export default function HomeScreen() {
     if (user) setIsEnabled(user.driver_mode);
   }, [user?.driver_mode]);
 
-  // ── Persist driver_mode to Supabase ──────────────────────────────────────
+  // ── Persist driver_mode to Supabase & Sanitize Navigation Stacks ──────────
   useEffect(() => {
     if (user && user.driver_mode !== isEnabled) {
       updateUser({ driver_mode: isEnabled });
+      sanitizeStacksOnModeSwitch(isEnabled);
     }
   }, [isEnabled]);
 
@@ -68,18 +72,19 @@ export default function HomeScreen() {
 
   const fetchHistory = async () => {
     if (!user?.id) return;
+    setHistoryLoading(true);
+    try {
+      const { data: historyData, error } = await supabase
+        .from("passenger_route_history")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("end_time", { ascending: false })
+        .limit(1);
 
-    const { data: historyData, error } = await supabase
-      .from("passenger_route_history")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("end_time", { ascending: false })
-      .limit(1);
-
-    if (error) {
-      console.error("Error fetching route history: ", error);
-      return;
-    }
+      if (error) {
+        console.error("Error fetching route history: ", error);
+        return;
+      }
 
     const enrichedHistory = await Promise.all(
       historyData.map(async (item) => {
@@ -137,7 +142,12 @@ export default function HomeScreen() {
       })
     );
 
-    setHistory(enrichedHistory);
+      setHistory(enrichedHistory);
+    } catch (error) {
+      console.error("Error en fetchHistory:", error);
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   // ── Active session details ───────────────────────────────────────────────
@@ -251,10 +261,7 @@ export default function HomeScreen() {
     (activeSession.status === "active" || activeSession.status === "pending");
 
   function handlePublishRoute(): void {
-    router.push({
-      pathname: "/(tabs)/available-routes/create-route-screen",
-      params: { activeModeP: "start" },
-    });
+    navigateToTab("available-routes", "create-route-screen", { activeModeP: "start" });
   }
 
   function handleOpenWhatsAppSupport(): void {
@@ -367,7 +374,7 @@ export default function HomeScreen() {
         ) : (
           /* ── Botón Ser Conductor ── */
           <Pressable
-            onPress={() => router.push("/(tabs)/profile/become-driver")}
+            onPress={() => navigateToTab("profile", "become-driver")}
             className="flex-row items-center gap-x-1 rounded-xl px-3 py-2"
             style={{
               backgroundColor: Colors.dark.warning,
@@ -389,8 +396,25 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 100, gap: 12 }}
         >
-          {/* ── Route Card ── */}
-          {activeSession ? (
+          {/* ── Route Card / History Card / Loading State ── */}
+          {loading || historyLoading ? (
+            <View
+              className="rounded-2xl py-12 items-center justify-center"
+              style={{
+                backgroundColor: Colors.dark.primary,
+                borderWidth: 1,
+                borderColor: Colors.dark.borderSecondary,
+              }}
+            >
+              <ActivityIndicator size="large" color={Colors.dark.secondary} />
+              <ThemedText
+                className="text-xs font-semibold mt-3"
+                style={{ color: Colors.dark.textSecondary }}
+              >
+                Cargando información del viaje...
+              </ThemedText>
+            </View>
+          ) : activeSession ? (
             <RouteCard
               key={`active-${activeSession.id}`}
               sessionId={activeSession.id}
@@ -499,7 +523,7 @@ export default function HomeScreen() {
                 icon="search-outline"
                 label={"Buscar\nNuevo Viaje"}
                 solidColor="#10B981"
-                onPress={() => router.push("/(tabs)/available-routes")}
+                onPress={() => navigateToTab("available-routes", "passenger")}
               />
             )}
           </View>

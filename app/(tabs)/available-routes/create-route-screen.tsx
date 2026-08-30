@@ -63,7 +63,11 @@ export default function CreateRouteScreen() {
         text1: "Acceso restringido",
         text2: "Solo los conductores en modo conductor pueden crear rutas.",
       });
-      router.replace("/(tabs)/home");
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace("/(tabs)/home");
+      }
     }
   }, [user, isFocused]);
 
