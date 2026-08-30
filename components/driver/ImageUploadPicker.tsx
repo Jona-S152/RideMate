@@ -1,10 +1,12 @@
+import OptionsModal from "@/components/Modals/OptionsModal";
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
-import React from "react";
-import { Alert, Pressable, View } from "react-native";
+import React, { useState } from "react";
+import { Pressable, View } from "react-native";
+import Toast from "react-native-toast-message";
 
 interface ImageUploadPickerProps {
   label: string;
@@ -23,6 +25,8 @@ export const ImageUploadPicker: React.FC<ImageUploadPickerProps> = ({
   onImageRemoved,
   required = false,
 }) => {
+  const [optionsModalVisible, setOptionsModalVisible] = useState(false);
+
   const pickImage = async (useCamera = false) => {
     try {
       let result: ImagePicker.ImagePickerResult;
@@ -30,7 +34,11 @@ export const ImageUploadPicker: React.FC<ImageUploadPickerProps> = ({
       if (useCamera) {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== "granted") {
-          Alert.alert("Permiso Denegado", "Se requiere acceso a la cámara para tomar la fotografía.");
+          Toast.show({
+            type: "info",
+            text1: "Permiso Denegado",
+            text2: "Se requiere acceso a la cámara para tomar la fotografía.",
+          });
           return;
         }
         result = await ImagePicker.launchCameraAsync({
@@ -41,7 +49,11 @@ export const ImageUploadPicker: React.FC<ImageUploadPickerProps> = ({
       } else {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== "granted") {
-          Alert.alert("Permiso Denegado", "Se requiere acceso a la galería para seleccionar la fotografía.");
+          Toast.show({
+            type: "info",
+            text1: "Permiso Denegado",
+            text2: "Se requiere acceso a la galería para seleccionar la fotografía.",
+          });
           return;
         }
         result = await ImagePicker.launchImageLibraryAsync({
@@ -56,21 +68,15 @@ export const ImageUploadPicker: React.FC<ImageUploadPickerProps> = ({
       }
     } catch (error: any) {
       console.error("Error al seleccionar imagen:", error);
-      Alert.alert("Error", "No se pudo cargar la imagen seleccionada.");
+      Toast.show({
+        type: "error",
+        text1: "Error al seleccionar imagen",
+      });
     }
   };
 
   const handlePressOptions = () => {
-    Alert.alert(
-      label,
-      "Selecciona una opción para adjuntar el documento:",
-      [
-        { text: "Tomar Foto", onPress: () => pickImage(true) },
-        { text: "Elegir de Galería", onPress: () => pickImage(false) },
-        { text: "Cancelar", style: "cancel" },
-      ],
-      { cancelable: true }
-    );
+    setOptionsModalVisible(true);
   };
 
   return (
@@ -145,6 +151,34 @@ export const ImageUploadPicker: React.FC<ImageUploadPickerProps> = ({
           </ThemedText>
         </Pressable>
       )}
+
+      <OptionsModal
+        visible={optionsModalVisible}
+        title={label}
+        description="Selecciona una opción para adjuntar el documento:"
+        iconName="camera-outline"
+        onClose={() => setOptionsModalVisible(false)}
+        options={[
+          {
+            label: "Tomar Foto",
+            iconName: "camera-outline",
+            type: "primary",
+            onPress: () => pickImage(true),
+          },
+          {
+            label: "Elegir de Galería",
+            iconName: "images-outline",
+            type: "default",
+            onPress: () => pickImage(false),
+          },
+          {
+            label: "Cancelar",
+            iconName: "close-circle-outline",
+            type: "cancel",
+            onPress: () => {},
+          },
+        ]}
+      />
     </View>
   );
 };

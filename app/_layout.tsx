@@ -15,9 +15,11 @@ import "../services/backgroundLocation.task";
 import AuthProvider, { useAuth } from "./context/AuthContext";
 import SessionProvider from "./context/SessionContext";
 
-import Toast from "react-native-toast-message";
 import { toastConfig } from "@/components/common/toast-config";
 import { registerDeviceToken, setupNotificationChannel } from "@/services/notifications.service";
+import { authService } from "@/services/auth.service";
+import { legalService } from "@/services/legal.service";
+import Toast from "react-native-toast-message";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -30,7 +32,7 @@ Notifications.setNotificationHandler({
 });
 
 function MainApp() {
-  const { token, user } = useAuth();
+  const { token, user, logout } = useAuth();
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
   const [ratingData, setRatingData] = useState<{
     trip_session_id: number;
@@ -52,6 +54,32 @@ function MainApp() {
     }
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!token || !user?.id) return;
+
+    let active = true;
+    const validatePersistedSession = async () => {
+      try {
+        const status = await legalService.getStatus(user.id);
+        if (active && !status.compliant) {
+          await authService.signOut();
+          await logout();
+        }
+      } catch (error) {
+        console.error("[_layout] Error verificando aceptación legal:", error);
+        if (active) {
+          await authService.signOut();
+          await logout();
+        }
+      }
+    };
+
+    validatePersistedSession();
+    return () => {
+      active = false;
+    };
+  }, [token, user?.id, logout]);
+
   // Realtime fallback: subscribe to passenger trip completion so the rating
   // modal fires immediately even if the push notification is delayed.
   useEffect(() => {
@@ -65,8 +93,8 @@ function MainApp() {
           if (ratingModalVisible) return;
 
           // Avoid showing if user already rated this session
-          const alreadyRated = await ratingsService.hasUserRatedTrip(tripSessionId, user.id);
-          if (alreadyRated) return;
+          // const alreadyRated = await ratingsService.hasUserRatedTrip(tripSessionId, user.id);
+          // if (alreadyRated) return;
 
           // Fetch the driver info & fare details from the trip session
           const { data: sessionData, error } = await supabase
@@ -206,6 +234,7 @@ function MainApp() {
         <Stack.Screen name="index" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="(auth)" />
+        <Stack.Screen name="legal-document" />
       </Stack>
 
       {/* Modal Global para calificar conductor y confirmar pago */}

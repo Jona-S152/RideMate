@@ -18,8 +18,10 @@ import {
 } from "@/interfaces/driver";
 import { driverService } from "@/services/driver.service";
 import { formatDateInput, isValidDate } from "@/utils/formatDate";
+import { useSafeBackHandler } from "@/hooks/useSafeBackHandler";
 
 export default function EditDriverScreen() {
+  useSafeBackHandler("/(tabs)/profile");
   const { user, updateUser } = useAuth();
   const router = useRouter();
 

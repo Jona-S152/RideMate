@@ -2,47 +2,37 @@ import { tripService } from './trip.service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as Location from 'expo-location';
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
 
 export const DRIVER_LOCATION_TASK = 'DRIVER_LOCATION_BACKGROUND';
 
-const checkBatteryOptimization = async () => {
+export const shouldPromptBatteryOptimization = async (): Promise<boolean> => {
+  if (Platform.OS !== 'android') return false;
+  try {
+    const hasPrompted = await AsyncStorage.getItem('BATTERY_OPTIMIZATION_PROMPTED');
+    return hasPrompted !== 'true';
+  } catch (e) {
+    console.warn("Error reading battery optimization flag:", e);
+    return false;
+  }
+};
+
+export const markBatteryOptimizationPrompted = async () => {
+  try {
+    await AsyncStorage.setItem('BATTERY_OPTIMIZATION_PROMPTED', 'true');
+  } catch (e) {}
+};
+
+export const openBatteryOptimizationSettings = async () => {
+  await markBatteryOptimizationPrompted();
   if (Platform.OS === 'android') {
     try {
-      const hasPrompted = await AsyncStorage.getItem('BATTERY_OPTIMIZATION_PROMPTED');
-      if (hasPrompted === 'true') {
-        return;
-      }
+      await IntentLauncher.startActivityAsync(
+        IntentLauncher.ActivityAction.IGNORE_BATTERY_OPTIMIZATION_SETTINGS
+      );
     } catch (e) {
-      console.warn("Error reading battery optimization flag:", e);
+      console.warn("Error opening battery optimization settings:", e);
     }
-
-    Alert.alert(
-      "Acción Requerida",
-      "Para que el rastreo no se detenga al bloquear el celular, busca RideMate en la siguiente lista y selecciona 'Sin restricción'.",
-      [
-        {
-          text: "Configurar",
-          onPress: async () => {
-            try {
-              await AsyncStorage.setItem('BATTERY_OPTIMIZATION_PROMPTED', 'true');
-            } catch (e) {}
-            IntentLauncher.startActivityAsync(
-              IntentLauncher.ActivityAction.IGNORE_BATTERY_OPTIMIZATION_SETTINGS
-            );
-          }
-        },
-        {
-          text: "No volver a mostrar",
-          onPress: async () => {
-            try {
-              await AsyncStorage.setItem('BATTERY_OPTIMIZATION_PROMPTED', 'true');
-            } catch (e) {}
-          }
-        },
-        { text: "Cancelar", style: "cancel" }
-      ]
-    );
   }
 };
 
@@ -105,11 +95,6 @@ export const startBackgroundTracking = async (
 
   const isRunning = await Location.hasStartedLocationUpdatesAsync(DRIVER_LOCATION_TASK);
   console.log("✅ Task running after start:", isRunning);
-
-  // Prompt battery optimization after tracking starts
-  setTimeout(() => {
-    checkBatteryOptimization();
-  }, 1000);
 };
 
 export const stopBackgroundTracking = async (tripSessionId: number) => {

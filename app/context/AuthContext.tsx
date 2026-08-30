@@ -11,6 +11,9 @@ export type User = {
   name: string;
   avatar_profile?: string;
   phone_number?: string;
+  accepted_terms_version?: string | null;
+  accepted_privacy_version?: string | null;
+  accepted_legal_at?: string | null;
 };
 
 type AuthContextType = {
@@ -73,7 +76,10 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         is_driver: newData.is_driver ?? prev.is_driver,
         driver_mode: newData.driver_mode ?? prev.driver_mode,
         name: newData.name ?? prev.name,
-        avatar_profile: newData.avatar_profile ?? prev.avatar_profile
+        avatar_profile: newData.avatar_profile ?? prev.avatar_profile,
+        accepted_terms_version: newData.accepted_terms_version ?? prev.accepted_terms_version,
+        accepted_privacy_version: newData.accepted_privacy_version ?? prev.accepted_privacy_version,
+        accepted_legal_at: newData.accepted_legal_at ?? prev.accepted_legal_at,
       };
       AsyncStorage.setItem("userInfo", JSON.stringify(updated));
       return updated;

@@ -3,6 +3,7 @@ import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { useCollapsingHeader } from "@/hooks/useCollapsingHeader";
 import { authService } from "@/services/auth.service";
+import { legalService } from "@/services/legal.service";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
@@ -24,6 +25,7 @@ export default function RegisterScreen() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [legalAccepted, setLegalAccepted] = useState({ terms: false, privacy: false });
 
   const headerHeight = useCollapsingHeader({
     expanded: HEADER_EXPANDED,
@@ -96,6 +98,15 @@ export default function RegisterScreen() {
       return;
     }
 
+    if (!legalAccepted.terms || !legalAccepted.privacy) {
+      Toast.show({
+        type: "warning",
+        text1: "Aceptación requerida",
+        text2: "Debes aceptar los Términos y la Política de Privacidad para continuar.",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -104,7 +115,8 @@ export default function RegisterScreen() {
         email: form.email.trim(),
         password: form.password,
         name: form.name,
-        lastname: form.lastname
+        lastname: form.lastname,
+        legal: await legalService.getActiveDocuments(),
       });
 
       if (!res.needsEmailConfirmation && res.session) {
@@ -253,6 +265,25 @@ export default function RegisterScreen() {
               );
             })()}
           </View>
+
+          {(["terms", "privacy"] as const).map((type) => {
+            const checked = legalAccepted[type];
+            return (
+              <View key={type} className="flex-row items-center mb-3">
+                <Pressable
+                  onPress={() => setLegalAccepted((current) => ({ ...current, [type]: !current[type] }))}
+                  className="mr-3"
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked }}
+                >
+                  <Ionicons name={checked ? "checkbox" : "square-outline"} size={25} color={checked ? Colors.dark.secondary : "#94a3b8"} />
+                </Pressable>
+                <Pressable className="flex-1" onPress={() => router.push({ pathname: "/legal-document", params: { type } })}>
+                  <Text className="text-blue-400 underline">{legalService.getDocumentLabel(type)}</Text>
+                </Pressable>
+              </View>
+            );
+          })}
 
           <Pressable
             onPress={handleRegister}

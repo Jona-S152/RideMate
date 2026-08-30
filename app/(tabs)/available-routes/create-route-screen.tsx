@@ -13,6 +13,7 @@ import Mapbox, {
 import * as Location from "expo-location";
 import { router } from "expo-router";
 import { useLocalSearchParams } from "expo-router/build/hooks";
+import { useIsFocused } from "@react-navigation/native";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -27,8 +28,10 @@ Mapbox.setAccessToken(MAPBOX_TOKEN);
 
 export default function CreateRouteScreen() {
   const { user } = useAuth();
+  const isFocused = useIsFocused();
   const cameraRef = useRef<Mapbox.Camera>(null);
   const isSubmitting = useRef(false);
+  const hasRedirected = useRef(false);
   const { activeModeP } = useLocalSearchParams();
 
   // Estados de ubicación
@@ -53,7 +56,8 @@ export default function CreateRouteScreen() {
 
   // Route Guard: solo conductores en modo conductor pueden acceder
   useEffect(() => {
-    if (user && (!user.is_driver || !user.driver_mode)) {
+    if (isFocused && user && (!user.is_driver || !user.driver_mode) && !hasRedirected.current) {
+      hasRedirected.current = true;
       Toast.show({
         type: "error",
         text1: "Acceso restringido",
@@ -61,7 +65,7 @@ export default function CreateRouteScreen() {
       });
       router.replace("/(tabs)/home");
     }
-  }, [user]);
+  }, [user, isFocused]);
 
   useEffect(() => {
     if (activeModeP === 'start')

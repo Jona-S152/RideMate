@@ -1,11 +1,12 @@
 import { useAuth } from "@/app/context/AuthContext";
 import GlassCard from "@/components/common/GlassCard";
+import ConfirmActionModal from "@/components/Modals/ConfirmActionModal";
 import { Coords } from "@/interfaces/available-routes";
 import { tripService } from "@/services/trip.service";
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Href, router } from "expo-router";
 import { useState } from "react";
-import { Alert, Image, Text, TouchableOpacity, View } from "react-native";
+import { Image, Text, TouchableOpacity, View } from "react-native";
 import Toast from "react-native-toast-message";
 import { ThemedText } from "../ui/ThemedText";
 
@@ -59,8 +60,38 @@ export default function AvailableRouteCard({
 }: DriverRouteCardProps) {
 
     const [imageError, setImageError] = useState(false);
+    const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
     const joinedCount = passengersData.length > 0 ? passengersData.length : passengers;
     const { user } = useAuth();
+
+    const handleDeleteTripConfirm = async () => {
+        if (!user?.id) return;
+        setIsDeleting(true);
+        try {
+            await tripService.DeleteTripSession(user.id);
+            Toast.show({
+                type: "success",
+                text1: "Éxito",
+                text2: "Ruta eliminada correctamente.",
+            });
+            setDeleteModalVisible(false);
+            if (router.canGoBack()) {
+                router.back();
+            } else {
+                router.replace("/(tabs)/available-routes");
+            }
+        } catch (error: any) {
+            console.error("Error al cancelar el viaje:", error.message);
+            Toast.show({
+                type: "error",
+                text1: "Error",
+                text2: "No se pudo cancelar el viaje.",
+            });
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     // Determine seat color logic
     const getSeatColor = (seatIndex: number) => {
@@ -77,141 +108,123 @@ export default function AvailableRouteCard({
     };
 
     return (
-        <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => {
-                onPress?.();
-            }}
-            onLongPress={() => {
-                if (user?.driver_mode === false) return;
-
-                Alert.alert(
-                    "Eliminar ruta",
-                    "¿Estás seguro de que deseas eliminar esta ruta?",
-                    [
-                        { text: "No", style: "cancel" },
-                        {
-                            text: "Sí, eliminar",
-                            style: "destructive",
-                            onPress: async () => {
-                                try {
-                                    await tripService.DeleteTripSession(user!.id);
-                                    Toast.show({
-                                        type: "success",
-                                        text1: "Éxito",
-                                        text2: "Ruta eliminada correctamente.",
-                                    });
-                                    if (router.canGoBack()) {
-                                        router.back();
-                                    } else {
-                                        router.replace("/(tabs)/available-routes");
-                                    }
-                                } catch (error: any) {
-                                    console.error("Error al cancelar el viaje:", error.message);
-                                    Toast.show({
-                                        type: "error",
-                                        text1: "Error",
-                                        text2: "No se pudo cancelar el viaje.",
-                                    });
-                                }
-                            }
-                        }
-                    ]
-                );
-            }}
-        >
-            <GlassCard
-                style={{
-                    margin: 4,
-                    borderRadius: 24,
-                    shadowColor: "#000",
-                    shadowOffset: { width: 0, height: 10 },
-                    shadowOpacity: 0.28,
-                    shadowRadius: 18,
-                    elevation: 8,
+        <>
+            <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                    onPress?.();
+                }}
+                onLongPress={() => {
+                    if (user?.driver_mode === false) return;
+                    setDeleteModalVisible(true);
                 }}
             >
-                {/* Hero Map Image */}
-                <View className="w-full h-36 bg-gray-700 relative">
-                    <Image
-                        source={
-                            imageUrl && !imageError
-                                ? { uri: imageUrl }
-                                : require('@/assets/images/mapExample.png')
-                        }
-                        onError={() => setImageError(true)}
-                        resizeMode="cover"
-                        className="w-full h-full"
-                    />
-                    {/* Status Indicator */}
-                    {status === 'active' && (
-                        <View className="absolute top-2 right-2 rounded-full px-2 py-1" style={{ backgroundColor: "rgba(16,185,129,0.92)" }}>
-                            <Text className="text-white text-xs font-bold">EN CURSO</Text>
-                        </View>
-                    )}
-                </View>
-
-                {/* Overlapping Driver Avatar */}
-                {driverName && (
-                    <View className="absolute left-4 top-28 z-10">
-                        <View className="relative">
-                            <Image
-                                source={{ uri: driverAvatar || "https://via.placeholder.com/150" }}
-                                className="w-14 h-14 rounded-full border-[3px] border-surfaceAlt"
-                            />
-                            <View className="absolute bottom-0 right-0 bg-success rounded-full px-1 border-2 border-surfaceAlt">
-                                <Text className="text-[8px] font-bold text-white">
-                                    ★ {driverRating ? driverRating.toFixed(1) : "0.0"}
-                                </Text>
-                            </View>
-                        </View>
-                    </View>
-                )}
-
-                {/* Card Content */}
-                <View className="pt-10 px-4 pb-4" style={{ backgroundColor: "rgba(12, 22, 42, 0.84)" }}>
-                    {/* Driver Name */}
-                    <ThemedText
-                        lightColor="white"
-                        darkColor="white"
-                        className="text-base font-bold mb-1"
-                        numberOfLines={1}
-                    >
-                        {driverName ?? "Ruta"}
-                    </ThemedText>
-
-                    {/* Route Text */}
-                    <ThemedText
-                        lightColor="#D1D5DB"
-                        darkColor="#D1D5DB"
-                        className="text-xs font-medium opacity-90 mb-2"
-                        numberOfLines={2}
-                    >
-                        {start.split(',')[0]} → {end.split(',')[0]}
-                    </ThemedText>
-
-                    {/* Bottom Row: hint + seat icons */}
-                    <View className="flex-row justify-between items-center mt-1">
-                        <Text className="text-textSecondary text-[10px]">
-                            {isDriver ? "Toca para iniciar" : ""}
-                        </Text>
-
-                        {/* Seat Icons — only for passengers, count based on vehicle capacity */}
-                        {!isDriver && (
-                            <View className="flex-row" style={{ gap: 4 }}>
-                                {Array.from({ length: seatsCapacity ?? 4 }, (_, i) => i).map((index) => (
-                                    <MaterialCommunityIcons
-                                        key={index}
-                                        name="car-seat"
-                                        size={18}
-                                        color={getSeatColor(index)}
-                                    />
-                                ))}
+                <GlassCard
+                    style={{
+                        margin: 4,
+                        borderRadius: 24,
+                        shadowColor: "#000",
+                        shadowOffset: { width: 0, height: 10 },
+                        shadowOpacity: 0.28,
+                        shadowRadius: 18,
+                        elevation: 8,
+                    }}
+                >
+                    {/* Hero Map Image */}
+                    <View className="w-full h-36 bg-gray-700 relative">
+                        <Image
+                            source={
+                                imageUrl && !imageError
+                                    ? { uri: imageUrl }
+                                    : require('@/assets/images/mapExample.png')
+                            }
+                            onError={() => setImageError(true)}
+                            resizeMode="cover"
+                            className="w-full h-full"
+                        />
+                        {/* Status Indicator */}
+                        {status === 'active' && (
+                            <View className="absolute top-2 right-2 rounded-full px-2 py-1" style={{ backgroundColor: "rgba(16,185,129,0.92)" }}>
+                                <Text className="text-white text-xs font-bold">EN CURSO</Text>
                             </View>
                         )}
                     </View>
-                </View>
-            </GlassCard>
-        </TouchableOpacity>
+
+                    {/* Overlapping Driver Avatar */}
+                    {driverName && (
+                        <View className="absolute left-4 top-28 z-10">
+                            <View className="relative">
+                                <Image
+                                    source={{ uri: driverAvatar || "https://via.placeholder.com/150" }}
+                                    className="w-14 h-14 rounded-full border-[3px] border-surfaceAlt"
+                                />
+                                <View className="absolute bottom-0 right-0 bg-success rounded-full px-1 border-2 border-surfaceAlt">
+                                    <Text className="text-[8px] font-bold text-white">
+                                        ★ {driverRating ? driverRating.toFixed(1) : "0.0"}
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
+                    )}
+
+                    {/* Card Content */}
+                    <View className="pt-10 px-4 pb-4" style={{ backgroundColor: "rgba(12, 22, 42, 0.84)" }}>
+                        {/* Driver Name */}
+                        <ThemedText
+                            lightColor="white"
+                            darkColor="white"
+                            className="text-base font-bold mb-1"
+                            numberOfLines={1}
+                        >
+                            {driverName ?? "Ruta"}
+                        </ThemedText>
+
+                        {/* Route Text */}
+                        <ThemedText
+                            lightColor="#D1D5DB"
+                            darkColor="#D1D5DB"
+                            className="text-xs font-medium opacity-90 mb-2"
+                            numberOfLines={2}
+                        >
+                            {start.split(',')[0]} → {end.split(',')[0]}
+                        </ThemedText>
+
+                        {/* Bottom Row: hint + seat icons */}
+                        <View className="flex-row justify-between items-center mt-1">
+                            <Text className="text-textSecondary text-[10px]">
+                                {isDriver ? "Toca para iniciar" : ""}
+                            </Text>
+
+                            {/* Seat Icons — only for passengers, count based on vehicle capacity */}
+                            {!isDriver && (
+                                <View className="flex-row" style={{ gap: 4 }}>
+                                    {Array.from({ length: seatsCapacity ?? 4 }, (_, i) => i).map((index) => (
+                                        <MaterialCommunityIcons
+                                            key={index}
+                                            name="car-seat"
+                                            size={18}
+                                            color={getSeatColor(index)}
+                                        />
+                                    ))}
+                                </View>
+                            )}
+                        </View>
+                    </View>
+                </GlassCard>
+            </TouchableOpacity>
+
+            <ConfirmActionModal
+                visible={deleteModalVisible}
+                title="Eliminar ruta"
+                description="¿Estás seguro de que deseas eliminar esta ruta?"
+                confirmText="Sí, eliminar"
+                cancelText="No"
+                confirmType="danger"
+                iconName="trash-outline"
+                loading={isDeleting}
+                onConfirm={handleDeleteTripConfirm}
+                onCancel={() => setDeleteModalVisible(false)}
+            />
+        </>
     );
 }

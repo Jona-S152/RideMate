@@ -64,7 +64,7 @@ export default function HomeScreen() {
   useEffect(() => {
     refreshUser();
     fetchHistory();
-  }, [user?.id, user?.driver_mode]);
+  }, [user?.id]);
 
   const fetchHistory = async () => {
     if (!user?.id) return;

@@ -11,6 +11,7 @@ import {
     TextInput,
     View,
 } from "react-native";
+import Toast from "react-native-toast-message";
 
 interface RatingModalProps {
     visible: boolean;
@@ -85,7 +86,10 @@ export default function RatingModal({
 
     const handleSubmit = async () => {
         if (rating === 0) {
-            alert("Por favor selecciona una calificación");
+            Toast.show({
+                type: "info",
+                text1: "Por favor selecciona una calificación",
+            });
             return;
         }
 
@@ -97,7 +101,10 @@ export default function RatingModal({
             onClose();
         } catch (error) {
             console.error("Error in RatingModal submit:", error);
-            alert("No se pudo enviar la calificación");
+            Toast.show({
+                type: "error",
+                text1: "No se pudo enviar la calificación",
+            });
         } finally {
             setLoading(false);
         }

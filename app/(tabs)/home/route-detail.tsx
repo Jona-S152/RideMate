@@ -7,11 +7,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { Alert, Animated, AppState, AppStateStatus, Dimensions, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import Toast from "react-native-toast-message";
+import { Animated, AppState, AppStateStatus, Dimensions, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   GestureHandlerRootView
 } from "react-native-gesture-handler";
+import Toast from "react-native-toast-message";
 
 // Mapbox Imports
 import { useAuth } from "@/app/context/AuthContext";
@@ -32,10 +32,12 @@ Mapbox.setAccessToken(
   process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || ""
 );
 
+import ConfirmActionModal from "@/components/Modals/ConfirmActionModal";
 import DriverRatingListModal from "@/components/Modals/DriverRatingListModal";
 import PassengerActionModal from "@/components/Modals/PassengerActionModal";
 import WaypointCheckInModal from "@/components/Modals/WaypointCheckInModal";
 import { useDriverLocation, useTripMeetingPoints, useTripRealtimeById, useTripStops } from "@/hooks/useRealTime";
+import { useSafeBackHandler } from "@/hooks/useSafeBackHandler";
 import { useTripTrackingStore } from "@/store/tripTrackinStore";
 import { calculateDistance, formatDistance } from "@/utils/geo";
 
@@ -100,6 +102,7 @@ interface Waypoint {
 }
 
 export default function RouteDetail() {
+  useSafeBackHandler("/(tabs)/home");
   const navigation = useNavigation();
   const params = useLocalSearchParams<{
     trip_session_id: string;
@@ -155,9 +158,21 @@ export default function RouteDetail() {
   const [checkInModalVisible, setCheckInModalVisible] = useState(false);
   const [waypointToCheckIn, setWaypointToCheckIn] = useState<Waypoint | null>(null);
   const [checkedInWaypoints, setCheckedInWaypoints] = useState<Set<string>>(new Set());
-
   // Rating Modal State
   const [driverRatingModalVisible, setDriverRatingModalVisible] = useState(false);
+
+  // Confirm Action Modal State
+  const [confirmModalConfig, setConfirmModalConfig] = useState<{
+    visible: boolean;
+    title: string;
+    description: string;
+    confirmText: string;
+    cancelText?: string;
+    confirmType?: "danger" | "warning" | "info";
+    iconName?: keyof typeof Ionicons.glyphMap;
+    loading?: boolean;
+    onConfirm: () => Promise<void> | void;
+  } | null>(null);
 
   // ... existing code
 
@@ -177,47 +192,29 @@ export default function RouteDetail() {
       /* 
       if (nextAppState === "active") {
         const { data } = await supabase
-          .from("trip_sessions")
-          .select("status")
-          .eq("id", id)
-          .single();
-
-        if (data?.status === "completed") {
-          router.replace("/(tabs)/home");
-        }
-      } 
+        .from('trip_sessions')
+        .select('*')
+        .eq('id', Number(id))
+        .single();
+      }
       */
     };
 
-    const subscription = AppState.addEventListener(
-      "change",
-      handleAppStateChange,
-    );
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
 
     return () => {
       subscription.remove();
     };
-  }, [id]);
+  }, []);
 
-  // Sale de la pantalla si la sesión no está vigente como conductor (trip_sessions.status = 'active' o 'pending') o como pasajero (passenger_trip_session.status = 'joined' o 'pending')
+  // 🛡️ SEGURIDAD: Redirigir al usuario si el viaje ya fue completado o si fue cancelado
   useEffect(() => {
-    console.warn("ACTIVE SESSION: ", JSON.stringify(session, null, 2));
-    console.warn("PASSENGERS: ", JSON.stringify(passengers, null, 2));
-    if (session === null) return;
-
-    console.warn("USER: ", JSON.stringify(user, null, 2));
-    // if (user?.driver_mode && (!['pending', 'active'].includes(session.status))) {
-    //   console.warn("DRIVERRRRR");
-    //   router.replace('/(tabs)/available-routes');
-    // } else 
-    if (user?.driver_mode === false) {
-      if (!passengersLoaded) return;
-
-      const passenger = passengers.find(p => p.passenger_id === user?.id);
-      console.warn("PASSENGERRRRR: ", JSON.stringify(passenger, null, 2));
-
-      const validStatuses = ['joined', 'pending_approval', 'pending', 'approved'];
+    if (session && passengersLoaded) {
       const isSessionCancelled = session.status === 'cancelled';
+      const isSessionCompleted = session.status === 'completed';
+      const passenger = passengers.find(p => p.passenger_id === user?.id);
+
+      const validStatuses = ['joined', 'completed'];
 
       if (isSessionCancelled || !passenger || !validStatuses.includes(passenger.status)) {
         router.replace('/(tabs)/available-routes');
@@ -543,73 +540,102 @@ export default function RouteDetail() {
     }
   };
 
-  const handleFinishTrip = async () => {
+  const executeFinishTrip = async () => {
     if (!session) return;
-
+    setConfirmModalConfig(prev => prev ? { ...prev, loading: true } : null);
     try {
-      const passengersInSession = passengers.filter(p => p.status === 'joined');
-      Alert.alert(
-        "Finalizar viaje",
-        passengersInSession.length > 0 ? `¿Estás seguro de que quieres finalizar este viaje? Hay ${passengersInSession.length} pasajero${passengersInSession.length > 1 ? 's' : ''} en el viaje. Si finalizas se omitirán sus paradas` : "¿Estás seguro de que quieres finalizar este viaje?",
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "Sí, finalizar",
-            style: "destructive",
-            onPress: async () => {
-              try {
-                const isFinished = await tripService.finishTripSession(session.id);
+      const isFinished = await tripService.finishTripSession(session.id);
+      if (!isFinished) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'No se pudo finalizar el viaje correctamente.',
+        });
+        setConfirmModalConfig(null);
+        return;
+      }
 
-                if (!isFinished) {
-                  Toast.show({
-                    type: 'error',
-                    text1: 'Error',
-                    text2: 'No se pudo finalizar el viaje correctamente.',
-                  });
-                  return;
-                }
+      await useTripTrackingStore.getState().stopTracking();
+      const latestPassengers = await fetchPassengers();
+      setConfirmModalConfig(null);
 
-                // // 3. Detener el tracking de ubicación
-                await useTripTrackingStore.getState().stopTracking();
+      if (latestPassengers) {
+        setPassengers(latestPassengers);
+        await fetchSessionUsers(latestPassengers);
+        const participants = latestPassengers.filter(p => p.status === 'joined' || p.status === 'completed');
+        if (participants.length > 0) {
+          setDriverRatingModalVisible(true);
+          return;
+        }
+      }
 
-                // 4. Obtener datos frescos para el modal
-                const latestPassengers = await fetchPassengers();
-                if (latestPassengers) {
-                  setPassengers(latestPassengers);
-                  await fetchSessionUsers(latestPassengers);
-
-                  const participants = latestPassengers.filter(p => p.status === 'joined' || p.status === 'completed');
-                  if (participants.length > 0) {
-                    setDriverRatingModalVisible(true);
-                    return;
-                  }
-                }
-
-                Toast.show({
-                  type: 'success',
-                  text1: '¡Viaje finalizado!',
-                  text2: 'Has llegado al destino y completado el viaje.',
-                });
-                router.replace("/(tabs)/home");
-              } catch (error) {
-                console.error("Error leaving trip:", error);
-                Toast.show({
-                  type: 'error',
-                  text1: 'Error',
-                  text2: 'No se pudo abandonar el viaje.',
-                });
-              }
-            }
-          }
-        ]
-      );
+      Toast.show({
+        type: 'success',
+        text1: '¡Viaje finalizado!',
+        text2: 'Has llegado al destino y completado el viaje.',
+      });
+      router.replace("/(tabs)/home");
     } catch (error) {
-      console.error("Error finishing trip:", error);
+      console.error("Error leaving trip:", error);
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'No se pudo finalizar el viaje correctamente.',
+        text2: 'No se pudo abandonar el viaje.',
       });
+      setConfirmModalConfig(null);
+    }
+  };
+
+  const handleFinishTrip = async () => {
+    if (!session) return;
+    const passengersInSession = passengers.filter(p => p.status === 'joined');
+    const description = passengersInSession.length > 0
+      ? `¿Estás seguro de que quieres finalizar este viaje? Hay ${passengersInSession.length} pasajero${passengersInSession.length > 1 ? 's' : ''} en el viaje. Si finalizas se omitirán sus paradas`
+      : "¿Estás seguro de que quieres finalizar este viaje?";
+
+    setConfirmModalConfig({
+      visible: true,
+      title: "Finalizar viaje",
+      description,
+      confirmText: "Sí, finalizar",
+      cancelText: "Cancelar",
+      confirmType: "danger",
+      iconName: "flag-outline",
+      onConfirm: executeFinishTrip,
+    });
+  };
+
+  const executeCancelTrip = async () => {
+    if (!session) return;
+    setConfirmModalConfig(prev => prev ? { ...prev, loading: true } : null);
+    try {
+      await tripService.cancelTripSession(session.id);
+
+      const passengerIds = await tripService.getPassengersIdsByRoute_includingRequests(session.id);
+      await sendMultiplePushNotifications(passengerIds, "Viaje cancelado", "El conductor ha cancelado el viaje.", {
+        type: "TRIP_CANCELLED",
+        trip_session_id: session.id,
+      });
+
+      setConfirmModalConfig(null);
+      Toast.show({
+        type: 'success',
+        text1: 'Éxito',
+        text2: 'Viaje cancelado correctamente.',
+      });
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace("/(tabs)/available-routes");
+      }
+    } catch (error: any) {
+      console.error("Error al cancelar el viaje:", error.message);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'No se pudo cancelar el viaje.',
+      });
+      setConfirmModalConfig(null);
     }
   };
 
@@ -627,103 +653,71 @@ export default function RouteDetail() {
 
     try {
       await useTripTrackingStore.getState().stopTracking();
+    } catch (e) {}
 
-      Alert.alert(
-        "Cancelar viaje",
-        "¿Estás seguro de que deseas cancelar este viaje?",
-        [
-          { text: "No", style: "cancel" },
-          {
-            text: "Sí, cancelar",
-            style: "destructive",
-            onPress: async () => {
-              try {
-                await tripService.cancelTripSession(session.id);
+    setConfirmModalConfig({
+      visible: true,
+      title: "Cancelar viaje",
+      description: "¿Estás seguro de que deseas cancelar este viaje?",
+      confirmText: "Sí, cancelar",
+      cancelText: "No",
+      confirmType: "danger",
+      iconName: "close-circle-outline",
+      onConfirm: executeCancelTrip,
+    });
+  };
 
-                const passengerIds = await tripService.getPassengersIdsByRoute_includingRequests(session.id);
-                await sendMultiplePushNotifications(passengerIds, "Viaje cancelado", "El conductor ha cancelado el viaje.", {
-                  type: "TRIP_CANCELLED",
-                  trip_session_id: session.id,
-                });
+  const executeLeaveTrip = async () => {
+    if (!session || !user) return;
+    setConfirmModalConfig(prev => prev ? { ...prev, loading: true } : null);
+    try {
+      await tripService.leaveTripSession(session.id, user.id);
 
-                Toast.show({
-                  type: 'success',
-                  text1: 'Éxito',
-                  text2: 'Viaje cancelado correctamente.',
-                });
-                if (router.canGoBack()) {
-                  router.back();
-                } else {
-                  router.replace("/(tabs)/available-routes");
-                }
-              } catch (error: any) {
-                console.error("Error al cancelar el viaje:", error.message);
-                Toast.show({
-                  type: 'error',
-                  text1: 'Error',
-                  text2: 'No se pudo cancelar el viaje.',
-                });
-              }
-            }
-          }
-        ]
-      );
+      await fetchMeetingPoints();
+      buildWaypoints();
+
+      await sendPushNotification(session.driver_id, "Viaje abandonado", `${user.name} ha abandonado el viaje.`, {
+        type: "TRIP_CANCELLED",
+        trip_session_id: session.id,
+      });
+
+      setConfirmModalConfig(null);
+      Toast.show({
+        type: 'success',
+        text1: 'Éxito',
+        text2: 'Has abandonado el viaje correctamente.',
+      });
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace("/(tabs)/available-routes");
+      }
     } catch (error) {
-      console.error("Error finishing trip:", error);
+      console.error("Error leaving trip:", error);
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'No se pudo finalizar el viaje correctamente.',
+        text2: 'No se pudo abandonar el viaje.',
       });
+      setConfirmModalConfig(null);
     }
   };
 
   const handleLeaveTrip = async () => {
     if (!session || !user) return;
 
-    Alert.alert(
-      "Abandonar viaje",
-      "¿Estás seguro de que quieres salirte de este viaje?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Sí, salir",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await tripService.leaveTripSession(session.id, user.id);
-
-              await fetchMeetingPoints();
-              buildWaypoints();
-
-              await sendPushNotification(session.driver_id, "Viaje abandonado", `${user.name} ha abandonado el viaje.`, {
-                type: "TRIP_CANCELLED",
-                trip_session_id: session.id,
-              });
-
-              Toast.show({
-                type: 'success',
-                text1: 'Éxito',
-                text2: 'Has abandonado el viaje correctamente.',
-              });
-              if (router.canGoBack()) {
-                router.back();
-              } else {
-                router.replace("/(tabs)/available-routes");
-              }
-            } catch (error) {
-              console.error("Error leaving trip:", error);
-              Toast.show({
-                type: 'error',
-                text1: 'Error',
-                text2: 'No se pudo abandonar el viaje.',
-              });
-            }
-          }
-        }
-      ]
-    );
+    setConfirmModalConfig({
+      visible: true,
+      title: "Abandonar viaje",
+      description: "¿Estás seguro de que quieres salirte de este viaje?",
+      confirmText: "Sí, salir",
+      cancelText: "Cancelar",
+      confirmType: "danger",
+      iconName: "log-out-outline",
+      onConfirm: executeLeaveTrip,
+    });
   };
+
 
 
 
@@ -1847,6 +1841,21 @@ export default function RouteDetail() {
             }
           }}
         />
+
+        {confirmModalConfig && (
+          <ConfirmActionModal
+            visible={confirmModalConfig.visible}
+            title={confirmModalConfig.title}
+            description={confirmModalConfig.description}
+            confirmText={confirmModalConfig.confirmText}
+            cancelText={confirmModalConfig.cancelText}
+            confirmType={confirmModalConfig.confirmType}
+            iconName={confirmModalConfig.iconName}
+            loading={confirmModalConfig.loading}
+            onConfirm={confirmModalConfig.onConfirm}
+            onCancel={() => setConfirmModalConfig(null)}
+          />
+        )}
       </View>
     </GestureHandlerRootView>
   );

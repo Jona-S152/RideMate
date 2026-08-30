@@ -1,3 +1,4 @@
+import OptionsModal from "@/components/Modals/OptionsModal";
 import { useAuth } from "@/app/context/AuthContext";
 import { Colors } from "@/constants/Colors";
 import { PassengerTripSession, SessionData, UserData } from "@/interfaces/available-routes";
@@ -45,7 +46,12 @@ export default function BottomSheetRouteDetail({
   ]
 
   const { user } = useAuth();
-  const { stopTracking } = useTripTrackingStore();
+  const {
+    showBatteryModal,
+    setShowBatteryModal,
+    configureBatteryOptimization,
+    dismissBatteryOptimization,
+  } = useTripTrackingStore();
 
   const isActive = session?.status === "active";
 
@@ -405,6 +411,34 @@ export default function BottomSheetRouteDetail({
           </Animated.View>
         </View>
       </BottomSheetView>
+
+      <OptionsModal
+        visible={showBatteryModal}
+        title="Acción Requerida"
+        description="Para que el rastreo no se detenga al bloquear el celular, busca RideMate en la siguiente lista y selecciona 'Sin restricción'."
+        iconName="battery-charging-outline"
+        onClose={() => setShowBatteryModal(false)}
+        options={[
+          {
+            label: "Configurar",
+            iconName: "settings-outline",
+            type: "primary",
+            onPress: configureBatteryOptimization,
+          },
+          {
+            label: "No volver a mostrar",
+            iconName: "eye-off-outline",
+            type: "default",
+            onPress: dismissBatteryOptimization,
+          },
+          {
+            label: "Cancelar",
+            iconName: "close-circle-outline",
+            type: "cancel",
+            onPress: () => setShowBatteryModal(false),
+          },
+        ]}
+      />
     </BottomSheet>
   );
 }

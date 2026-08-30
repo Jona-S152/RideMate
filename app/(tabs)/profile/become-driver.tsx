@@ -13,6 +13,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
+import { useSafeBackHandler } from "@/hooks/useSafeBackHandler";
 import {
   BecomeDriverFormData,
   DriverProfile,
@@ -23,6 +24,7 @@ import { driverService } from "@/services/driver.service";
 import { formatDateInput, isValidDate } from "@/utils/formatDate";
 
 export default function BecomeDriverScreen() {
+  useSafeBackHandler("/(tabs)/profile");
   const { user } = useAuth();
   const router = useRouter();
 

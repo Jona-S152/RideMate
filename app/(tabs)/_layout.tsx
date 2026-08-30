@@ -43,7 +43,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
-      backBehavior="none"
+      backBehavior="history"
       screenOptions={{
         tabBarShowLabel: false,
         tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,

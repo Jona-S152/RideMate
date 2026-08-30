@@ -7,7 +7,6 @@ import Mapbox, { Camera, MarkerView } from "@rnmapbox/maps";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Modal,
   Pressable,
@@ -187,28 +186,6 @@ export default function PassengerActionModal({
     }
   };
 
-  const confirmAction = (type: "approve" | "reject") => {
-    if (type === "approve") {
-      Alert.alert(
-        "Aceptar pasajero",
-        `¿Confirmas aceptar a ${details?.name}? Se añadirá su destino como parada en tu ruta.`,
-        [
-          { text: "Cancelar", style: "cancel" },
-          { text: "Aceptar", onPress: handleApprove },
-        ]
-      );
-    } else {
-      Alert.alert(
-        "Rechazar pasajero",
-        `¿Confirmas rechazar la solicitud de ${details?.name}?`,
-        [
-          { text: "Cancelar", style: "cancel" },
-          { text: "Rechazar", style: "destructive", onPress: handleReject },
-        ]
-      );
-    }
-  };
-
   if (!visible) return null;
 
   const hasPickup = details && details.pickup_latitude !== 0 && details.pickup_longitude !== 0;
@@ -348,7 +325,7 @@ export default function PassengerActionModal({
                   {/* Action Buttons */}
                   <View className="flex-row w-full gap-3">
                     <Pressable
-                      onPress={() => confirmAction("reject")}
+                      onPress={handleReject}
                       disabled={actionLoading}
                       className="flex-1 bg-red-900/20 h-12 rounded-xl items-center justify-center border border-red-900/40"
                     >
@@ -356,7 +333,7 @@ export default function PassengerActionModal({
                     </Pressable>
 
                     <Pressable
-                      onPress={() => confirmAction("approve")}
+                      onPress={handleApprove}
                       disabled={actionLoading}
                       className="flex-1 h-12 rounded-xl items-center justify-center"
                       style={{ backgroundColor: Colors.dark.secondary }}

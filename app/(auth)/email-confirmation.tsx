@@ -1,6 +1,9 @@
 import { Colors } from "@/constants/Colors";
 import { supabase } from "@/lib/supabase";
 import { authService } from "@/services/auth.service";
+import LegalConsent from "@/components/legal/LegalConsent";
+import { legalService } from "@/services/legal.service";
+import { ActiveLegalVersions } from "@/interfaces/legal";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
@@ -15,6 +18,10 @@ export default function EmailConfirmationScreen() {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [email, setEmail] = useState<string>("");
+  const [completedRegistration, setCompletedRegistration] = useState<{
+    session: { access_token: string; user: { id: string; email?: string } };
+    userRecord: any;
+  } | null>(null);
 
   useEffect(() => {
     let pendingEmail = "";
@@ -74,12 +81,11 @@ export default function EmailConfirmationScreen() {
 
       // Fase 2: Insertar en BD y asignar tenant
       const { session, userRecord } = await authService.completeRegistration(form);
+      if (!session) {
+        throw new Error("No se pudo obtener la sesión después de confirmar el correo.");
+      }
 
-      // Limpiar registro pendiente
-      await AsyncStorage.removeItem("pendingRegistration");
-
-      // Iniciar sesión globalmente
-      await login(session?.access_token ?? "", userRecord);
+      setCompletedRegistration({ session, userRecord });
     } catch (err: any) {
       console.error("[email-confirmation] Error completando registro:", err);
       Toast.show({
@@ -90,6 +96,14 @@ export default function EmailConfirmationScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLegalAcceptance = async (active: ActiveLegalVersions) => {
+    if (!completedRegistration) return;
+    await legalService.acceptCurrentVersions(completedRegistration.userRecord.id, active);
+    await AsyncStorage.removeItem("pendingRegistration");
+    await login(completedRegistration.session.access_token, completedRegistration.userRecord);
+    setCompletedRegistration(null);
   };
 
   const handleResendEmail = async () => {
@@ -134,6 +148,18 @@ export default function EmailConfirmationScreen() {
     await authService.signOut();
     router.replace("/(auth)/login");
   };
+
+  if (completedRegistration) {
+    return (
+      <View className="flex-1 bg-background px-6 justify-center items-center">
+        <LegalConsent
+          title="Acepta los documentos legales"
+          description="Confirma las versiones actuales para finalizar tu registro."
+          onAccept={handleLegalAcceptance}
+        />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-background px-6 justify-center items-center">

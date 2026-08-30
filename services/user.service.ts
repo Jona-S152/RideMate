@@ -13,13 +13,28 @@ export interface UserProfile {
 
 export interface ActivityItem {
   id: string;
+  trip_session_id: number;
   start_location: string;
   end_location: string;
   start_time: string;
   status: string;
-  price?: number;
-  passenger_count?: number;
+  price: number;
+  passenger_count: number;
   role: 'passenger' | 'driver';
+}
+
+export interface GetActivityHistoryOptions {
+  userId: string;
+  role: 'passenger' | 'driver';
+  page?: number;
+  limit?: number;
+  startDate?: Date | null;
+  endDate?: Date | null;
+}
+
+export interface ActivityHistoryPage {
+  data: ActivityItem[];
+  hasMore: boolean;
 }
 
 export const userService = {
@@ -58,11 +73,6 @@ export const userService = {
     const { data: result, error } = await supabase
       .rpc("update_user_profile", {user_id: userId, payload: updateData});
 
-    // const { error } = await supabase
-    //   .from("users")
-    //   .update(updateData)
-    //   .eq("id", userId);
-
     if (error) {
       console.error("[userService.updateProfile] Error:", error.message);
       throw error;
@@ -92,66 +102,225 @@ export const userService = {
 
   /**
    * Fetches the activity/trip history for a user, acting as either a passenger or driver.
+   * Excludes in-progress ('active') and pending ('pending', 'pending_approval') trips.
    */
-  async getActivityHistory(userId: string, role: 'passenger' | 'driver'): Promise<ActivityItem[]> {
+  async getActivityHistory({
+    userId,
+    role,
+    page = 1,
+    limit = 10,
+    startDate = null,
+    endDate = null,
+  }: GetActivityHistoryOptions): Promise<ActivityHistoryPage> {
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.max(1, limit);
+    const rangeStart = (safePage - 1) * safeLimit;
+    const rangeEnd = rangeStart + safeLimit - 1;
+    const startOfDay = startDate
+      ? new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()).toISOString()
+      : null;
+    const endOfDay = endDate
+      ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59, 999).toISOString()
+      : null;
+
     if (role === 'passenger') {
-      const { data, error } = await supabase
+      // 1. Fetch from passenger_route_history for passenger user
+      let historyQuery = supabase
         .from('passenger_route_history')
         .select('*')
         .eq('user_id', userId)
-        .order('end_time', { ascending: false });
+        .order('start_time', { ascending: false });
 
-      if (error) {
-        console.error("[userService.getActivityHistory] Error passenger history:", error.message);
-        throw error;
+      if (startOfDay) historyQuery = historyQuery.gte('start_time', startOfDay);
+      if (endOfDay) historyQuery = historyQuery.lte('start_time', endOfDay);
+      const { data: historyData, error: historyError } = await historyQuery.range(rangeStart, rangeEnd);
+
+      if (historyError) {
+        console.error("[userService.getActivityHistory] Error passenger history:", historyError.message);
       }
 
-      return (data || []).map((item: any) => ({
-        id: `h-${item.id}`,
-        start_location: item.start_location,
-        end_location: item.end_location,
-        start_time: item.start_time,
-        status: 'completed',
-        price: 2,
-        role: 'passenger'
-      }));
-    } else {
-      const { data, error } = await supabase
-        .from('passenger_route_history')
-        .select('*')
-        .eq('driver_id', userId)
-        .order('end_time', { ascending: false });
+      // 2. Fetch from passenger_trip_sessions for completed/cancelled/left/rejected sessions
+      let sessionQuery = supabase
+        .from('passenger_trip_sessions')
+        .select(`
+          id,
+          trip_session_id,
+          status,
+          fare_amount,
+          created_at,
+          trip_sessions!inner (
+            id,
+            start_location,
+            end_location,
+            start_time,
+            driver_id
+          )
+        `)
+        .eq('passenger_id', userId)
+        .in('status', ['cancelled', 'left', 'rejected', 'completed'])
+        .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error("[userService.getActivityHistory] Error driver history:", error.message);
-        throw error;
+      if (startOfDay) sessionQuery = sessionQuery.gte('trip_sessions.start_time', startOfDay);
+      if (endOfDay) sessionQuery = sessionQuery.lte('trip_sessions.start_time', endOfDay);
+      const { data: sessionData, error: sessionError } = await sessionQuery.range(rangeStart, rangeEnd);
+
+      if (sessionError) {
+        console.error("[userService.getActivityHistory] Error passenger session history:", sessionError.message);
       }
 
-      // Group by trip_session_id to avoid duplicate trips in driver view
-      const uniqueTripsMap = new Map<number, any>();
-      (data || []).forEach((item: any) => {
-        if (!uniqueTripsMap.has(item.trip_session_id)) {
-          uniqueTripsMap.set(item.trip_session_id, {
-            ...item,
-            p_count: 0
-          });
-        }
+      const tripsMap = new Map<number, ActivityItem>();
+
+      // Populate from passenger_route_history
+      (historyData || []).forEach((item: any) => {
         if (item.user_id !== item.driver_id) {
-          const trip = uniqueTripsMap.get(item.trip_session_id);
-          if (trip) trip.p_count += 1;
+          tripsMap.set(item.trip_session_id, {
+            id: `h-${item.id}`,
+            trip_session_id: item.trip_session_id,
+            start_location: item.start_location || "Punto de inicio",
+            end_location: item.end_location || "Destino",
+            start_time: item.start_time || item.created_at,
+            status: item.status || 'completed',
+            price: Number(item.price ?? 1.25),
+            passenger_count: Number(item.passenger_count ?? 1),
+            role: 'passenger',
+          });
         }
       });
 
-      return Array.from(uniqueTripsMap.values()).map((item: any) => ({
-        id: `s-${item.trip_session_id}`,
-        start_location: item.start_location,
-        end_location: item.end_location,
-        start_time: item.start_time,
-        status: 'completed',
-        price: 2,
-        passenger_count: item.p_count,
-        role: 'driver'
-      }));
+      // Populate or complement from passenger_trip_sessions (for cancelled, left, etc.)
+      (sessionData || []).forEach((item: any) => {
+        const tsId = item.trip_session_id;
+        if (!tripsMap.has(tsId) && item.trip_sessions) {
+          tripsMap.set(tsId, {
+            id: `pts-${item.id}`,
+            trip_session_id: tsId,
+            start_location: item.trip_sessions.start_location || "Punto de inicio",
+            end_location: item.trip_sessions.end_location || "Destino",
+            start_time: item.trip_sessions.start_time || item.created_at,
+            status: item.status === 'left' ? 'left' : item.status === 'rejected' ? 'rejected' : item.status === 'cancelled' ? 'cancelled' : 'completed',
+            price: Number(item.fare_amount ?? 1.25),
+            passenger_count: 1,
+            role: 'passenger',
+          });
+        }
+      });
+
+      const data = Array.from(tripsMap.values()).sort(
+        (a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+      ).slice(0, safeLimit);
+
+      return {
+        data,
+        hasMore: (historyData?.length ?? 0) === safeLimit || (sessionData?.length ?? 0) === safeLimit,
+      };
+    } else {
+      // Driver Role
+      // 1. Fetch from passenger_route_history for driver
+      let historyQuery = supabase
+        .from('passenger_route_history')
+        .select('*')
+        .eq('driver_id', userId)
+        .order('start_time', { ascending: false });
+
+      if (startOfDay) historyQuery = historyQuery.gte('start_time', startOfDay);
+      if (endOfDay) historyQuery = historyQuery.lte('start_time', endOfDay);
+      const { data: historyData, error: historyError } = await historyQuery.range(rangeStart, rangeEnd);
+
+      if (historyError) {
+        console.error("[userService.getActivityHistory] Error driver history:", historyError.message);
+      }
+
+      // 2. Fetch from trip_sessions for driver to include completed & cancelled sessions
+      let driverSessionsQuery = supabase
+        .from('trip_sessions')
+        .select(`
+          id,
+          start_location,
+          end_location,
+          start_time,
+          status,
+          created_at,
+          passenger_trip_sessions (
+            id,
+            status,
+            fare_amount
+          )
+        `)
+        .eq('driver_id', userId)
+        .in('status', ['completed', 'cancelled'])
+        .order('start_time', { ascending: false });
+
+      if (startOfDay) driverSessionsQuery = driverSessionsQuery.gte('start_time', startOfDay);
+      if (endOfDay) driverSessionsQuery = driverSessionsQuery.lte('start_time', endOfDay);
+      const { data: driverSessions, error: driverSessionsError } = await driverSessionsQuery.range(rangeStart, rangeEnd);
+
+      if (driverSessionsError) {
+        console.error("[userService.getActivityHistory] Error driver trip sessions:", driverSessionsError.message);
+      }
+
+      const driverTripsMap = new Map<number, ActivityItem>();
+
+      // Aggregate history from passenger_route_history
+      (historyData || []).forEach((item: any) => {
+        const tsId = item.trip_session_id;
+        if (!driverTripsMap.has(tsId)) {
+          driverTripsMap.set(tsId, {
+            id: `dh-${item.id}`,
+            trip_session_id: tsId,
+            start_location: item.start_location || "Punto de inicio",
+            end_location: item.end_location || "Destino",
+            start_time: item.start_time || item.created_at,
+            status: item.status || 'completed',
+            price: Number(item.price ?? 0),
+            passenger_count: Number(item.passenger_count ?? 0),
+            role: 'driver',
+          });
+        } else {
+          const existing = driverTripsMap.get(tsId)!;
+          if (item.user_id !== item.driver_id && existing.passenger_count === 0) {
+            existing.passenger_count += 1;
+            if (existing.price === 0) {
+              existing.price += Number(item.price ?? 1.25);
+            }
+          }
+        }
+      });
+
+      // Complement from trip_sessions
+      (driverSessions || []).forEach((session: any) => {
+        const tsId = session.id;
+        const validPassengers = (session.passenger_trip_sessions || []).filter(
+          (p: any) => p.status === 'completed' || p.status === 'joined'
+        );
+        const pCount = validPassengers.length;
+        const totalPrice = validPassengers.reduce(
+          (sum: number, p: any) => sum + Number(p.fare_amount ?? 1.25),
+          0
+        );
+
+        if (!driverTripsMap.has(tsId)) {
+          driverTripsMap.set(tsId, {
+            id: `ts-${session.id}`,
+            trip_session_id: tsId,
+            start_location: session.start_location || "Punto de inicio",
+            end_location: session.end_location || "Destino",
+            start_time: session.start_time || session.created_at,
+            status: session.status || 'completed',
+            price: totalPrice,
+            passenger_count: pCount,
+            role: 'driver',
+          });
+        }
+      });
+
+      const data = Array.from(driverTripsMap.values()).sort(
+        (a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+      ).slice(0, safeLimit);
+
+      return {
+        data,
+        hasMore: (historyData?.length ?? 0) === safeLimit || (driverSessions?.length ?? 0) === safeLimit,
+      };
     }
   },
 

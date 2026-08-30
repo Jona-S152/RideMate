@@ -5,6 +5,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
+import { useSafeBackHandler } from "@/hooks/useSafeBackHandler";
 import { userService } from "@/services/user.service";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -15,6 +16,7 @@ import Toast from "react-native-toast-message";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 export default function EditProfileScreen() {
+    useSafeBackHandler("/(tabs)/profile");
     const { user, updateUser, refreshUser } = useAuth();
     const router = useRouter();
     const [changePassVisibleModal, setChangePassVisibleModal] = useState<boolean>(false);

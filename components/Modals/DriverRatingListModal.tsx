@@ -13,6 +13,7 @@ import {
     TextInput,
     View,
 } from "react-native";
+import Toast from "react-native-toast-message";
 
 interface PassengerToRate extends UserData {
     selectedRating: number;
@@ -64,7 +65,10 @@ export default function DriverRatingListModal({
     const handleSubmit = async () => {
         const incomplete = items.some((p) => p.selectedRating === 0);
         if (incomplete && items.length > 0) {
-            alert("Por favor califica a todos los pasajeros");
+            Toast.show({
+                type: "info",
+                text1: "Por favor califica a todos los pasajeros",
+            });
             return;
         }
 
@@ -80,7 +84,10 @@ export default function DriverRatingListModal({
             onClose();
         } catch (error) {
             console.error("Error submitting driver ratings:", error);
-            alert("No se pudieron enviar las calificaciones");
+            Toast.show({
+                type: "error",
+                text1: "No se pudieron enviar las calificaciones",
+            });
         } finally {
             setLoading(false);
         }

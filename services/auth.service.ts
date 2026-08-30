@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { ActiveLegalVersions } from "@/interfaces/legal";
 import * as Linking from "expo-linking";
 
 export interface UserRecord {
@@ -8,6 +9,9 @@ export interface UserRecord {
   driver_mode: boolean;
   name: string;
   avatar_profile?: string;
+  accepted_terms_version?: string | null;
+  accepted_privacy_version?: string | null;
+  accepted_legal_at?: string | null;
 }
 
 export interface AuthSessionResponse {
@@ -204,7 +208,7 @@ export const authService = {
    * Phase 1: Registers user in Supabase Auth and sends confirmation email.
    * If email confirmation is disabled in Supabase, directly creates public.users record.
    */
-  async signUp(form: { email: string; password: string; name: string; lastname: string }): Promise<{ needsEmailConfirmation: boolean; session?: any }> {
+  async signUp(form: { email: string; password: string; name: string; lastname: string; legal?: ActiveLegalVersions }): Promise<{ needsEmailConfirmation: boolean; session?: any }> {
     // Clear any existing active session from a previous user
     await supabase.auth.signOut().catch(() => {});
 
@@ -225,7 +229,7 @@ export const authService = {
           name: form.name,
           lastname: form.lastname,
         }
-      },
+      }
     });
 
     if (authError) throw authError;
@@ -244,11 +248,14 @@ export const authService = {
         role_id: 2,
         city_id: org?.city_id,
         status: 'active',
-        last_seen_at: new Date().toISOString()
+        last_seen_at: new Date().toISOString(),
+        accepted_terms_version: form.legal?.terms.version ?? null,
+        accepted_privacy_version: form.legal?.privacy.version ?? null,
+        accepted_legal_at: form.legal ? new Date().toISOString() : null,
       }, { onConflict: "id" });
 
       if (insertError) {
-        console.error("[authService.signUp] Error creando perfil directo en public.users:", insertError);
+        throw insertError;
       } else {
         await this.assignTenantByEmail(userId, form.email.trim());
       }
@@ -262,7 +269,7 @@ export const authService = {
   /**
    * Phase 2: Completes registration after email confirmation.
    * Inserts profile into public.users and assigns tenant/organization.
-   */
+    */
   async completeRegistration(form: { email: string; password: string; name: string; lastname: string }): Promise<AuthSessionResponse> {
     const cleanEmail = form.email.trim().toLowerCase();
     let session = (await supabase.auth.getSession()).data.session;
