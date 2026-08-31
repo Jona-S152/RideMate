@@ -55,7 +55,6 @@ export default function BecomeDriverScreen() {
     seats_capacity: 4,
     registration_doc_uri: "",
     vehicle_image_uri: "",
-    terms_accepted: false,
   });
 
   // Edit Approved Form Fields
@@ -239,14 +238,6 @@ export default function BecomeDriverScreen() {
   // Submit Initial Application
   const handleSubmitApplication = async () => {
     if (!user?.id) return;
-    if (!formData.terms_accepted) {
-      Toast.show({
-        type: "error",
-        text1: "Términos Obligatorios",
-        text2: "Debes aceptar la política de protección de datos (LOPDP) para continuar.",
-      });
-      return;
-    }
 
     if (formData.license_expiration_date) {
       const dateCheck = isValidDate(formData.license_expiration_date);
@@ -964,7 +955,7 @@ export default function BecomeDriverScreen() {
         {currentStep === 3 && (
           <View>
             <ThemedText className="text-lg font-bold mb-4" style={{ color: Colors.light.secondary }}>
-              3. Resumen y Confirmación Legal
+              3. Resumen
             </ThemedText>
 
             <View
@@ -1003,35 +994,6 @@ export default function BecomeDriverScreen() {
               </ThemedText>
             </View>
 
-            {/* LOPDP Terms Checkbox Card */}
-            <Pressable
-              onPress={() => updateFormField("terms_accepted", !formData.terms_accepted)}
-              className="p-4 rounded-2xl mb-6 flex-row items-center justify-between border"
-              style={{
-                backgroundColor: Colors.dark.glassSoft,
-                borderColor: formData.terms_accepted ? Colors.light.secondary : Colors.dark.border,
-              }}
-            >
-              <View className="flex-1 mr-3">
-                <ThemedText className="text-xs font-bold mb-1" style={{ color: "white" }}>
-                  Aceptación de Términos (LOPDP) *
-                </ThemedText>
-                <ThemedText className="text-xs opacity-75" style={{ color: Colors.dark.textSecondary }}>
-                  Confirmo que los documentos son verídicos y acepto la Política de Protección de Datos Personales y Términos de Servicio.
-                </ThemedText>
-              </View>
-
-              <View
-                className="w-6 h-6 rounded-md items-center justify-center border"
-                style={{
-                  backgroundColor: formData.terms_accepted ? Colors.light.secondary : "transparent",
-                  borderColor: formData.terms_accepted ? Colors.light.secondary : Colors.dark.border,
-                }}
-              >
-                {formData.terms_accepted && <Ionicons name="checkmark" size={16} color="white" />}
-              </View>
-            </Pressable>
-
             <View className="flex-row gap-3">
               <Pressable
                 className="flex-1 py-4 rounded-full items-center border"
@@ -1044,11 +1006,11 @@ export default function BecomeDriverScreen() {
 
               <Pressable
                 style={{
-                  backgroundColor: formData.terms_accepted ? Colors.light.secondary : "rgba(18, 182, 234, 0.4)",
+                  backgroundColor: Colors.light.secondary,
                 }}
                 className="flex-1 py-4 rounded-full items-center shadow-lg"
                 onPress={handleSubmitApplication}
-                disabled={submitting || !formData.terms_accepted}
+                disabled={submitting}
               >
                 {submitting ? (
                   <ActivityIndicator color="white" />

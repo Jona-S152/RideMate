@@ -9,6 +9,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { decode } from 'base64-arraybuffer';
 import * as FileSystem from 'expo-file-system';
+import { discordService } from "@/services/discord.service";
 
 export const driverService = {
   /**
@@ -115,6 +116,23 @@ export const driverService = {
       throw new Error(error.message || "Error al enviar la solicitud de conductor.");
     }
 
+    // 5. Notificar a Discord Webhook (Función estándar en cliente)
+    discordService.sendDriverApplicationToDiscord({
+      userId,
+      licenseNumber: formData.license_number.trim(),
+      licenseExpirationDate: formData.license_expiration_date || null,
+      licenseImageUrl,
+      brand: formData.brand.trim(),
+      model: formData.model.trim(),
+      year: parseInt(formData.year as string, 10) || new Date().getFullYear(),
+      plate: formData.plate.toUpperCase().trim(),
+      color: formData.color.trim(),
+      seatsCapacity: Number(formData.seats_capacity) || 4,
+      registrationDocUrl,
+      vehicleImageUrl,
+      isUpdate: false,
+    }).catch((err) => console.error("[submitDriverApplication] Error en Discord notification:", err));
+
     return data;
   },
 
@@ -181,6 +199,23 @@ export const driverService = {
       }
       throw new Error(error.message || "Error al actualizar los datos del conductor.");
     }
+
+    // 5. Notificar actualización a Discord Webhook (Función estándar en cliente)
+    discordService.sendDriverApplicationToDiscord({
+      userId,
+      licenseNumber: formData.license_number.trim(),
+      licenseExpirationDate: formData.license_expiration_date || null,
+      licenseImageUrl: licenseImageUrl || undefined,
+      brand: formData.brand ? formData.brand.trim() : "",
+      model: formData.model ? formData.model.trim() : "",
+      year: formData.year ? parseInt(formData.year, 10) : new Date().getFullYear(),
+      plate: formData.plate ? formData.plate.toUpperCase().trim() : "",
+      color: formData.color ? formData.color.trim() : "",
+      seatsCapacity: formData.seats_capacity ? Number(formData.seats_capacity) : 4,
+      registrationDocUrl: registrationDocUrl || undefined,
+      vehicleImageUrl: vehicleImageUrl || undefined,
+      isUpdate: true,
+    }).catch((err) => console.error("[updateDriverProfileForReverification] Error en Discord notification:", err));
 
     return data;
   },

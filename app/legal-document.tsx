@@ -17,7 +17,7 @@ export default function LegalDocumentScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <View className="h-16 flex-row items-center px-4 border-b border-slate-700">
+      <View className="h-24 flex-row items-center px-4 pt-8 pb-2 border-b border-slate-700">
         <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel="Volver">
           <Ionicons name="arrow-back" size={24} color="white" />
         </Pressable>

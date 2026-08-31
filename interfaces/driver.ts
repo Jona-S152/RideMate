@@ -45,9 +45,6 @@ export interface BecomeDriverFormData {
   seats_capacity: number;
   registration_doc_uri: string;
   vehicle_image_uri: string;
-
-  // Step 3: Terms & Confirmation
-  terms_accepted: boolean;
 }
 
 export interface AddVehicleFormData {
