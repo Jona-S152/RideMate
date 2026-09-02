@@ -278,9 +278,10 @@ export default function PassengerRoutesScreen() {
                   isDriver={false}
                   seatsCapacity={(item as any).vehicle?.seats_capacity}
                   imageUrl={
-                    Array.isArray((item as any).routes)
+                    (item as any).image_url ||
+                    (Array.isArray((item as any).routes)
                       ? ((item as any).routes[0] as any)?.image_url
-                      : ((item as any).routes as any)?.image_url
+                      : ((item as any).routes as any)?.image_url)
                   }
                   onPress={() => handleRoutePress(item)}
                 />

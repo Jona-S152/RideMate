@@ -127,7 +127,7 @@ export default function ActivityScreen() {
 
     const handleItemPress = (item: ActivityItem) => {
         if (item.trip_session_id) {
-            router.push(`/(tabs)/available-routes/route-detail?id=${item.trip_session_id}`);
+            router.push(`/(tabs)/available-routes/route-detail?id=${item.trip_session_id}&viewOnly=true&source=activity`);
         }
     };
 

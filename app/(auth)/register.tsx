@@ -142,6 +142,7 @@ export default function RegisterScreen() {
         password: form.password,
         name: form.name,
         lastname: form.lastname,
+        legal: await legalService.getActiveDocuments(),
       }));
 
       // Navigate to email confirmation screen

@@ -904,10 +904,12 @@ export default function BecomeDriverScreen() {
                   style={{ borderColor: Colors.dark.border }}
                   placeholder="Ej. 4"
                   keyboardType="numeric"
-                  value={String(formData.seats_capacity)}
+                  maxLength={1}
+                  value={formData.seats_capacity === 0 ? "" : String(formData.seats_capacity)}
                   onChangeText={(val) => {
                     const cleanVal = val.replace(/[^0-9]/g, "");
-                    updateEditFormField("seats_capacity", cleanVal === "" ? 0 : parseInt(cleanVal, 10));
+                    if (Number(cleanVal) > 7) return;
+                    updateFormField("seats_capacity", cleanVal === "" ? 0 : parseInt(cleanVal, 10));
                   }}
                 />
               </View>
@@ -951,7 +953,7 @@ export default function BecomeDriverScreen() {
           </View>
         )}
 
-        {/* PASO 3: REVISIÓN Y TÉRMINOS LOPDP */}
+        {/* PASO 3: REVISIÓN */}
         {currentStep === 3 && (
           <View>
             <ThemedText className="text-lg font-bold mb-4" style={{ color: Colors.light.secondary }}>

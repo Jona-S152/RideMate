@@ -211,16 +211,21 @@ export default function RouteDetail() {
   useEffect(() => {
     if (session && passengersLoaded) {
       const isSessionCancelled = session.status === 'cancelled';
-      const isSessionCompleted = session.status === 'completed';
-      const passenger = passengers.find(p => p.passenger_id === user?.id);
 
-      const validStatuses = ['joined', 'completed'];
+      if (isDriver) {
+        if (isSessionCancelled) {
+          router.replace('/(tabs)/available-routes');
+        }
+      } else {
+        const passenger = passengers.find(p => p.passenger_id === user?.id);
+        const validStatuses = ['joined', 'completed', 'pending', 'approved', 'pending_approval'];
 
-      if (isSessionCancelled || !passenger || !validStatuses.includes(passenger.status)) {
-        router.replace('/(tabs)/available-routes');
+        if (isSessionCancelled || !passenger || !validStatuses.includes(passenger.status)) {
+          router.replace('/(tabs)/available-routes');
+        }
       }
     }
-  }, [session, passengers, passengersLoaded, user]);
+  }, [session, passengers, passengersLoaded, user, isDriver]);
 
   const fetchActiveSessionStops = async () => {
     try {

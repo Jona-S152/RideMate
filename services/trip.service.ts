@@ -59,7 +59,7 @@ export const tripService = {
         vehicle:vehicles!vehicle_id (
           *
         ),
-        routes (
+        routes:routes!route_id (
           image_url,
           organization_id
         ),
@@ -126,9 +126,11 @@ export const tripService = {
       const joinedPassengers = session.passengers?.filter((p: any) => p.status === "joined") || [];
       const hasPendingRequest = pendingSessionIds.includes(session.id);
       const pendingRequestsCount = pendingCounts[session.id] || 0;
+      const routeObj = Array.isArray(session.routes) ? session.routes[0] : session.routes;
       
       return {
         ...session,
+        image_url: routeObj?.image_url,
         driver_name: session.driver?.name,
         driver_avatar: session.driver?.avatar_profile,
         driver_rating: session.driver?.rating,

@@ -45,6 +45,8 @@ export default function AvailableRouteCard({
     trip_session_id,
     start,
     end,
+    startCoords,
+    endCoords,
     passengers = 0,
     driverName,
     driverAvatar,
@@ -107,6 +109,14 @@ export default function AvailableRouteCard({
         return "#A0AECB";
     };
 
+    // Mapbox dynamic static map fallback when imageUrl is missing or fails to load
+    const mapboxToken = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
+    const fallbackMapUrl = (startCoords?.coordinates?.length === 2 && endCoords?.coordinates?.length === 2 && mapboxToken)
+        ? `https://api.mapbox.com/styles/v1/mapbox/traffic-night-v2/static/pin-s-a+2ecc71(${startCoords.coordinates[0]},${startCoords.coordinates[1]}),pin-s-b+e74c3c(${endCoords.coordinates[0]},${endCoords.coordinates[1]})/auto/600x600?padding=110,110,110,110&access_token=${mapboxToken}`
+        : undefined;
+
+    const displayImageUrl = (imageUrl && imageUrl.startsWith("http")) ? imageUrl : fallbackMapUrl;
+
     return (
         <>
             <TouchableOpacity
@@ -134,8 +144,10 @@ export default function AvailableRouteCard({
                     <View className="w-full h-36 bg-gray-700 relative">
                         <Image
                             source={
-                                imageUrl && !imageError
-                                    ? { uri: imageUrl }
+                                displayImageUrl && !imageError
+                                    ? { uri: displayImageUrl }
+                                    : fallbackMapUrl
+                                    ? { uri: fallbackMapUrl }
                                     : require('@/assets/images/mapExample.png')
                             }
                             onError={() => setImageError(true)}

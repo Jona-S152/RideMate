@@ -1,10 +1,11 @@
-import ConfirmActionModal from "@/components/Modals/ConfirmActionModal";
 import { useAuth } from "@/app/context/AuthContext";
 import { SwipeTripActions } from "@/components/features/SwipeTripActions";
+import ConfirmActionModal from "@/components/Modals/ConfirmActionModal";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { useTripMeetingPoints, useTripRealtimeById, useTripStops } from "@/hooks/useRealTime";
+import { useSafeBackHandler } from "@/hooks/useSafeBackHandler";
 import { DriverInfo, PassengerTripSession, RouteData, SessionData, UserData } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
 import { sendMultiplePushNotifications, sendPushNotification } from "@/services/notifications.service";
@@ -16,7 +17,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { format, isToday, isTomorrow } from "date-fns";
 import { es } from "date-fns/locale";
 import * as Location from "expo-location";
-import { useSafeBackHandler } from "@/hooks/useSafeBackHandler";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Image, Pressable, RefreshControl, ScrollView, View } from "react-native";
@@ -25,10 +25,11 @@ import Toast from "react-native-toast-message";
 
 export default function RouteDetail() {
     useSafeBackHandler("/(tabs)/available-routes");
-    const params = useLocalSearchParams<{ id: string, sessionId?: string }>();
+    const params = useLocalSearchParams<{ id: string, sessionId?: string, viewOnly?: string, source?: string }>();
     const { user } = useAuth();
     const router = useRouter();
     const { startTracking, stopTracking } = useTripTrackingStore();
+    const isReadOnlyView = params.viewOnly === 'true' || params.source === 'activity' || params.source === 'history';
     const [driver, setDriver] = useState<DriverInfo | null>(null);
     const [passengers, setPassengers] = useState<PassengerTripSession[]>([]);
     //const [meetingPoints, setMeetingPoints] = useState<MeetingPoint[]>([]);
@@ -61,6 +62,10 @@ export default function RouteDetail() {
     const { session } = useTripRealtimeById(sessionId);
     const { stops: sessionStops } = useTripStops(sessionId);
     const { meetingPoints: sessionMeetingPoints } = useTripMeetingPoints(sessionId);
+    const isSessionTerminal = useMemo(
+        () => ['cancelled', 'completed', 'left'].includes(String(session?.status ?? '')),
+        [session?.status]
+    );
 
     const isPassengerActive = useMemo(() => {
         const userPassenger = passengers.find(p => p.passenger_id === user?.id);
@@ -229,13 +234,24 @@ export default function RouteDetail() {
     }, [params.id, session, sessionMeetingPoints]);
 
     useEffect(() => {
-        console.warn("SESSION status changed:", session?.status, "| sessionId:", sessionId, "| driver_mode:", user?.driver_mode);
+        console.warn("SESSION status changed:", session?.status, "| sessionId:", sessionId, "| driver_mode:", user?.driver_mode, "| readOnly:", isReadOnlyView);
+
+        if (isReadOnlyView) {
+            return;
+        }
+
         // Redirigir al pasajero a la pantalla de ruta activa cuando el conductor inicia el viaje
         if (session?.status === 'active' && !user?.driver_mode) {
             console.warn(`[route-detail] Redirecting passenger to active route: /(tabs)/home/route-detail?id=${sessionId}`);
             router.replace(`/(tabs)/home/route-detail?id=${sessionId}`);
         }
-    }, [session?.status, sessionId, user?.driver_mode]);
+
+        // Redirigir cuando el real-time detecte que la sesión fue cancelada o completada
+        if (session?.status === 'cancelled' || session?.status === 'completed') {
+            console.warn(`[route-detail] Session ${sessionId} is ${session.status}, redirecting to available-routes`);
+            router.replace('/(tabs)/available-routes');
+        }
+    }, [session?.status, sessionId, user?.driver_mode, isReadOnlyView]);
 
 
     const handleStartTrip = async () => {
@@ -576,12 +592,12 @@ export default function RouteDetail() {
                 </View>
 
                 {/* Botón de Compartir */}
-                <Pressable
+                {/* <Pressable
                     onPress={() => console.log("Compartir...")}
                     className="p-2 -mr-2"
                 >
                     <Ionicons name="share-outline" size={24} color="#E2EBF0" />
-                </Pressable>
+                </Pressable> */}
             </ThemedView>
 
             <ScrollView
@@ -866,7 +882,8 @@ export default function RouteDetail() {
                 </View>
             </ScrollView>
             {
-                (session?.status !== 'completed' && session?.status !== 'cancelled') &&
+                !isReadOnlyView &&
+                !isSessionTerminal &&
                 (!user?.driver_mode && !user?.is_driver) &&
                 isPassengerActive && (
                     <Pressable onPress={() => handleLeaveTrip()}>
@@ -882,7 +899,9 @@ export default function RouteDetail() {
                 )
             }
             {
-                session?.status !== 'completed' && session?.status !== 'cancelled' && user?.driver_mode && (
+                !isReadOnlyView &&
+                !isSessionTerminal &&
+                user?.driver_mode && (
                     <SwipeTripActions
                         onStart={handleStartTrip}
                         onCancel={handleCancelTrip}

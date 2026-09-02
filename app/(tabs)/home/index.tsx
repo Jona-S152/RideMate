@@ -10,13 +10,12 @@ import { useActiveSession } from "@/hooks/useRealTime";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, ScrollView, View } from "react-native";
 
+import { useModeNavigation } from "@/hooks/useModeNavigation";
 import { Vehicle } from "@/interfaces/driver";
 import { supabase } from "@/lib/supabase";
 import { registerDeviceToken } from "@/services/notifications.service";
 import { ratingsService } from "@/services/ratings.service";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { useModeNavigation } from "@/hooks/useModeNavigation";
 
 // Reemplaza con el número real de WhatsApp Business cuando esté disponible
 const WHATSAPP_SUPPORT_URL =
@@ -424,7 +423,9 @@ export default function HomeScreen() {
               routeScreen={
                 activeSession.status === "active"
                   ? `/(tabs)/home/route-detail?id=${activeSession.id}`
-                  : `/(tabs)/available-routes/route-detail?id=${activeSession.route_id}&sessionId=${activeSession.id}`
+                  : ["cancelled", "completed", "left"].includes(activeSession.status)
+                    ? `/(tabs)/available-routes/route-detail?id=${activeSession.route_id}&sessionId=${activeSession.id}&viewOnly=true&source=home`
+                    : `/(tabs)/available-routes/route-detail?id=${activeSession.route_id}&sessionId=${activeSession.id}`
               }
               startLocation={activeSession.start_location.split(",")[0].trim()}
               endLocation={activeSession.end_location.split(",")[0].trim()}
@@ -441,7 +442,7 @@ export default function HomeScreen() {
               routeId={(history[0] as any).route_id}
               title={`${history[0].start_location} - ${history[0].end_location}`}
               isActive={"completed"}
-              routeScreen={`/(tabs)/available-routes/route-detail?id=${history[0].route_id}&sessionId=${history[0].trip_session_id}`}
+              routeScreen={`/(tabs)/available-routes/route-detail?id=${history[0].route_id}&sessionId=${history[0].trip_session_id}&viewOnly=true&source=home`}
               startLocation={history[0].start_location.split(",")[0].trim()}
               endLocation={history[0].end_location.split(",")[0].trim()}
               passengerCount={(history[0] as any).passengers_data?.length || 0}
