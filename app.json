@@ -12,6 +12,9 @@
     ],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
@@ -21,9 +24,6 @@
           "location",
           "location"
         ]
-      },
-      "runtimeVersion": {
-        "policy": "appVersion"
       }
     },
     "android": {
@@ -68,8 +68,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.anonymous.RideMate",
-      "googleServicesFile": "./google-services.json",
-      "runtimeVersion": "1.0.0"
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -123,7 +122,8 @@
       "backgroundColor": "#0F172A"
     },
     "updates": {
-      "url": "https://u.expo.dev/b4cab86f-ce79-4ee9-90ab-eaef88ce61a8"
+      "url": "https://u.expo.dev/b4cab86f-ce79-4ee9-90ab-eaef88ce61a8",
+      "checkAutomatically": "ON_ERROR_RECOVERY"
     }
   }
 }

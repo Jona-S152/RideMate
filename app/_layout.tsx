@@ -1,9 +1,11 @@
 import PassengerActionModal from "@/components/Modals/PassengerActionModal";
 import RatingModal from "@/components/Modals/RatingModal";
 import { Colors } from "@/constants/Colors";
+import { useAppUpdates } from "@/hooks/useAppUpdates";
 import { supabase } from "@/lib/supabase";
 import { ratingsService } from "@/services/ratings.service";
 import { tripService } from "@/services/trip.service";
+import { useTripTrackingStore } from "@/store/tripTrackinStore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Linking from "expo-linking";
 import * as Notifications from "expo-notifications";
@@ -16,6 +18,7 @@ import AuthProvider, { useAuth } from "./context/AuthContext";
 import SessionProvider from "./context/SessionContext";
 
 import { toastConfig } from "@/components/common/toast-config";
+import ConfirmActionModal from "@/components/Modals/ConfirmActionModal";
 import { authService } from "@/services/auth.service";
 import { legalService } from "@/services/legal.service";
 import { registerDeviceToken, setupNotificationChannel } from "@/services/notifications.service";
@@ -43,6 +46,8 @@ const passengerAlreadyPaid = (session: {
 
 function MainApp() {
   const { token, user, logout } = useAuth();
+  const isTracking = useTripTrackingStore((state) => state.isTracking);
+  const { isUpdateReady, dismissUpdate, applyUpdate } = useAppUpdates();
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
   const [ratingData, setRatingData] = useState<{
     trip_session_id: number;
@@ -367,6 +372,18 @@ function MainApp() {
           // Aquí se podría disparar un evento global de refresco si fuera necesario
           console.log("Acción de pasajero completada globalmente");
         }}
+      />
+
+      <ConfirmActionModal
+        visible={isUpdateReady && !!token && !isTracking}
+        title="Actualización lista"
+        description="Se descargó una nueva versión de RideMate. Reinicia la app para aplicarla."
+        confirmText="Actualizar ahora"
+        cancelText="Más tarde"
+        confirmType="info"
+        iconName="download-outline"
+        onConfirm={() => void applyUpdate()}
+        onCancel={dismissUpdate}
       />
 
       <Toast config={toastConfig} />
