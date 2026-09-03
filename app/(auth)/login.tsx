@@ -4,20 +4,21 @@ import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { useAppInsets } from "@/hooks/useAppInsets";
+import { useCollapsingHeader } from "@/hooks/useCollapsingHeader";
 import { ActiveLegalVersions } from "@/interfaces/legal";
 import { AuthSessionResponse, authService } from "@/services/auth.service";
 import { legalService } from "@/services/legal.service";
 import { Ionicons } from "@expo/vector-icons";
 import { Link } from "expo-router";
-import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Image, Keyboard, Pressable, Text, View } from "react-native";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Animated, Dimensions, Image, Keyboard, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import Toast from "react-native-toast-message";
 import { useAuth } from "../context/AuthContext";
 
 export default function LoginScreen() {
     const { login } = useAuth()
     const insets = useAppInsets();
+    const { height: screenHeight } = Dimensions.get("window");
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -29,30 +30,26 @@ export default function LoginScreen() {
     const [loginLoading, setLoginLoading] = useState(false);
     const [legalLoading, setLegalLoading] = useState(false);
 
-    const HEADER_EXPANDED = 400;
-    const HEADER_COLLAPSED = 185;
+    const HEADER_EXPANDED = screenHeight * 0.5;
+    const HEADER_COLLAPSED = screenHeight * 0.3;
     const AnimatedThemedView = Animated.createAnimatedComponent(ThemedView);
-
-    const headerHeight = useRef(
-        new Animated.Value(HEADER_EXPANDED)
-    ).current;
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
+    const headerHeight = useCollapsingHeader({
+        expanded: HEADER_EXPANDED,
+        collapsed: HEADER_COLLAPSED,
+        keyboardHeight,
+    });
 
     useEffect(() => {
-        const showSub = Keyboard.addListener("keyboardDidShow", () => {
-            Animated.timing(headerHeight, {
-                toValue: HEADER_COLLAPSED,
-                duration: 250,
-                useNativeDriver: false,
-            }).start();
-        });
+        const showSub = Keyboard.addListener(
+            Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+            (event) => setKeyboardHeight(event.endCoordinates.height)
+        );
 
-        const hideSub = Keyboard.addListener("keyboardDidHide", () => {
-            Animated.timing(headerHeight, {
-                toValue: HEADER_EXPANDED,
-                duration: 250,
-                useNativeDriver: false,
-            }).start();
-        });
+        const hideSub = Keyboard.addListener(
+            Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+            () => setKeyboardHeight(0)
+        );
 
         return () => {
             showSub.remove();
@@ -132,7 +129,7 @@ export default function LoginScreen() {
     }
 
     return (
-        <KeyboardAwareScrollView className="bg-background" contentContainerStyle={{ paddingBottom: 24 + insets.bottom }}>
+        <View className="flex-1 bg-background">
             <AnimatedThemedView
                 style={{ height: headerHeight, paddingTop: insets.top }}
                 lightColor={Colors.light.glassStrong}
@@ -148,6 +145,12 @@ export default function LoginScreen() {
                     className="mb-1"
                     source={require('../../assets/images/CarLogin.png')}/> */}
             </AnimatedThemedView>
+            <ScrollView
+                className="flex-1"
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                contentContainerStyle={{ paddingBottom: keyboardHeight + 24 + insets.bottom }}
+            >
             <View className="mx-6 my-8 items-center justify-center">
                 <ThemedTextInput
                     lightColor={Colors.light.glassSoft}
@@ -205,6 +208,7 @@ export default function LoginScreen() {
                     </Link>
                 </View>
             </View>
-        </KeyboardAwareScrollView>
+            </ScrollView>
+        </View>
     );
 }
