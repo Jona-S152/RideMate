@@ -105,7 +105,8 @@
           "backgroundColor": "#0F172A"
         }
       ],
-      "expo-maps"
+      "expo-maps",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true
