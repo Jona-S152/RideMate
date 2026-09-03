@@ -5,10 +5,10 @@ import { ThemedView } from "@/components/ThemedView";
 import FilterCard from "@/components/common/FilterCard";
 import MasonryGrid from "@/components/common/MasonryGrid";
 import AvailableRouteCard from "@/components/features/available-route-card";
-import { Colors } from "@/constants/Colors";
-import { useAvailableRoutesSubscription } from "@/hooks/useRealTime";
-import { useAppInsets } from "@/hooks/useAppInsets";
 import { useBottomTabOverflow } from "@/components/ui/TabBarBackground";
+import { Colors } from "@/constants/Colors";
+import { useAppInsets } from "@/hooks/useAppInsets";
+import { useAvailableRoutesSubscription } from "@/hooks/useRealTime";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { SessionData } from "@/interfaces/available-routes";
 import { tripService } from "@/services/trip.service";
@@ -184,10 +184,10 @@ export default function PassengerRoutesScreen() {
   });
 
   return (
-    <View style={{ flex: 1, backgroundColor: Colors.light.background }}>
+    <View style={{ flex: 1, backgroundColor: Colors.dark.background }}>
       <ThemedView
-        lightColor={Colors.light.glass}
-        darkColor={Colors.dark.glass}
+        lightColor={Colors.light.primary}
+        darkColor={Colors.dark.primary}
         className="w-full px-4 py-6 rounded-bl-[40px]"
         style={{ paddingTop: insets.top + 16 }}
       >

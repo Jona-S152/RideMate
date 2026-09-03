@@ -1,20 +1,20 @@
 import { useAuth } from "@/app/context/AuthContext";
 import { useSession } from "@/app/context/SessionContext";
+import { VehicleSelectorDropdown } from "@/components/driver/VehicleSelectorDropdown";
 import { ThemedText } from "@/components/ui/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { useAppInsets } from "@/hooks/useAppInsets";
 import { Coords } from "@/interfaces/available-routes";
 import { Vehicle } from "@/interfaces/driver";
-import { VehicleSelectorDropdown } from "@/components/driver/VehicleSelectorDropdown";
 import { supabase } from "@/lib/supabase";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import Mapbox, { Camera, LineLayer, MapView, MarkerView, ShapeSource } from "@rnmapbox/maps";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Dimensions, Image, Pressable, StyleSheet, View, ViewStyle } from "react-native";
-import Toast from "react-native-toast-message";
+import { ActivityIndicator, Dimensions, Image, Pressable, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import Toast from "react-native-toast-message";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -35,7 +35,7 @@ export default function RoutePreviewScreen() {
 
     const bottomSheetRef = useRef<BottomSheet>(null);
     const cameraRef = useRef<Mapbox.Camera>(null);
-    const snapPoints = useMemo(() => ["50%", "88%"], []);
+    const snapPoints = useMemo(() => ["60%", "88%"], []);
 
     useEffect(() => {
         fetchRouteDetails();
@@ -360,7 +360,7 @@ export default function RoutePreviewScreen() {
                             router.replace("/(tabs)/available-routes");
                         }
                     }}
-                    style={[styles.backButton, { top: insets.top + 8 }] as ViewStyle}
+                    style={[styles.backButton, { top: insets.top + 8 }]}
                 >
                     <Ionicons name="chevron-back" size={24} color={Colors.light.text} />
                 </Pressable>
@@ -369,7 +369,6 @@ export default function RoutePreviewScreen() {
                     ref={bottomSheetRef}
                     index={0}
                     snapPoints={snapPoints}
-                    bottomInset={insets.bottom}
                     backgroundStyle={{
                         backgroundColor: Colors.dark.background,
                         borderTopLeftRadius: 55,
@@ -378,7 +377,7 @@ export default function RoutePreviewScreen() {
                 >
                     <BottomSheetScrollView
                         style={{ backgroundColor: Colors.dark.background }}
-                        contentContainerStyle={[styles.scrollContent, { paddingBottom: 24 + insets.bottom }]}
+                        contentContainerStyle={[styles.scrollContent, { paddingBottom: 24 + (insets.bottom > 16 ? insets.bottom : 0) }]}
                     >
                         {/* Visual Route Timeline */}
                         <View style={styles.timelineContainer}>
@@ -574,6 +573,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginTop: 10,
+        marginBottom: 26,
         elevation: 3,
     }
 });

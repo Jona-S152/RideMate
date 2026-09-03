@@ -8,12 +8,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
  */
 export function useAppInsets() {
   const insets = useSafeAreaInsets();
+  const hasNativeNavBar = insets.bottom > 20;
+  const navBarPadding = hasNativeNavBar ? insets.bottom : 0;
 
   return {
     top: insets.top,
     bottom: insets.bottom,
     left: insets.left,
     right: insets.right,
+    hasNativeNavBar,
+    navBarPadding,
     bottomWith: (extra = 0) => insets.bottom + extra,
     topWith: (extra = 0) => insets.top + extra,
   };

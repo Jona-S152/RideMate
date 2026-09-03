@@ -168,7 +168,11 @@ export default function ProfileScreen() {
             </View>
 
             {/* ── MENU OPTIONS ─────────────────────────────────── */}
-            <ScrollView showsVerticalScrollIndicator={false} style={styles.menuScroll} contentContainerStyle={[styles.menuContent, { paddingBottom: tabOverflow }]}>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                style={[styles.menuScroll, { marginBottom: tabOverflow }]}
+                contentContainerStyle={[styles.menuContent, { paddingBottom: 20 }]}
+            >
                 {loadingProfile ? (
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="small" color={Colors.light.secondary} />
@@ -277,12 +281,12 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.light.background,
+        backgroundColor: Colors.dark.background,
     },
     header: {
         paddingBottom: 24,
         paddingHorizontal: 20,
-        backgroundColor: Colors.light.glass,
+        backgroundColor: Colors.dark.card,
         borderBottomLeftRadius: 32,
         borderBottomRightRadius: 32,
     },

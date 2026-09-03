@@ -5,10 +5,10 @@ import { ThemedView } from "@/components/ThemedView";
 import FilterCard from "@/components/common/FilterCard";
 import MasonryGrid from "@/components/common/MasonryGrid";
 import AvailableRouteCard from "@/components/features/available-route-card";
-import { Colors } from "@/constants/Colors";
-import { useThemeColor } from "@/hooks/useThemeColor";
-import { useAppInsets } from "@/hooks/useAppInsets";
 import { useBottomTabOverflow } from "@/components/ui/TabBarBackground";
+import { Colors } from "@/constants/Colors";
+import { useAppInsets } from "@/hooks/useAppInsets";
+import { useThemeColor } from "@/hooks/useThemeColor";
 import { RouteData, RouteStop, UserData } from "@/interfaces/available-routes";
 import { tripService } from "@/services/trip.service";
 import { userService } from "@/services/user.service";
@@ -161,10 +161,10 @@ export default function DriverRoutesScreen() {
   const filteredAdminRoutes = filterRoutes(adminRoutes);
 
   return (
-    <View style={{ flex: 1, backgroundColor: Colors.light.background }}>
+    <View style={{ flex: 1, backgroundColor: Colors.dark.background }}>
       <ThemedView
-        lightColor={Colors.light.primary}
-        darkColor={Colors.dark.primary}
+        lightColor={Colors.light.glassSoft}
+        darkColor={Colors.light.glassSoft}
         className="w-full px-4 py-6 rounded-bl-[40px]"
         style={{ paddingTop: insets.top + 16 }}
       >
@@ -181,8 +181,9 @@ export default function DriverRoutesScreen() {
             className="flex-1 mr-2"
           />
           <Pressable
+            style={{ backgroundColor: Colors.dark.background, borderWidth: 1, borderColor: "rgba(226,235,240,0.14)" }}
             onPress={() => setVisibleFilters(!visibleFilters)}
-            className="bg-white/20 p-3 rounded-2xl"
+            className="p-3 rounded-2xl"
           >
             <Ionicons name="options-outline" size={24} color="white" />
           </Pressable>

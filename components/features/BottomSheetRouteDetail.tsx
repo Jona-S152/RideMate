@@ -241,7 +241,6 @@ export default function BottomSheetRouteDetail({
       snapPoints={snapPoints}
       onChange={handleSheetChanges}
       enablePanDownToClose={false}
-      bottomInset={insets.bottom}
       backgroundStyle={{
         backgroundColor: Colors.dark.background,
         borderTopLeftRadius: 55,
@@ -249,7 +248,7 @@ export default function BottomSheetRouteDetail({
       }}
       handleComponent={HandleDragToResize}
     >
-      <BottomSheetView style={{ paddingBottom: insets.bottom }}>
+      <BottomSheetView>
         <View
           className="px-6"
         >
@@ -390,7 +389,7 @@ export default function BottomSheetRouteDetail({
               )}
 
               {/* Acciones del viaje */}
-              <View className="my-6">
+              <View className="my-6" style={{ marginBottom: 20 + (insets.bottom > 16 ? insets.bottom : 0) }}>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}

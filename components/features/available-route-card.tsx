@@ -1,6 +1,7 @@
 import { useAuth } from "@/app/context/AuthContext";
 import GlassCard from "@/components/common/GlassCard";
 import ConfirmActionModal from "@/components/Modals/ConfirmActionModal";
+import { Colors } from "@/constants/Colors";
 import { Coords } from "@/interfaces/available-routes";
 import { tripService } from "@/services/trip.service";
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -147,8 +148,8 @@ export default function AvailableRouteCard({
                                 displayImageUrl && !imageError
                                     ? { uri: displayImageUrl }
                                     : fallbackMapUrl
-                                    ? { uri: fallbackMapUrl }
-                                    : require('@/assets/images/mapExample.png')
+                                        ? { uri: fallbackMapUrl }
+                                        : require('@/assets/images/mapExample.png')
                             }
                             onError={() => setImageError(true)}
                             resizeMode="cover"
@@ -180,7 +181,7 @@ export default function AvailableRouteCard({
                     )}
 
                     {/* Card Content */}
-                    <View className="pt-10 px-4 pb-4" style={{ backgroundColor: "rgba(12, 22, 42, 0.84)" }}>
+                    <View className="pt-10 px-4 pb-4" style={{ backgroundColor: Colors.light.glassSoft }}>
                         {/* Driver Name */}
                         <ThemedText
                             lightColor="white"

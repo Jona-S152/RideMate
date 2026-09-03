@@ -14,6 +14,9 @@ import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useAuth } from "../context/AuthContext";
 
+import { BottomTabBar, BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import { View } from "react-native";
+
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const pathName = usePathname();
@@ -44,9 +47,32 @@ export default function TabLayout() {
     return <Redirect href="/(tabs)/home" />;
   }
 
+  const renderTabBar = (props: BottomTabBarProps) => {
+    if (hideTabBar) return null;
+
+    return (
+      <View pointerEvents="box-none" style={{ position: "absolute", bottom: 0, left: 0, right: 0 }}>
+        {/* Protector de fondo que cubre el espacio inferior y bloquea los toques accidentales detrás del TabBar flotante */}
+        <View
+          pointerEvents="auto"
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: TAB_BAR_BOTTOM_OFFSET + insets.bottom,
+            backgroundColor: Colors[colorScheme ?? "light"].background,
+          }}
+        />
+        <BottomTabBar {...props} />
+      </View>
+    );
+  };
+
   return (
     <Tabs
       backBehavior="history"
+      tabBar={renderTabBar}
       screenOptions={{
         tabBarShowLabel: false,
         tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
