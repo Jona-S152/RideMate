@@ -9,8 +9,8 @@ import { useTripTrackingStore } from "@/store/tripTrackinStore";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Image, Pressable, ScrollView, View } from "react-native";
-import { FlatList } from "react-native-gesture-handler";
+import { Image, Pressable, View } from "react-native";
+import { FlatList, ScrollView as GestureHandlerScrollView } from "react-native-gesture-handler";
 import Animated, { interpolate, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { ThemedText } from "../ui/ThemedText";
 import { ThemedView } from "../ui/ThemedView";
@@ -117,7 +117,7 @@ export default function BottomSheetRouteDetail({
   const [currentSnapPoint, setCurrentSnapPoint] = useState<number>(0);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [driverData, setDriverData] = useState<UserData | null>(null);
-  const snapPoints = useMemo(() => ["45%"], []);
+  const snapPoints = useMemo(() => ["40%", "45%"], []);
   const animatedIndex = useSharedValue(0);
 
   const fetchUser = async () => {
@@ -390,10 +390,12 @@ export default function BottomSheetRouteDetail({
 
               {/* Acciones del viaje */}
               <View className="my-6" style={{ marginBottom: 20 + (insets.bottom > 16 ? insets.bottom : 0) }}>
-                <ScrollView
+                <GestureHandlerScrollView
                   horizontal
+                  nestedScrollEnabled
+                  directionalLockEnabled
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ paddingHorizontal: 4 }}
+                  contentContainerStyle={{ paddingLeft: 4, paddingRight: 20 }}
                 >
                   {actions.map((action, index) => (
                     <Pressable
@@ -415,7 +417,7 @@ export default function BottomSheetRouteDetail({
                       </ThemedText>
                     </Pressable>
                   ))}
-                </ScrollView>
+                </GestureHandlerScrollView>
               </View>
 
             </View>
