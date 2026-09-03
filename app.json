@@ -32,11 +32,6 @@
         "notificationBody": "Compartiendo ubicación en tiempo real"
       },
       "newArchEnabled": true,
-      "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyD7QUc9cGMHwVNILiyJjJc0yvM5KVBZsEA"
-        }
-      },
       "permissions": [
         "WAKE_LOCK",
         "ACCESS_FINE_LOCATION",

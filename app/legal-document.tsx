@@ -1,4 +1,3 @@
-import { Screen } from "@/components/screen";
 import { getLegalUrl } from "@/config/legal";
 import { LegalDocumentType } from "@/interfaces/legal";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,8 +16,8 @@ export default function LegalDocumentScreen() {
   const title = documentType === "terms" ? "Términos y Condiciones" : "Política de Privacidad";
 
   return (
-    <Screen withTabBarPadding={false} edges={['top', 'bottom']} className="flex-1">
-      <View className="flex-row items-center px-4 py-3 border-b border-slate-700">
+    <View className="flex-1 bg-background">
+      <View className="h-24 flex-row items-center px-4 pt-8 pb-2 border-b border-slate-700">
         <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel="Volver">
           <Ionicons name="arrow-back" size={24} color="white" />
         </Pressable>
@@ -41,6 +40,6 @@ export default function LegalDocumentScreen() {
           javaScriptEnabled
         />
       )}
-    </Screen>
+    </View>
   );
 }
