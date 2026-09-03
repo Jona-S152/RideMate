@@ -19,9 +19,10 @@ import { registerDeviceToken } from "@/services/notifications.service";
 import { ratingsService } from "@/services/ratings.service";
 import { Ionicons } from "@expo/vector-icons";
 
+const WHATSAPP_SUPPORT_PHONE = process.env.EXPO_PUBLIC_WHATSAPP_SUPPORT_PHONE || "593999999999";
 // Reemplaza con el número real de WhatsApp Business cuando esté disponible
 const WHATSAPP_SUPPORT_URL =
-  "https://wa.me/593999999999?text=Hola,%20necesito%20soporte%20con%20RideMate";
+  `https://wa.me/${WHATSAPP_SUPPORT_PHONE}?text=Hola,%20necesito%20soporte%20con%20RideMate`;
 
 export default function HomeScreen() {
   const { user, updateUser, refreshUser } = useAuth();
@@ -89,61 +90,61 @@ export default function HomeScreen() {
         return;
       }
 
-    const enrichedHistory = await Promise.all(
-      historyData.map(async (item) => {
-        const { data: session } = await supabase
-          .from("trip_sessions")
-          .select("driver_id, route_id, routes(image_url)")
-          .eq("id", item.trip_session_id)
-          .single();
-
-        let driverInfo = undefined;
-        if (session?.driver_id) {
-          const { data: driverUser } = await supabase
-            .from("users")
-            .select("name, avatar_profile")
-            .eq("id", session.driver_id)
+      const enrichedHistory = await Promise.all(
+        historyData.map(async (item) => {
+          const { data: session } = await supabase
+            .from("trip_sessions")
+            .select("driver_id, route_id, routes(image_url)")
+            .eq("id", item.trip_session_id)
             .single();
 
-          if (driverUser) {
-            const ratingInfo = await ratingsService.getUserRating(session.driver_id);
-            driverInfo = {
-              name: driverUser.name,
-              avatar: driverUser.avatar_profile,
-              rating: ratingInfo.rating,
-            };
+          let driverInfo = undefined;
+          if (session?.driver_id) {
+            const { data: driverUser } = await supabase
+              .from("users")
+              .select("name, avatar_profile")
+              .eq("id", session.driver_id)
+              .single();
+
+            if (driverUser) {
+              const ratingInfo = await ratingsService.getUserRating(session.driver_id);
+              driverInfo = {
+                name: driverUser.name,
+                avatar: driverUser.avatar_profile,
+                rating: ratingInfo.rating,
+              };
+            }
           }
-        }
 
-        const { data: passengers } = await supabase
-          .from("passenger_trip_sessions")
-          .select("passenger_id")
-          .eq("trip_session_id", item.trip_session_id)
-          .in("status", ["completed", "joined"]);
+          const { data: passengers } = await supabase
+            .from("passenger_trip_sessions")
+            .select("passenger_id")
+            .eq("trip_session_id", item.trip_session_id)
+            .in("status", ["completed", "joined"]);
 
-        let passengersData: any[] = [];
-        if (passengers && passengers.length > 0) {
-          const pIds = passengers.map((p) => p.passenger_id);
-          const { data: users } = await supabase
-            .from("users")
-            .select("id, avatar_profile")
-            .in("id", pIds);
-          if (users) {
-            passengersData = users.map((u) => ({ id: u.id, avatar: u.avatar_profile }));
+          let passengersData: any[] = [];
+          if (passengers && passengers.length > 0) {
+            const pIds = passengers.map((p) => p.passenger_id);
+            const { data: users } = await supabase
+              .from("users")
+              .select("id, avatar_profile")
+              .in("id", pIds);
+            if (users) {
+              passengersData = users.map((u) => ({ id: u.id, avatar: u.avatar_profile }));
+            }
           }
-        }
 
-        return {
-          ...item,
-          driver_details: driverInfo,
-          passengers_data: passengersData,
-          route_id: session?.route_id,
-          image_url: Array.isArray(session?.routes)
-            ? (session.routes[0] as any)?.image_url
-            : (session?.routes as any)?.image_url,
-        };
-      })
-    );
+          return {
+            ...item,
+            driver_details: driverInfo,
+            passengers_data: passengersData,
+            route_id: session?.route_id,
+            image_url: Array.isArray(session?.routes)
+              ? (session.routes[0] as any)?.image_url
+              : (session?.routes as any)?.image_url,
+          };
+        })
+      );
 
       setHistory(enrichedHistory);
     } catch (error) {

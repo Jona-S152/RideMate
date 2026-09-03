@@ -18,8 +18,12 @@
         "NSLocationWhenInUseUsageDescription": "Necesitamos tu ubicación para el viaje",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Necesitamos tu ubicación incluso con la app cerrada",
         "UIBackgroundModes": [
+          "location",
           "location"
         ]
+      },
+      "runtimeVersion": {
+        "policy": "appVersion"
       }
     },
     "android": {
@@ -47,6 +51,20 @@
         "android.permission.ACCESS_BACKGROUND_LOCATION",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "WAKE_LOCK",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "INTERNET",
+        "POST_NOTIFICATIONS",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
         "android.permission.POST_NOTIFICATIONS"
       ],
       "adaptiveIcon": {
@@ -55,7 +73,8 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.anonymous.RideMate",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "runtimeVersion": "1.0.0"
     },
     "web": {
       "bundler": "metro",
@@ -107,6 +126,9 @@
       "image": "./assets/brand-assets/SplashScreen_DarkMode.png",
       "resizeMode": "contain",
       "backgroundColor": "#0F172A"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/b4cab86f-ce79-4ee9-90ab-eaef88ce61a8"
     }
   }
 }
