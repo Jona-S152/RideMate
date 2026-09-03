@@ -1,7 +1,9 @@
 import { useAuth } from "@/app/context/AuthContext";
 import ConfirmActionModal from "@/components/Modals/ConfirmActionModal";
 import { ThemedText } from "@/components/ThemedText";
+import { useBottomTabOverflow } from "@/components/ui/TabBarBackground";
 import { Colors } from "@/constants/Colors";
+import { useAppInsets } from "@/hooks/useAppInsets";
 import { UserData } from "@/interfaces/available-routes";
 import { DriverApplicationStatus } from "@/interfaces/driver";
 import { driverService } from "@/services/driver.service";
@@ -16,6 +18,8 @@ import Toast from "react-native-toast-message";
 
 export default function ProfileScreen() {
     const { user, logout } = useAuth();
+    const insets = useAppInsets();
+    const tabOverflow = useBottomTabOverflow();
 
     const [userData, setUserData] = useState<UserData | null>(null);
     const [driverStatus, setDriverStatus] = useState<DriverApplicationStatus | null>(null);
@@ -56,7 +60,8 @@ export default function ProfileScreen() {
                 setUserData({
                     ...(data as any as UserData),
                     rating: ratingInfo.rating,
-                    rating_count: ratingInfo.count
+                    rating_count: ratingInfo.count,
+                    completed_trips_count: data.completed_trips_count || 0
                 });
             }
 
@@ -99,7 +104,7 @@ export default function ProfileScreen() {
     return (
         <View style={styles.container}>
             {/* ── HEADER ─────────────────────────────────────────── */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
                 <View style={styles.avatarSection}>
                     <View style={styles.avatarContainer}>
                         {userData?.avatar_profile || user?.avatar_profile ? (
@@ -152,7 +157,7 @@ export default function ProfileScreen() {
                         <View style={styles.metricIconRow}>
                             <Ionicons name="car-sport" size={18} color={Colors.light.secondary} />
                             <ThemedText lightColor={Colors.light.text} darkColor={Colors.light.text} style={styles.metricValue}>
-                                {userData?.rating_count ?? 0}
+                                {userData?.completed_trips_count ?? 0}
                             </ThemedText>
                         </View>
                         <ThemedText lightColor={Colors.light.textSecondary} darkColor={Colors.light.textSecondary} style={styles.metricLabel}>
@@ -163,7 +168,7 @@ export default function ProfileScreen() {
             </View>
 
             {/* ── MENU OPTIONS ─────────────────────────────────── */}
-            <ScrollView showsVerticalScrollIndicator={false} style={styles.menuScroll} contentContainerStyle={styles.menuContent}>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.menuScroll} contentContainerStyle={[styles.menuContent, { paddingBottom: tabOverflow }]}>
                 {loadingProfile ? (
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="small" color={Colors.light.secondary} />
@@ -265,8 +270,6 @@ export default function ProfileScreen() {
                 onConfirm={handleDeleteAccountConfirm}
                 onCancel={() => setDeleteModalVisible(false)}
             />
-
-            <View style={{ height: 100 }} />
         </View>
     );
 }
@@ -277,7 +280,6 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.light.background,
     },
     header: {
-        paddingTop: 56,
         paddingBottom: 24,
         paddingHorizontal: 20,
         backgroundColor: Colors.light.glass,

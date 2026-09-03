@@ -1,5 +1,6 @@
 import { useAuth } from "@/app/context/AuthContext";
 import { Colors } from "@/constants/Colors";
+import { useAppInsets } from "@/hooks/useAppInsets";
 import {
   FeedbackCategory,
   feedbackService,
@@ -37,6 +38,7 @@ export default function FeedbackModal({
   screenName = "Home",
 }: FeedbackModalProps) {
   const { user } = useAuth();
+  const insets = useAppInsets();
   const [category, setCategory] = useState<FeedbackCategory>("general");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -93,7 +95,7 @@ export default function FeedbackModal({
                 borderTopRightRadius: 28,
                 paddingHorizontal: 20,
                 paddingTop: 12,
-                paddingBottom: Platform.OS === "ios" ? 36 : 24,
+                paddingBottom: 24 + insets.bottom,
                 borderTopWidth: 1,
                 borderColor: Colors.dark.borderSecondary,
               }}

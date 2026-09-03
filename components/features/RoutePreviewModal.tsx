@@ -1,5 +1,6 @@
 import { useAuth } from "@/app/context/AuthContext";
 import { Colors } from "@/constants/Colors";
+import { useAppInsets } from "@/hooks/useAppInsets";
 import { Vehicle } from "@/interfaces/driver";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -40,6 +41,7 @@ export default function RoutePreviewModal({
 }: RoutePreviewModalProps) {
     console.log("RoutePreviewModal rendered, visible:", visible);
     const { user } = useAuth();
+    const insets = useAppInsets();
     const isDriver = user?.driver_mode === true;
 
     const occupiedCount = passengersData.length > 0 ? passengersData.length : passengers;
@@ -60,7 +62,7 @@ export default function RoutePreviewModal({
                 />
 
                 {/* Sheet Content */}
-                <View style={styles.modalView}>
+                <View style={[styles.modalView, { paddingBottom: 24 + insets.bottom }]}>
                     {/* Map Image Header */}
                     <View className="w-full h-52 relative">
                         <Image

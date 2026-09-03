@@ -1,6 +1,7 @@
 import { useAuth } from "@/app/context/AuthContext";
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
+import { useAppInsets } from "@/hooks/useAppInsets";
 import { tripService } from "@/services/trip.service";
 import { calculateDistance } from "@/utils/geo";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -28,6 +29,7 @@ Mapbox.setAccessToken(MAPBOX_TOKEN);
 
 export default function CreateRouteScreen() {
   const { user } = useAuth();
+  const insets = useAppInsets();
   const isFocused = useIsFocused();
   const cameraRef = useRef<Mapbox.Camera>(null);
   const isSubmitting = useRef(false);
@@ -246,7 +248,7 @@ export default function CreateRouteScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: Colors.dark.background }}>
       {/* PANEL DE SELECCIÓN SUPERIOR */}
-      <View className="absolute top-16 left-0 right-0 z-50 px-5">
+      <View className="absolute left-0 right-0 z-50 px-5" style={{ top: insets.top + 16 }}>
         <View
           className="p-5 rounded-[35px] shadow-2xl"
           style={{
@@ -368,7 +370,7 @@ export default function CreateRouteScreen() {
       )}
 
       {/* BOTONES DE ACCIÓN */}
-      <View className="absolute bottom-12 left-0 right-0 px-6">
+      <View className="absolute left-0 right-0 px-6" style={{ bottom: 48 + insets.bottom }}>
         {/* Botón para Fijar Punto */}
         {isSelectionMode && (
           <Pressable
@@ -417,8 +419,9 @@ export default function CreateRouteScreen() {
             console.error("Error al cerrar la pantalla:", error);
           }
         }}
-        className="absolute top-14 left-6 w-10 h-10 rounded-full items-center justify-center shadow-lg z-[60]"
+        className="absolute left-6 w-10 h-10 rounded-full items-center justify-center shadow-lg z-[60]"
         style={{
+          top: insets.top + 12,
           backgroundColor: Colors.dark.glassSoft,
           borderColor: Colors.dark.border,
           borderWidth: 1,

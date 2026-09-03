@@ -1,6 +1,7 @@
-import OptionsModal from "@/components/Modals/OptionsModal";
 import { useAuth } from "@/app/context/AuthContext";
+import OptionsModal from "@/components/Modals/OptionsModal";
 import { Colors } from "@/constants/Colors";
+import { useAppInsets } from "@/hooks/useAppInsets";
 import { PassengerTripSession, SessionData, UserData } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
 import { ratingsService } from "@/services/ratings.service";
@@ -46,6 +47,7 @@ export default function BottomSheetRouteDetail({
   ]
 
   const { user } = useAuth();
+  const insets = useAppInsets();
   const {
     showBatteryModal,
     setShowBatteryModal,
@@ -239,6 +241,7 @@ export default function BottomSheetRouteDetail({
       snapPoints={snapPoints}
       onChange={handleSheetChanges}
       enablePanDownToClose={false}
+      bottomInset={insets.bottom}
       backgroundStyle={{
         backgroundColor: Colors.dark.background,
         borderTopLeftRadius: 55,
@@ -246,7 +249,7 @@ export default function BottomSheetRouteDetail({
       }}
       handleComponent={HandleDragToResize}
     >
-      <BottomSheetView>
+      <BottomSheetView style={{ paddingBottom: insets.bottom }}>
         <View
           className="px-6"
         >
@@ -311,6 +314,8 @@ export default function BottomSheetRouteDetail({
                     );
                     const isPending =
                       pSession?.status === "pending_approval";
+                    const isCompleted =
+                      pSession?.status === "completed";
 
                     const handlePress = () => {
                       console.log(pSession?.status);
@@ -331,7 +336,9 @@ export default function BottomSheetRouteDetail({
                           <View
                             className={`w-16 h-24 rounded-full border-2 overflow-hidden ${isPending
                               ? "border-secondary"
-                              : "border-tird"
+                              : isCompleted
+                                ? "border-green-500"
+                                : "border-tird"
                               }`}
                           >
                             <Image
@@ -339,13 +346,18 @@ export default function BottomSheetRouteDetail({
                               resizeMode="cover"
                               className="w-full h-full"
                             />
+                            {/* {isCompleted && (
+                              <View className="absolute bottom-0 right-0 bg-white/20 rounded-full p-0.5">
+                                <Ionicons name="checkmark-done-outline" size={16} color="white" />
+                              </View>
+                            )} */}
                           </View>
                           <ThemedView
-                            lightColor={Colors.light.tird}
+                            lightColor={isCompleted ? Colors.dark.success : Colors.dark.success}
                             className="rounded-full justify-center items-center max-w-[40px] px-2  -translate-y-3"
                           >
                             <ThemedText lightColor={Colors.light.textBlack}>
-                              {isPending ? "..." : (item.rating || "0.0")}
+                              {isPending ? "..." : isCompleted ? "✓" : (item.rating || "0.0")}
                             </ThemedText>
                           </ThemedView>
                         </View>

@@ -1,10 +1,13 @@
+import { TAB_BAR_BOTTOM_OFFSET, TAB_BAR_HEIGHT } from "@/constants/layout";
+
+/** Static tab bar chrome. Apply `bottom: TAB_BAR_BOTTOM_OFFSET + insets.bottom` at runtime. */
 export const TabBarStyle = {
     style : {
                 position: 'absolute',
-                bottom: 20,                // separación del borde inferior
+                bottom: TAB_BAR_BOTTOM_OFFSET,
                 left: 20,
                 right: 20,
-                height: 70,                // alto del tab bar
+                height: TAB_BAR_HEIGHT,
                 backgroundColor: '#000A1C',
                 borderRadius: 35,          // hace que se vea ovalado
                 borderTopWidth: 0,         // elimina borde feo default

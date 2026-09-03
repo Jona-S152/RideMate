@@ -1,6 +1,9 @@
-// This is a shim for web and Android where the tab bar is generally opaque.
+import { TAB_BAR_TOTAL_HEIGHT } from '@/constants/layout';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 export default undefined;
 
 export function useBottomTabOverflow() {
-  return 0;
+  const insets = useSafeAreaInsets();
+  return TAB_BAR_TOTAL_HEIGHT + insets.bottom;
 }

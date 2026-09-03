@@ -10,6 +10,8 @@ import { useActiveSession } from "@/hooks/useRealTime";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, ScrollView, View } from "react-native";
 
+import { useBottomTabOverflow } from "@/components/ui/TabBarBackground";
+import { useAppInsets } from "@/hooks/useAppInsets";
 import { useModeNavigation } from "@/hooks/useModeNavigation";
 import { Vehicle } from "@/interfaces/driver";
 import { supabase } from "@/lib/supabase";
@@ -26,6 +28,8 @@ export default function HomeScreen() {
   const { sessionChanged, setSessionChanged } = useSession();
   const { activeSession, loading } = useActiveSession(user);
   const { navigateToTab, sanitizeStacksOnModeSwitch } = useModeNavigation();
+  const insets = useAppInsets();
+  const tabOverflow = useBottomTabOverflow();
 
   const [isEnabled, setIsEnabled] = useState(user?.driver_mode ?? false);
   const [history, setHistory] = useState<any[]>([]);
@@ -306,7 +310,7 @@ export default function HomeScreen() {
       />
 
       {/* ── HEADER ─────────────────────────────────────────────────────── */}
-      <View className="flex-row justify-between items-center mx-4 mt-12 mb-4">
+      <View className="flex-row justify-between items-center mx-4 mb-4" style={{ marginTop: insets.top + 16 }}>
         {/* Greeting */}
         <View className="flex-1 mr-3">
           <ThemedText className="font-bold text-4xl" style={{ color: "#E2EBF0" }}>
@@ -393,7 +397,7 @@ export default function HomeScreen() {
       <View className="flex-1 mx-4">
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 100, gap: 12 }}
+          contentContainerStyle={{ paddingBottom: tabOverflow, gap: 12 }}
         >
           {/* ── Route Card / History Card / Loading State ── */}
           {loading || historyLoading ? (

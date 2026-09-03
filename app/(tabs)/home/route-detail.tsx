@@ -37,6 +37,7 @@ import DriverRatingListModal from "@/components/Modals/DriverRatingListModal";
 import PassengerActionModal from "@/components/Modals/PassengerActionModal";
 import WaypointCheckInModal from "@/components/Modals/WaypointCheckInModal";
 import { useDriverLocation, useTripMeetingPoints, useTripRealtimeById, useTripStops } from "@/hooks/useRealTime";
+import { useAppInsets } from "@/hooks/useAppInsets";
 import { useSafeBackHandler } from "@/hooks/useSafeBackHandler";
 import { useTripTrackingStore } from "@/store/tripTrackinStore";
 import { calculateDistance, formatDistance } from "@/utils/geo";
@@ -103,6 +104,7 @@ interface Waypoint {
 
 export default function RouteDetail() {
   useSafeBackHandler("/(tabs)/home");
+  const insets = useAppInsets();
   const navigation = useNavigation();
   const params = useLocalSearchParams<{
     trip_session_id: string;
@@ -133,7 +135,9 @@ export default function RouteDetail() {
   const { driverLocation } = useDriverLocation(Number(id));
   const { meetingPoints: rtMeetingPoints } = useTripMeetingPoints(Number(id));
 
-  const isDriver = !!(user?.driver_mode || (session && user && session.driver_id === user.id));
+  const isDriver = session && user
+    ? session.driver_id === user.id
+    : !!user?.driver_mode;
 
   const [region, setRegion] = useState<MapRegion | null>(null);
   const [hasCenteredOnDriver, setHasCenteredOnDriver] = useState(false);
@@ -141,6 +145,7 @@ export default function RouteDetail() {
   const ignoreRegionChangeRef = useRef(false);
   const [passengers, setPassengers] = useState<PassengerTripSession[]>([]);
   const [passengersLoaded, setPassengersLoaded] = useState(false);
+  const completionRedirectedRef = useRef(false);
   const [currentPassengerToDropOff, setCurrentPassengerToDropOff] = useState<PassengerTripSession | null>(null);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [stopsData, setStopsData] = useState<Passenger_Stops[]>([]);
@@ -218,7 +223,7 @@ export default function RouteDetail() {
         }
       } else {
         const passenger = passengers.find(p => p.passenger_id === user?.id);
-        const validStatuses = ['joined', 'completed', 'pending', 'approved', 'pending_approval'];
+        const validStatuses = ['joined', 'pending', 'approved', 'pending_approval'];
 
         if (isSessionCancelled || !passenger || !validStatuses.includes(passenger.status)) {
           router.replace('/(tabs)/available-routes');
@@ -323,7 +328,8 @@ export default function RouteDetail() {
       // 🛡️ Filtro de seguridad: excluir waypoints omitidos, abandonados o cancelados
       const isStatusInactive = ['skipped', 'left', 'cancelled'].includes(item.status);
       // 🛡️ Filtro de seguridad: excluir waypoints de pasajeros que abandonaron o fueron cancelados
-      const isPassengerActive = !item.passengerId || activePassengerIds.size === 0 || activePassengerIds.has(item.passengerId);
+      const isPassengerActive =
+        !item.passengerId || !passengersLoaded || activePassengerIds.has(item.passengerId);
       return !isStatusInactive && isPassengerActive;
     });
 
@@ -483,7 +489,7 @@ export default function RouteDetail() {
         setCheckedInWaypoints((prev) => new Set(prev).add(waypointToCheckIn.id));
       }
       await buildWaypoints();
-      fetchPassengers();
+      await refreshPassengersState();
     }
   };
 
@@ -561,12 +567,10 @@ export default function RouteDetail() {
       }
 
       await useTripTrackingStore.getState().stopTracking();
-      const latestPassengers = await fetchPassengers();
+      const latestPassengers = await refreshPassengersState();
       setConfirmModalConfig(null);
 
       if (latestPassengers) {
-        setPassengers(latestPassengers);
-        await fetchSessionUsers(latestPassengers);
         const participants = latestPassengers.filter(p => p.status === 'joined' || p.status === 'completed');
         if (participants.length > 0) {
           setDriverRatingModalVisible(true);
@@ -658,7 +662,7 @@ export default function RouteDetail() {
 
     try {
       await useTripTrackingStore.getState().stopTracking();
-    } catch (e) {}
+    } catch (e) { }
 
     setConfirmModalConfig({
       visible: true,
@@ -994,6 +998,25 @@ export default function RouteDetail() {
     }
   };
 
+  const getVisiblePassengers = (
+    passengerSessions: PassengerTripSession[],
+    forDriver: boolean
+  ) =>
+    passengerSessions.filter((passenger) => {
+      if (['left', 'cancelled', 'rejected'].includes(passenger.status)) return false;
+      if (!forDriver && passenger.status === 'completed') return false;
+      return true;
+    });
+
+  const refreshPassengersState = async () => {
+    const data = await fetchPassengers();
+    if (!data) return;
+    const visible = getVisiblePassengers(data, isDriver);
+    setPassengers(visible);
+    await fetchSessionUsers(visible);
+    return visible;
+  };
+
   const fetchPendingRequests = async () => {
     try {
       const data = await tripService.getPendingRequests(Number(id));
@@ -1041,11 +1064,7 @@ export default function RouteDetail() {
     // 1. Carga inicial
     const loadInitialPassengers = async () => {
       try {
-        const data = await fetchPassengers();
-        if (data) {
-          setPassengers(data);
-          fetchSessionUsers(data);
-        }
+        await refreshPassengersState();
         await fetchPendingRequests();
       } catch (error) {
         console.error("Error loading initial passengers:", error);
@@ -1070,11 +1089,21 @@ export default function RouteDetail() {
         (payload) => {
           console.log("Cambio detectado en pasajeros:", payload);
 
-          fetchPassengers().then((data) => {
-            if (data) {
-              setPassengers(data);
-              fetchSessionUsers(data);
-              // Refresh meeting points and active stops when passengers change (e.g. leave trip)
+          if (payload.eventType === "UPDATE" && payload.new?.status === "completed") {
+            const completedPassengerId = payload.new.passenger_id;
+
+            // 🛡️ PASAJERO PROPIO: redirigir si el usuario actual fue completado y no es conductor
+            if (!isDriver && completedPassengerId === user?.id && !completionRedirectedRef.current) {
+              completionRedirectedRef.current = true;
+              router.replace('/(tabs)/available-routes');
+              return;
+            }
+            // 🚗 CONDUCTOR: no eliminar del estado local — el fetchPassengers a continuación
+            // actualizará el estado con el pasajero ya completado para que siga visible.
+          }
+
+          refreshPassengersState().then((visiblePassengers) => {
+            if (visiblePassengers) {
               fetchMeetingPoints();
               fetchActiveSessionStops();
             }
@@ -1096,12 +1125,7 @@ export default function RouteDetail() {
         },
         (payload) => {
           console.log("Cambio detectado en solicitudes:", payload);
-          fetchPassengers().then((data) => {
-            if (data) {
-              setPassengers(data);
-              fetchSessionUsers(data);
-            }
-          });
+          refreshPassengersState();
           fetchPendingRequests();
         },
       )
@@ -1112,7 +1136,7 @@ export default function RouteDetail() {
       supabase.removeChannel(channel);
       supabase.removeChannel(channelRequests);
     };
-  }, [id]);
+  }, [id, isDriver, user?.id]);
 
   // Fetch meeting points when passengers change
   useEffect(() => {
@@ -1126,7 +1150,7 @@ export default function RouteDetail() {
     if (session) {
       buildWaypoints();
     }
-  }, [session, stopsData, meetingPoints]);
+  }, [session, stopsData, meetingPoints, passengers, passengersLoaded]);
 
   // Detect current waypoint when driver location or waypoints change
   useEffect(() => {
@@ -1494,7 +1518,8 @@ export default function RouteDetail() {
         {/* Botón de Atrás */}
         <View
           pointerEvents="box-none"
-          className="absolute top-8 left-[14px] z-50"
+          className="absolute left-[14px] z-50"
+          style={{ top: insets.top + 8 }}
         >
           <Pressable
             onPress={() => navigation.goBack()}
@@ -1511,7 +1536,8 @@ export default function RouteDetail() {
         {/* Botón para Mostrar/Ocultar Paradas */}
         <View
           pointerEvents="box-none"
-          className="absolute top-8 right-[14px] z-50"
+          className="absolute right-[14px] z-50"
+          style={{ top: insets.top + 8 }}
         >
           {/* Contenedor del degradado para el fondo del botón (solo si quieres el efecto) */}
           <View className="absolute inset-0 flex-row w-40 h-12 rounded-full overflow-hidden">
@@ -1549,7 +1575,7 @@ export default function RouteDetail() {
               "rgba(255,255,255,0.7)",
               "rgba(255,255,255,0.95)",
             ]}
-            style={{ flex: 1, paddingTop: 80, paddingHorizontal: 20 }}
+            style={{ flex: 1, paddingTop: insets.top + 48, paddingHorizontal: 20 }}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
           >
@@ -1793,8 +1819,7 @@ export default function RouteDetail() {
             setPassengerIdToProcess(null);
           }}
           onActionComplete={async () => {
-            const data = await fetchPassengers();
-            if (data) setPassengers(data);
+            await refreshPassengersState();
             await fetchMeetingPoints();
             buildWaypoints();
           }}

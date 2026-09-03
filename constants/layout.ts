@@ -1,0 +1,3 @@
+export const TAB_BAR_HEIGHT = 70;
+export const TAB_BAR_BOTTOM_OFFSET = 20;
+export const TAB_BAR_TOTAL_HEIGHT = TAB_BAR_HEIGHT + TAB_BAR_BOTTOM_OFFSET;

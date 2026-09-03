@@ -1,15 +1,17 @@
 import { Colors } from '@/constants/Colors';
+import { useAppInsets } from '@/hooks/useAppInsets';
 import { Ionicons } from '@expo/vector-icons';
 import Mapbox from '@rnmapbox/maps';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
-import { Dimensions, Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function NavigationScreen() {
   const router = useRouter();
+  const insets = useAppInsets();
   const params = useLocalSearchParams<{
     lat: string;
     lng: string;
@@ -342,7 +344,7 @@ export default function NavigationScreen() {
       </Mapbox.MapView>
 
       {/* Header con instrucciones */}
-      <SafeAreaView style={styles.headerContainer}>
+      <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
         <LinearGradient
           colors={[Colors.dark.background, 'rgba(0,10,28,0.8)']}
           style={styles.instructionBanner}
@@ -361,10 +363,10 @@ export default function NavigationScreen() {
             <Text style={styles.instructionSubtitle}>en {stepDistance}</Text>
           </View>
         </LinearGradient>
-      </SafeAreaView>
+      </View>
 
       {/* Footer con info de llegada */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: 24 + insets.bottom }]}>
         <View style={styles.statsContainer}>
           <View style={styles.statBox}>
             <Text style={styles.statValue}>{duration}</Text>
@@ -417,7 +419,6 @@ const styles = StyleSheet.create({
     top: 0,
     width: '100%',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 40 : 0,
   },
   instructionBanner: {
     flexDirection: 'row',
@@ -461,7 +462,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '100%',
     backgroundColor: Colors.dark.background,
-    paddingBottom: 40,
     paddingTop: 20,
     paddingHorizontal: 20,
     borderTopLeftRadius: 30,

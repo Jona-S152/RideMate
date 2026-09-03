@@ -9,6 +9,17 @@ export interface UserProfile {
   avatar_profile?: string;
   city_id?: number | null;
   phone_number?: string;
+  completed_trips_count?: number;
+}
+
+export interface PassengerStatusSummary {
+  total: number;
+  joined: number;
+  pending: number;
+  completed: number;
+  cancelled: number;
+  left: number;
+  rejected: number;
 }
 
 export interface ActivityItem {
@@ -20,6 +31,7 @@ export interface ActivityItem {
   status: string;
   price: number;
   passenger_count: number;
+  passenger_status_summary?: PassengerStatusSummary;
   role: 'passenger' | 'driver';
 }
 
@@ -39,7 +51,7 @@ export interface ActivityHistoryPage {
 
 export const userService = {
   /**
-   * Fetches the full profile details for a user.
+   * Fetches the full profile details for a user, including completed trips count.
    */
   async getUserProfile(userId: string): Promise<UserProfile | null> {
     const { data, error } = await supabase
@@ -52,7 +64,16 @@ export const userService = {
       console.error("[userService.getUserProfile] Error:", error.message);
       throw error;
     }
-    return data;
+
+    if (!data) return null;
+
+    // Fetch completed trips count
+    const completedTripsCount = await this.getCompletedTripsCount(userId, data.is_driver ? 'driver' : 'passenger');
+
+    return {
+      ...data,
+      completed_trips_count: completedTripsCount
+    };
   },
 
   /**
@@ -169,19 +190,66 @@ export const userService = {
       }
 
       const tripsMap = new Map<number, ActivityItem>();
+      const sessionIds = Array.from(new Set([...(sessionData || []).map((item: any) => item.trip_session_id), ...(historyData || []).map((item: any) => item.trip_session_id)]));
+      let sessionStatusSummary: Record<number, PassengerStatusSummary> = {};
+
+      if (sessionIds.length > 0) {
+        const { data: passengerSessionsData } = await supabase
+          .from('passenger_trip_sessions')
+          .select('trip_session_id, status')
+          .in('trip_session_id', sessionIds);
+
+        const summaryMap = new Map<number, PassengerStatusSummary>();
+        (passengerSessionsData || []).forEach((entry: any) => {
+          const key = Number(entry.trip_session_id);
+          const current = summaryMap.get(key) || {
+            total: 0,
+            joined: 0,
+            pending: 0,
+            completed: 0,
+            cancelled: 0,
+            left: 0,
+            rejected: 0,
+          };
+
+          current.total += 1;
+          if (entry.status === 'joined') current.joined += 1;
+          if (entry.status === 'pending') current.pending += 1;
+          if (entry.status === 'completed') current.completed += 1;
+          if (entry.status === 'cancelled') current.cancelled += 1;
+          if (entry.status === 'left') current.left += 1;
+          if (entry.status === 'rejected') current.rejected += 1;
+
+          summaryMap.set(key, current);
+        });
+
+        sessionStatusSummary = Object.fromEntries(Array.from(summaryMap.entries()));
+      }
 
       // Populate from passenger_route_history
       (historyData || []).forEach((item: any) => {
         if (item.user_id !== item.driver_id) {
-          tripsMap.set(item.trip_session_id, {
+          const tripSessionId = Number(item.trip_session_id);
+          const passengerSummary = sessionStatusSummary[tripSessionId] || {
+            total: Number(item.passenger_count ?? 1),
+            joined: 0,
+            pending: 0,
+            completed: 0,
+            cancelled: 0,
+            left: 0,
+            rejected: 0,
+          };
+
+          tripsMap.set(tripSessionId, {
             id: `h-${item.id}`,
-            trip_session_id: item.trip_session_id,
+            trip_session_id: tripSessionId,
             start_location: item.start_location || "Punto de inicio",
             end_location: item.end_location || "Destino",
             start_time: item.start_time || item.created_at,
             status: item.status || 'completed',
             price: Number(item.price ?? 1.25),
-            passenger_count: Number(item.passenger_count ?? 1),
+            passenger_count: Number(passengerSummary.total || item.passenger_count || 1),
+            passenger_status_summary: passengerSummary,
             role: 'passenger',
           });
         }
@@ -189,7 +257,17 @@ export const userService = {
 
       // Populate or complement from passenger_trip_sessions (for cancelled, left, etc.)
       (sessionData || []).forEach((item: any) => {
-        const tsId = item.trip_session_id;
+        const tsId = Number(item.trip_session_id);
+        const summary = sessionStatusSummary[tsId] || {
+          total: 1,
+          joined: 0,
+          pending: 0,
+          completed: 0,
+          cancelled: 0,
+          left: 0,
+          rejected: 0,
+        };
+
         if (!tripsMap.has(tsId) && item.trip_sessions) {
           tripsMap.set(tsId, {
             id: `pts-${item.id}`,
@@ -199,7 +277,8 @@ export const userService = {
             start_time: item.trip_sessions.start_time || item.created_at,
             status: item.status === 'left' ? 'left' : item.status === 'rejected' ? 'rejected' : item.status === 'cancelled' ? 'cancelled' : 'completed',
             price: Number(item.fare_amount ?? 1.25),
-            passenger_count: 1,
+            passenger_count: Number(summary.total || 1),
+            passenger_status_summary: summary,
             role: 'passenger',
           });
         }
@@ -259,10 +338,55 @@ export const userService = {
       }
 
       const driverTripsMap = new Map<number, ActivityItem>();
+      const driverSessionIds = Array.from(new Set((driverSessions || []).map((s: any) => Number(s.id))));
+      let driverSessionStatusSummary: Record<number, PassengerStatusSummary> = {};
+
+      if (driverSessionIds.length > 0) {
+        const { data: driverPassengerSessions } = await supabase
+          .from('passenger_trip_sessions')
+          .select('trip_session_id, status')
+          .in('trip_session_id', driverSessionIds);
+
+        const summaryMap = new Map<number, PassengerStatusSummary>();
+        (driverPassengerSessions || []).forEach((entry: any) => {
+          const key = Number(entry.trip_session_id);
+          const current = summaryMap.get(key) || {
+            total: 0,
+            joined: 0,
+            pending: 0,
+            completed: 0,
+            cancelled: 0,
+            left: 0,
+            rejected: 0,
+          };
+
+          current.total += 1;
+          if (entry.status === 'joined') current.joined += 1;
+          if (entry.status === 'pending') current.pending += 1;
+          if (entry.status === 'completed') current.completed += 1;
+          if (entry.status === 'cancelled') current.cancelled += 1;
+          if (entry.status === 'left') current.left += 1;
+          if (entry.status === 'rejected') current.rejected += 1;
+
+          summaryMap.set(key, current);
+        });
+
+        driverSessionStatusSummary = Object.fromEntries(Array.from(summaryMap.entries()));
+      }
 
       // Aggregate history from passenger_route_history
       (historyData || []).forEach((item: any) => {
-        const tsId = item.trip_session_id;
+        const tsId = Number(item.trip_session_id);
+        const summary = driverSessionStatusSummary[tsId] || {
+          total: Number(item.passenger_count ?? 0),
+          joined: 0,
+          pending: 0,
+          completed: 0,
+          cancelled: 0,
+          left: 0,
+          rejected: 0,
+        };
+
         if (!driverTripsMap.has(tsId)) {
           driverTripsMap.set(tsId, {
             id: `dh-${item.id}`,
@@ -272,13 +396,14 @@ export const userService = {
             start_time: item.start_time || item.created_at,
             status: item.status || 'completed',
             price: Number(item.price ?? 0),
-            passenger_count: Number(item.passenger_count ?? 0),
+            passenger_count: Number(summary.total || item.passenger_count || 0),
+            passenger_status_summary: summary,
             role: 'driver',
           });
         } else {
           const existing = driverTripsMap.get(tsId)!;
           if (item.user_id !== item.driver_id && existing.passenger_count === 0) {
-            existing.passenger_count += 1;
+            existing.passenger_count = Math.max(existing.passenger_count, Number(summary.total || 1));
             if (existing.price === 0) {
               existing.price += Number(item.price ?? 1.25);
             }
@@ -288,11 +413,20 @@ export const userService = {
 
       // Complement from trip_sessions
       (driverSessions || []).forEach((session: any) => {
-        const tsId = session.id;
+        const tsId = Number(session.id);
+        const summary = driverSessionStatusSummary[tsId] || {
+          total: 0,
+          joined: 0,
+          pending: 0,
+          completed: 0,
+          cancelled: 0,
+          left: 0,
+          rejected: 0,
+        };
         const validPassengers = (session.passenger_trip_sessions || []).filter(
           (p: any) => p.status === 'completed' || p.status === 'joined'
         );
-        const pCount = validPassengers.length;
+        const pCount = Math.max(summary.total, validPassengers.length);
         const totalPrice = validPassengers.reduce(
           (sum: number, p: any) => sum + Number(p.fare_amount ?? 1.25),
           0
@@ -308,6 +442,7 @@ export const userService = {
             status: session.status || 'completed',
             price: totalPrice,
             passenger_count: pCount,
+            passenger_status_summary: summary,
             role: 'driver',
           });
         }
@@ -321,6 +456,46 @@ export const userService = {
         data,
         hasMore: (historyData?.length ?? 0) === safeLimit || (driverSessions?.length ?? 0) === safeLimit,
       };
+    }
+  },
+
+  /**
+   * Gets the count of completed trips for a user (passenger or driver).
+   */
+  async getCompletedTripsCount(userId: string, role: 'passenger' | 'driver'): Promise<number> {
+    try {
+      if (role === 'passenger') {
+        // Count completed trips in passenger_route_history
+        const { count, error } = await supabase
+          .from('passenger_trip_sessions')
+          .select('*', { count: 'exact', head: true })
+          .eq('passenger_id', userId)
+          .eq('status', 'completed');
+
+        if (error) {
+          console.error("[userService.getCompletedTripsCount] Error fetching passenger trips:", error.message);
+          return 0;
+        }
+
+        return count ?? 0;
+      } else {
+        // Count completed trips in trip_sessions for driver
+        const { count, error } = await supabase
+          .from('trip_sessions')
+          .select('*', { count: 'exact', head: true })
+          .eq('driver_id', userId)
+          .eq('status', 'completed');
+
+        if (error) {
+          console.error("[userService.getCompletedTripsCount] Error fetching driver trips:", error.message);
+          return 0;
+        }
+
+        return count ?? 0;
+      }
+    } catch (error: any) {
+      console.error("[userService.getCompletedTripsCount] Exception:", error.message);
+      return 0;
     }
   },
 

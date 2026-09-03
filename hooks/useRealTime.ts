@@ -2,7 +2,7 @@ import { User } from '@/app/context/AuthContext';
 import { DriverLocation, PassengerTripSession, SessionData, TripSessionMeetingPoints, TripSessionStops } from '@/interfaces/available-routes';
 import { supabase } from '@/lib/supabase';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 // ─────────────────────────────────────────────────────────────
 // Hook: useTripRealtimeById
@@ -33,7 +33,7 @@ export const useTripRealtimeById = (sessionId: number) => {
 
         try {
             const channel = supabase
-                .channel(`session-${sessionId}`)
+                .channel(`trip-session-${sessionId}`)
                 .on(
                     'postgres_changes',
                     {
@@ -42,7 +42,12 @@ export const useTripRealtimeById = (sessionId: number) => {
                         table: 'trip_sessions',
                         filter: `id=eq.${sessionId}`,
                     },
-                    () => {
+                    (payload) => {
+                        const updatedSession = payload.new as Partial<SessionData>;
+                        setSession((currentSession) => currentSession
+                            ? { ...currentSession, ...updatedSession }
+                            : updatedSession as SessionData
+                        );
                         refreshSession();
                     }
                 )
@@ -64,11 +69,11 @@ export const useTripRealtimeById = (sessionId: number) => {
 // Hook: usePassengerTripRealtimeById
 // Suscribe a cambios de una sesión específica de pasajero por ID.
 // ─────────────────────────────────────────────────────────────
-export const usePassengerTripRealtimeById = (sessionId: number, user: User) => {
+export const usePassengerTripRealtimeById = (sessionId: number, user: User | null) => {
     const [passengerSession, setPassengerSession] = useState<PassengerTripSession | null>(null);
 
     const refreshSession = async () => {
-        if (!sessionId) return;
+        if (!sessionId || !user?.id) return;
         try {
             const { data, error } = await supabase
                 .from("passenger_trip_sessions")
@@ -86,22 +91,25 @@ export const usePassengerTripRealtimeById = (sessionId: number, user: User) => {
     };
 
     useEffect(() => {
+        if (!user?.id) return;
         refreshSession();
 
         try {
             const channel = supabase
-                .channel(`session-${sessionId}`)
+                .channel(`passenger-trip-session-${sessionId}-${user.id}`)
                 .on(
                     'postgres_changes',
                     {
                         event: 'UPDATE',
                         schema: 'public',
                         table: 'passenger_trip_sessions',
-                        filter: `passenger_id=eq.${user.id},trip_session_id=eq.${sessionId}`,
+                        filter: `trip_session_id=eq.${sessionId}`,
                     },
                     (payload) => {
                         const newData = payload.new as PassengerTripSession;
-                        setPassengerSession(newData);
+                        if (newData.passenger_id === user.id) {
+                            setPassengerSession(newData);
+                        }
                     }
                 )
                 .subscribe();
@@ -112,7 +120,7 @@ export const usePassengerTripRealtimeById = (sessionId: number, user: User) => {
         } catch (error) {
             console.error("usePassengerTripRealtimeById subscription error:", error);
         }
-    }, [sessionId]);
+    }, [sessionId, user?.id]);
 
     return { passengerSession };
 };
@@ -439,6 +447,12 @@ export const useDriverLocation = (tripSessionId: number) => {
 // Escucha cambios en las sesiones de viaje disponibles (pendientes o activas).
 // ─────────────────────────────────────────────────────────────
 export const useAvailableRoutesSubscription = (onUpdate: () => void) => {
+    const onUpdateRef = useRef(onUpdate);
+
+    useEffect(() => {
+        onUpdateRef.current = onUpdate;
+    }, [onUpdate]);
+
     useEffect(() => {
         const channel = supabase
             .channel("public:trip_sessions")
@@ -451,7 +465,7 @@ export const useAvailableRoutesSubscription = (onUpdate: () => void) => {
                     // filter: "status=in.(pending,active)",
                 },
                 () => {
-                    onUpdate();
+                    onUpdateRef.current();
                 }
             )
             .subscribe();
@@ -459,5 +473,5 @@ export const useAvailableRoutesSubscription = (onUpdate: () => void) => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [onUpdate]);
+    }, []);
 };

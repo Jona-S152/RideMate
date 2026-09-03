@@ -1352,10 +1352,15 @@ export const tripService = {
           filter: `passenger_id=eq.${passengerId}`,
         },
         (payload) => {
-          const updated = payload.new as any;
-          if (updated?.status === 'completed') {
+          const updated = payload.new as { status?: string; trip_session_id?: number };
+          const previous = payload.old as { status?: string } | undefined;
+          if (
+            updated?.status === 'completed' &&
+            previous?.status !== 'completed' &&
+            updated.trip_session_id
+          ) {
             console.log('[tripService] Passenger trip completed:', updated.trip_session_id);
-            onCompleted(updated.trip_session_id);
+            onCompleted(Number(updated.trip_session_id));
           }
         }
       )

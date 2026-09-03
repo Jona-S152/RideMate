@@ -7,6 +7,7 @@ import { ImageUploadPicker } from "@/components/driver/ImageUploadPicker";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { Colors } from "@/constants/Colors";
+import { useAppInsets } from "@/hooks/useAppInsets";
 import { AddVehicleFormData } from "@/interfaces/driver";
 import { driverService } from "@/services/driver.service";
 
@@ -23,6 +24,7 @@ export const AddVehicleModal: React.FC<AddVehicleModalProps> = ({
   onClose,
   onVehicleAdded,
 }) => {
+  const insets = useAppInsets();
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState<AddVehicleFormData>({
     brand: "",
@@ -107,7 +109,7 @@ export const AddVehicleModal: React.FC<AddVehicleModalProps> = ({
       <View className="flex-1 bg-black/70 justify-end">
         <View
           className="w-full max-h-[90%] rounded-t-[36px] p-6"
-          style={{ backgroundColor: Colors.dark.glassStrong, borderColor: Colors.dark.border, borderWidth: 1 }}
+          style={{ backgroundColor: Colors.dark.glassStrong, borderColor: Colors.dark.border, borderWidth: 1, paddingBottom: 24 + insets.bottom }}
         >
           {/* Header */}
           <View className="flex-row items-center justify-between pb-4 border-b border-white/10 mb-4">

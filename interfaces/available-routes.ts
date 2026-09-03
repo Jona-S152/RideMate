@@ -118,6 +118,7 @@ export interface UserData {
     avatar_profile: string;
     rating?: number;
     rating_count?: number;
+    completed_trips_count?: number;
     city_id?: number | null;
     status?: 'active' | 'inactive' | 'blocked' | 'deleted' | null;
     last_seen_at?: string | null;

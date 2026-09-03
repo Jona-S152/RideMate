@@ -8,7 +8,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Linking from "expo-linking";
 import * as Notifications from "expo-notifications";
 import { router, Stack } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import "../services/backgroundLocation.task";
@@ -16,10 +16,11 @@ import AuthProvider, { useAuth } from "./context/AuthContext";
 import SessionProvider from "./context/SessionContext";
 
 import { toastConfig } from "@/components/common/toast-config";
-import { registerDeviceToken, setupNotificationChannel } from "@/services/notifications.service";
 import { authService } from "@/services/auth.service";
 import { legalService } from "@/services/legal.service";
+import { registerDeviceToken, setupNotificationChannel } from "@/services/notifications.service";
 import Toast from "react-native-toast-message";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -31,6 +32,15 @@ Notifications.setNotificationHandler({
   }),
 });
 
+const passengerAlreadyPaid = (session: {
+  passenger_paid_at?: string | null;
+  payment_status?: string | null;
+}) =>
+  !!session.passenger_paid_at ||
+  session.payment_status === "paid_by_passenger" ||
+  session.payment_status === "confirmed" ||
+  session.payment_status === "disputed";
+
 function MainApp() {
   const { token, user, logout } = useAuth();
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
@@ -38,6 +48,7 @@ function MainApp() {
     trip_session_id: number;
     driver_id: string;
     driver_name: string;
+    driver_rating?: number;
     fare_amount?: number;
     payment_status?: string;
   } | null>(null);
@@ -46,6 +57,97 @@ function MainApp() {
   const [passengerActionModalVisible, setPassengerActionModalVisible] = useState(false);
   const [passengerIdToProcess, setPassengerIdToProcess] = useState<string | null>(null);
   const [tripSessionIdToProcess, setTripSessionIdToProcess] = useState<number>(0);
+  const handledRatingTripsRef = useRef<Set<number>>(new Set());
+  const pendingRatingTripsRef = useRef<Set<number>>(new Set());
+
+  const openRatingForTrip = useCallback(async (
+    tripSessionId: number,
+    notificationData?: { driver_id?: string; driver_name?: string }
+  ) => {
+    if (!user?.id || !Number.isFinite(tripSessionId) || tripSessionId <= 0) return false;
+    if (
+      handledRatingTripsRef.current.has(tripSessionId) ||
+      pendingRatingTripsRef.current.has(tripSessionId)
+    ) return false;
+
+    pendingRatingTripsRef.current.add(tripSessionId);
+    try {
+      if (await ratingsService.hasUserRatedTrip(tripSessionId, user.id)) {
+        handledRatingTripsRef.current.add(tripSessionId);
+        return false;
+      }
+
+      let sessionData: any = null;
+      let sessionError: unknown = null;
+      for (let attempt = 0; attempt < 3 && !sessionData; attempt += 1) {
+        const result = await supabase
+          .from("passenger_trip_sessions")
+          .select("trip_session_id, fare_amount, payment_status, passenger_paid_at")
+          .eq("trip_session_id", tripSessionId)
+          .eq("passenger_id", user.id)
+          .eq("status", "completed")
+          .order("id", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        sessionData = result.data;
+        sessionError = result.error;
+        if (!sessionData && attempt < 2) {
+          await new Promise(resolve => setTimeout(resolve, 250));
+        }
+      }
+
+      if (sessionError || !sessionData) {
+        console.warn('[_layout] Could not fetch session for rating modal:', sessionError);
+        return false;
+      }
+
+      if (passengerAlreadyPaid(sessionData)) {
+        handledRatingTripsRef.current.add(tripSessionId);
+        return false;
+      }
+
+      const { data: tripSession } = await supabase
+        .from("trip_sessions")
+        .select("driver_id")
+        .eq("id", tripSessionId)
+        .maybeSingle();
+      const driverId = tripSession?.driver_id || notificationData?.driver_id || '';
+      let driverName = notificationData?.driver_name || 'tu conductor';
+      let driverRating = 0;
+      if (driverId) {
+        const [{ data: driver }, ratingInfo] = await Promise.all([
+          supabase
+            .from("users")
+            .select("name, last_name")
+            .eq("id", driverId)
+            .maybeSingle(),
+          ratingsService.getUserRating(driverId),
+        ]);
+        if (driver) {
+          driverName = `${driver.name || ''} ${driver.last_name || ''}`.trim() || driverName;
+        }
+        driverRating = ratingInfo.rating;
+      }
+
+      setRatingData({
+        trip_session_id: tripSessionId,
+        driver_id: driverId,
+        driver_name: driverName,
+        driver_rating: driverRating,
+        fare_amount: Number(sessionData.fare_amount) || 1.25,
+        payment_status: sessionData.payment_status || 'pending',
+      });
+      handledRatingTripsRef.current.add(tripSessionId);
+      setRatingModalVisible(true);
+      return true;
+    } catch (error) {
+      console.error('[_layout] Error opening rating modal:', error);
+      return false;
+    } finally {
+      pendingRatingTripsRef.current.delete(tripSessionId);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     setupNotificationChannel();
@@ -87,52 +189,40 @@ function MainApp() {
 
     const unsubscribe = tripService.subscribeToPassengerTripCompleted(
       user.id,
-      async (tripSessionId) => {
-        try {
-          // Avoid double-showing if push notification already triggered the modal
-          if (ratingModalVisible) return;
-
-          // Avoid showing if user already rated this session
-          // const alreadyRated = await ratingsService.hasUserRatedTrip(tripSessionId, user.id);
-          // if (alreadyRated) return;
-
-          // Fetch the driver info & fare details from the trip session
-          const { data: sessionData, error } = await supabase
-            .from('passenger_trip_sessions')
-            .select('trip_session_id, fare_amount, payment_status, trip_sessions(driver_id, driver_profiles(full_name))')
-            .eq('trip_session_id', tripSessionId)
-            .eq('passenger_id', user.id)
-            .maybeSingle();
-
-          if (error || !sessionData) {
-            console.warn('[_layout] Could not fetch session for rating modal:', error);
-            return;
-          }
-
-          const tripSession = (sessionData as any).trip_sessions;
-          const driverId: string = tripSession?.driver_id || '';
-          const driverName: string = tripSession?.driver_profiles?.full_name || 'tu conductor';
-          const fareAmount: number = Number((sessionData as any).fare_amount) || 1.25;
-          const paymentStatus: string = (sessionData as any).payment_status || 'pending';
-
-          setRatingData({
-            trip_session_id: tripSessionId,
-            driver_id: driverId,
-            driver_name: driverName,
-            fare_amount: fareAmount,
-            payment_status: paymentStatus,
-          });
-          setRatingModalVisible(true);
-        } catch (e) {
-          console.error('[_layout] Error in subscribeToPassengerTripCompleted handler:', e);
-        }
-      }
+      openRatingForTrip
     );
 
     return () => {
       unsubscribe();
     };
-  }, [user?.id, ratingModalVisible]);
+  }, [user?.id, openRatingForTrip]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const reconcileCompletedTrips = async () => {
+      const { data, error } = await supabase
+        .from("passenger_trip_sessions")
+        .select("trip_session_id, payment_status, passenger_paid_at")
+        .eq("passenger_id", user.id)
+        .eq("status", "completed")
+        .order("id", { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.error("[_layout] Error reconciling completed passenger trips:", error);
+        return;
+      }
+
+      const unpaidTrips = (data || []).filter((trip) => !passengerAlreadyPaid(trip));
+      for (const trip of unpaidTrips) {
+        const opened = await openRatingForTrip(Number(trip.trip_session_id));
+        if (opened) break;
+      }
+    };
+
+    reconcileCompletedTrips();
+  }, [user?.id, openRatingForTrip]);
 
   useEffect(() => {
     // Definimos la estructura esperada de los datos de la notificación
@@ -154,12 +244,7 @@ function MainApp() {
           setTripSessionIdToProcess(Number(data.trip_session_id));
           setPassengerActionModalVisible(true);
         } else if (data.type === "RATE_DRIVER") {
-          setRatingData({
-            trip_session_id: Number(data.trip_session_id),
-            driver_id: data.driver_id || "",
-            driver_name: data.driver_name || "tu conductor",
-          });
-          setRatingModalVisible(true);
+          openRatingForTrip(Number(data.trip_session_id), data);
         }
       },
     );
@@ -172,15 +257,17 @@ function MainApp() {
           console.log("[_layout] NEW_PASSENGER notification received in foreground – handled via route-detail list.");
           return;
         } else if (data.type === "RATE_DRIVER") {
-          setRatingData({
-            trip_session_id: Number(data.trip_session_id),
-            driver_id: data.driver_id || "",
-            driver_name: data.driver_name || "tu conductor",
-          });
-          setRatingModalVisible(true);
+          openRatingForTrip(Number(data.trip_session_id), data);
         }
       },
     );
+
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      const data = response?.notification.request.content.data as NotificationData | undefined;
+      if (data?.type === "RATE_DRIVER") {
+        openRatingForTrip(Number(data.trip_session_id), data);
+      }
+    });
 
     // Escuchar Deep Links para callback de autenticación por correo
     const handleDeepLink = async (event: { url: string }) => {
@@ -223,7 +310,7 @@ function MainApp() {
       foregroundSubscription.remove();
       linkSubscription.remove();
     };
-  }, []);
+  }, [openRatingForTrip]);
 
   // Mientras carga el token desde AsyncStorage
   if (token === undefined) return null;
@@ -241,10 +328,14 @@ function MainApp() {
       {ratingData && (
         <RatingModal
           visible={ratingModalVisible}
-          onClose={() => setRatingModalVisible(false)}
+          onClose={() => {
+            setRatingModalVisible(false);
+            setRatingData(null);
+          }}
           title="Califica a tu conductor"
           subtitle="¿Cómo fue tu experiencia en este viaje?"
           userName={ratingData.driver_name}
+          userRating={ratingData.driver_rating}
           fareAmount={ratingData.fare_amount}
           paymentStatus={ratingData.payment_status}
           onConfirmPayment={async () => {
@@ -260,6 +351,8 @@ function MainApp() {
               rating,
               comment,
             });
+            setRatingModalVisible(false);
+            setRatingData(null);
           }}
         />
       )}
@@ -283,12 +376,14 @@ function MainApp() {
 
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView className="flex-1" style={{ backgroundColor: Colors.dark.background }}>
-      <AuthProvider>
-        <SessionProvider>
-          <MainApp />
-        </SessionProvider>
-      </AuthProvider>
-    </GestureHandlerRootView>
+    <SafeAreaProvider>
+      <GestureHandlerRootView className="flex-1" style={{ backgroundColor: Colors.dark.background }}>
+        <AuthProvider>
+          <SessionProvider>
+            <MainApp />
+          </SessionProvider>
+        </AuthProvider>
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }

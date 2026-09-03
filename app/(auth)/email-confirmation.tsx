@@ -1,3 +1,4 @@
+import { Screen } from "@/components/screen";
 import { Colors } from "@/constants/Colors";
 import { supabase } from "@/lib/supabase";
 import { authService } from "@/services/auth.service";
@@ -141,7 +142,7 @@ export default function EmailConfirmationScreen() {
   };
 
   return (
-    <View className="flex-1 bg-background px-6 justify-center items-center">
+    <Screen withTabBarPadding={false} edges={['top', 'bottom']} className="flex-1 px-6 justify-center items-center">
       <View
         className="w-full rounded-3xl p-8 items-center border border-slate-700 shadow-2xl"
         style={{ backgroundColor: Colors.dark.surface }}
@@ -211,6 +212,6 @@ export default function EmailConfirmationScreen() {
           </Text>
         </Pressable>
       </View>
-    </View>
+    </Screen>
   );
 }

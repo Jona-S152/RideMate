@@ -1,6 +1,7 @@
 import { useAuth } from "@/app/context/AuthContext";
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
+import { useAppInsets } from "@/hooks/useAppInsets";
 import { useTripStops } from "@/hooks/useRealTime";
 import { supabase } from "@/lib/supabase";
 import { tripService } from "@/services/trip.service";
@@ -34,6 +35,7 @@ export default function SelectionMapScreen() {
   const { trip_session_id } = useLocalSearchParams();
   const router = useRouter();
   const { user } = useAuth();
+  const insets = useAppInsets();
   const { stops: sessionStatusStops } = useTripStops(Number(trip_session_id));
 
   // ── Mapa ────────────────────────────────────────────────────────────────────
@@ -360,7 +362,7 @@ export default function SelectionMapScreen() {
     <View style={{ flex: 1, backgroundColor: Colors.dark.background }}>
 
       {/* ── PANEL SUPERIOR ─────────────────────────────────────────────────── */}
-      <View className="absolute top-16 left-0 right-0 z-50 px-5">
+      <View className="absolute left-0 right-0 z-50 px-5" style={{ top: insets.top + 16 }}>
         <View
           style={{
             backgroundColor: Colors.dark.glass,
@@ -581,7 +583,7 @@ export default function SelectionMapScreen() {
       )}
 
       {/* ── BOTONES INFERIORES ──────────────────────────────────────────────── */}
-      <View style={styles.bottomBar}>
+      <View style={[styles.bottomBar, { bottom: 44 + insets.bottom }]}>
         {/* En modo selección: botón "Fijar punto" */}
         {isSelectionMode && (
           <Pressable
@@ -650,7 +652,7 @@ export default function SelectionMapScreen() {
         }}
         style={[
           styles.closeBtn,
-          { backgroundColor: Colors.dark.glassSoft, borderColor: Colors.dark.border },
+          { top: insets.top + 12, backgroundColor: Colors.dark.glassSoft, borderColor: Colors.dark.border },
         ]}
       >
         <Ionicons
@@ -782,7 +784,6 @@ const styles = StyleSheet.create({
   },
   closeBtn: {
     position: "absolute",
-    top: 56,
     left: 24,
     width: 40,
     height: 40,

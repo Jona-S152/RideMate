@@ -1,4 +1,5 @@
 import { Colors } from "@/constants/Colors";
+import { useAppInsets } from "@/hooks/useAppInsets";
 import { supabase } from "@/lib/supabase";
 import { tripService } from "@/services/trip.service";
 import { Ionicons } from "@expo/vector-icons";
@@ -63,6 +64,7 @@ export default function DriverRequestsModal({
   onClose,
   onSelectPendingPassenger,
 }: DriverRequestsModalProps) {
+  const insets = useAppInsets();
   const [requests, setRequests] = useState<PassengerRequestItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -144,7 +146,7 @@ export default function DriverRequestsModal({
             maxHeight: "85%",
             paddingHorizontal: 20,
             paddingTop: 12,
-            paddingBottom: 32,
+            paddingBottom: 24 + insets.bottom,
             borderTopWidth: 1,
             borderColor: Colors.dark.borderSecondary,
           }}

@@ -3,6 +3,7 @@ import CustomDateRangePickerModal from "@/components/Modals/CustomDateRangePicke
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
+import { useAppInsets } from "@/hooks/useAppInsets";
 import { useSafeBackHandler } from "@/hooks/useSafeBackHandler";
 import { ActivityItem, userService } from "@/services/user.service";
 import { Ionicons } from "@expo/vector-icons";
@@ -12,6 +13,7 @@ import { ActivityIndicator, Animated, Pressable, RefreshControl, View } from "re
 
 export default function ActivityScreen() {
     const { user } = useAuth();
+    const insets = useAppInsets();
     useSafeBackHandler("/(tabs)/profile");
     const [role, setRole] = useState<'passenger' | 'driver'>('passenger');
     const [history, setHistory] = useState<ActivityItem[]>([]);
@@ -192,7 +194,7 @@ export default function ActivityScreen() {
                     className="flex-row justify-between items-center pt-3.5"
                     style={{ borderTopColor: Colors.dark.border, borderTopWidth: 1 }}
                 >
-                    <View className="flex-row items-center gap-3">
+                    <View className="flex-row items-center gap-3 flex-wrap">
                         {/* Price Badge */}
                         <View className="flex-row items-center px-3 py-1.5 rounded-xl border border-blue-500/20 bg-blue-500/10">
                             <Ionicons name="cash-outline" size={16} color={Colors.dark.secondary} />
@@ -210,6 +212,26 @@ export default function ActivityScreen() {
                         </View>
                     </View>
 
+                    {item.passenger_status_summary && (
+                        <View className="flex-row items-center gap-1.5 flex-wrap justify-end max-w-[55%]">
+                            {item.passenger_status_summary.completed > 0 && (
+                                <View className="px-1.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30">
+                                    <ThemedText className="text-[9px] font-bold text-emerald-300">{item.passenger_status_summary.completed} ok</ThemedText>
+                                </View>
+                            )}
+                            {item.passenger_status_summary.left > 0 && (
+                                <View className="px-1.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30">
+                                    <ThemedText className="text-[9px] font-bold text-amber-300">{item.passenger_status_summary.left} left</ThemedText>
+                                </View>
+                            )}
+                            {item.passenger_status_summary.cancelled > 0 && (
+                                <View className="px-1.5 py-0.5 rounded-full bg-red-500/15 border border-red-500/30">
+                                    <ThemedText className="text-[9px] font-bold text-red-300">{item.passenger_status_summary.cancelled} cancel</ThemedText>
+                                </View>
+                            )}
+                        </View>
+                    )}
+
                     <Ionicons name="chevron-forward" size={18} color={Colors.dark.textSecondary} />
                 </View>
             </Pressable>
@@ -222,7 +244,8 @@ export default function ActivityScreen() {
                 style={{ height: headerHeight, opacity: headerOpacity }}
                 lightColor={Colors.dark.glass}
                 darkColor={Colors.dark.glass}
-                className="w-full px-6 pt-12 rounded-bl-[40px] z-10 border-b border-slate-800"
+                className="w-full px-6 rounded-bl-[40px] z-10 border-b border-slate-800"
+                style={{ paddingTop: insets.top + 16 }}
             >
                 <View className="flex-row items-center justify-between mb-4">
                     <View className="flex-row items-center gap-x-3">
@@ -316,7 +339,7 @@ export default function ActivityScreen() {
                     data={history}
                     keyExtractor={(item) => item.id}
                     renderItem={renderTripItem}
-                    contentContainerStyle={{ paddingTop: 20, paddingBottom: 100 }}
+                    contentContainerStyle={{ paddingTop: 20, paddingBottom: 24 + insets.bottom }}
                     onScroll={Animated.event(
                         [{ nativeEvent: { contentOffset: { y: scrollY } } }],
                         { useNativeDriver: false }

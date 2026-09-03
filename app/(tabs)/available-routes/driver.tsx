@@ -7,6 +7,8 @@ import MasonryGrid from "@/components/common/MasonryGrid";
 import AvailableRouteCard from "@/components/features/available-route-card";
 import { Colors } from "@/constants/Colors";
 import { useThemeColor } from "@/hooks/useThemeColor";
+import { useAppInsets } from "@/hooks/useAppInsets";
+import { useBottomTabOverflow } from "@/components/ui/TabBarBackground";
 import { RouteData, RouteStop, UserData } from "@/interfaces/available-routes";
 import { tripService } from "@/services/trip.service";
 import { userService } from "@/services/user.service";
@@ -25,6 +27,8 @@ import {
 
 export default function DriverRoutesScreen() {
   const { user } = useAuth();
+  const insets = useAppInsets();
+  const tabOverflow = useBottomTabOverflow();
   const [text, setText] = useState<string>("");
   const [visibleFilters, setVisibleFilters] = useState<boolean>(false);
   const [selectedFilter, setSelectedFilter] = useState<string>("puntoPartida");
@@ -162,6 +166,7 @@ export default function DriverRoutesScreen() {
         lightColor={Colors.light.primary}
         darkColor={Colors.dark.primary}
         className="w-full px-4 py-6 rounded-bl-[40px]"
+        style={{ paddingTop: insets.top + 16 }}
       >
         <ThemedText className="font-semibold text-4xl py-3">
           Panel de Rutas
@@ -220,9 +225,10 @@ export default function DriverRoutesScreen() {
         )}
       </ThemedView>
 
-      <View className="flex-1 mx-4 mb-24">
+      <View className="flex-1 mx-4">
         <ScrollView
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: tabOverflow }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -331,9 +337,10 @@ export default function DriverRoutesScreen() {
       {/* BOTÓN FLOTANTE (FAB) PARA CREAR RUTA */}
       <Pressable
         onPress={() => handleCreateRoute()}
-        className="absolute bottom-28 right-6 w-16 h-16 rounded-full items-center justify-center shadow-lg"
+        className="absolute right-6 w-16 h-16 rounded-full items-center justify-center shadow-lg"
         style={
           {
+            bottom: 112 + insets.bottom,
             backgroundColor: secondaryColor,
             elevation: 8, // Sombra para Android
             shadowColor: "#000", // Sombra para iOS

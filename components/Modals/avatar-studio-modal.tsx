@@ -1,5 +1,6 @@
 import { useAuth } from "@/app/context/AuthContext";
 import { Colors } from "@/constants/Colors";
+import { useAppInsets } from "@/hooks/useAppInsets";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import React, { useState } from "react";
@@ -25,6 +26,7 @@ const TABS = ["Random", "Piel", "Pelo", "Ropa", "Ojos", "Cejas", "Boca", "Acceso
 
 export default function AvatarStudioModal({ visible, setVisible, onApply }: AvatarStudioModalProps) {
     const { user } = useAuth();
+    const insets = useAppInsets();
 
     const [seed, setSeed] = useState(user?.id);
     const [skinColor, setSkinColor] = useState<string | null>(null);
@@ -166,8 +168,8 @@ export default function AvatarStudioModal({ visible, setVisible, onApply }: Avat
         >
             <View className="flex-1 justify-end bg-black/70">
                 <View
-                    style={{ backgroundColor: Colors.dark.primary }}
-                    className="w-full rounded-t-3xl overflow-hidden border-t border-slate-700 pb-8"
+                    className="w-full rounded-t-3xl overflow-hidden border-t border-slate-700"
+                    style={{ backgroundColor: Colors.dark.primary, paddingBottom: 24 + insets.bottom }}
                 >
                     {/* Header */}
                     <View className="p-5 flex-row items-center justify-between border-b border-slate-800">

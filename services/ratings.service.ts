@@ -9,6 +9,23 @@ export interface RatingData {
 }
 
 export const ratingsService = {
+  async hasUserRatedTrip(tripSessionId: number, raterId: string) {
+    const { data, error } = await supabase
+      .from("ratings")
+      .select("id")
+      .eq("trip_session_id", tripSessionId)
+      .eq("rater_id", raterId)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error checking existing trip rating:", error);
+      throw error;
+    }
+
+    return !!data;
+  },
+
   /**
    * Saves a single rating to the ratings table.
    */

@@ -4,7 +4,8 @@ import ConfirmActionModal from "@/components/Modals/ConfirmActionModal";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
-import { useTripMeetingPoints, useTripRealtimeById, useTripStops } from "@/hooks/useRealTime";
+import { useAppInsets } from "@/hooks/useAppInsets";
+import { usePassengerTripRealtimeById, useTripMeetingPoints, useTripRealtimeById, useTripStops } from "@/hooks/useRealTime";
 import { useSafeBackHandler } from "@/hooks/useSafeBackHandler";
 import { DriverInfo, PassengerTripSession, RouteData, SessionData, UserData } from "@/interfaces/available-routes";
 import { supabase } from "@/lib/supabase";
@@ -18,13 +19,14 @@ import { format, isToday, isTomorrow } from "date-fns";
 import { es } from "date-fns/locale";
 import * as Location from "expo-location";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Image, Pressable, RefreshControl, ScrollView, View } from "react-native";
 import Toast from "react-native-toast-message";
 
 
 export default function RouteDetail() {
     useSafeBackHandler("/(tabs)/available-routes");
+    const insets = useAppInsets();
     const params = useLocalSearchParams<{ id: string, sessionId?: string, viewOnly?: string, source?: string }>();
     const { user } = useAuth();
     const router = useRouter();
@@ -62,6 +64,10 @@ export default function RouteDetail() {
     const { session } = useTripRealtimeById(sessionId);
     const { stops: sessionStops } = useTripStops(sessionId);
     const { meetingPoints: sessionMeetingPoints } = useTripMeetingPoints(sessionId);
+    const { passengerSession } = usePassengerTripRealtimeById(sessionId, user);
+    const isDriverView = session && user
+        ? session.driver_id === user.id
+        : !!user?.driver_mode;
     const isSessionTerminal = useMemo(
         () => ['cancelled', 'completed', 'left'].includes(String(session?.status ?? '')),
         [session?.status]
@@ -72,6 +78,16 @@ export default function RouteDetail() {
         if (!userPassenger) return false;
         return ['joined', 'pending', 'pending_approval', 'approved'].includes(userPassenger.status);
     }, [passengers, user?.id]);
+    const redirectedRef = useRef(false);
+
+    const passengerStatusConfig: Record<string, { label: string; bg: string; text: string; icon: keyof typeof Ionicons.glyphMap }> = {
+        joined: { label: 'Unido', bg: '#2563EB', text: '#E0F2FE', icon: 'checkmark-circle-outline' },
+        pending: { label: 'Pendiente', bg: '#F59E0B', text: '#FEF3C7', icon: 'time-outline' },
+        completed: { label: 'Completado', bg: '#10B981', text: '#D1FAE5', icon: 'checkmark-done-outline' },
+        cancelled: { label: 'Cancelado', bg: '#EF4444', text: '#FEE2E2', icon: 'close-circle-outline' },
+        left: { label: 'Abandonó', bg: '#F97316', text: '#FFEDD5', icon: 'log-out-outline' },
+        rejected: { label: 'Rechazado', bg: '#6B7280', text: '#F3F4F6', icon: 'ban-outline' },
+    };
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -160,17 +176,17 @@ export default function RouteDetail() {
     };
 
     const fetchSessionUsers = async (passengerSessions: PassengerTripSession[]) => {
-        const activeSessions = passengerSessions.filter(p => !['left', 'cancelled', 'rejected'].includes(p.status));
-
-        if (!activeSessions.length) {
+        if (!passengerSessions.length) {
             setSessionUsers([]);
             return [];
         }
 
+        const passengerIds = [...new Set(passengerSessions.map(p => p.passenger_id))];
+
         const { data, error } = await supabase
             .from("users")
             .select("*")
-            .in('id', activeSessions.map(p => p.passenger_id));
+            .in('id', passengerIds);
 
         if (error) {
             console.error("Error fetching session users:", error);
@@ -236,23 +252,27 @@ export default function RouteDetail() {
     useEffect(() => {
         console.warn("SESSION status changed:", session?.status, "| sessionId:", sessionId, "| driver_mode:", user?.driver_mode, "| readOnly:", isReadOnlyView);
 
-        if (isReadOnlyView) {
+        if (isReadOnlyView || redirectedRef.current) {
             return;
         }
 
         // Redirigir al pasajero a la pantalla de ruta activa cuando el conductor inicia el viaje
-        if (session?.status === 'active' && !user?.driver_mode) {
+        if (session?.status === 'active' && !isDriverView) {
             console.warn(`[route-detail] Redirecting passenger to active route: /(tabs)/home/route-detail?id=${sessionId}`);
+            redirectedRef.current = true;
             router.replace(`/(tabs)/home/route-detail?id=${sessionId}`);
+            return;
         }
 
-        // Redirigir cuando el real-time detecte que la sesión fue cancelada o completada
-        if (session?.status === 'cancelled' || session?.status === 'completed') {
-            console.warn(`[route-detail] Session ${sessionId} is ${session.status}, redirecting to available-routes`);
+        // Redirigir al pasajero cuando se cancele su sesión o la ruta completa
+        const passengerStatus = passengerSession?.status;
+        const isPassengerTerminal = ['cancelled', 'left', 'rejected'].includes(String(passengerStatus ?? ''));
+        if (!isDriverView && (session?.status === 'cancelled' || session?.status === 'completed' || isPassengerTerminal)) {
+            console.warn(`[route-detail] Session ${sessionId} is ${session?.status ?? passengerStatus}, redirecting to available-routes`);
+            redirectedRef.current = true;
             router.replace('/(tabs)/available-routes');
         }
-    }, [session?.status, sessionId, user?.driver_mode, isReadOnlyView]);
-
+    }, [session?.status, passengerSession?.status, sessionId, isDriverView, isReadOnlyView]);
 
     const handleStartTrip = async () => {
         if (session?.status === 'active') {
@@ -564,9 +584,11 @@ export default function RouteDetail() {
             className="flex-1"
             lightColor={Colors.light.background}
             darkColor={Colors.dark.background}
+            style={{ paddingBottom: insets.bottom }}
         >
             <ThemedView
-                className="flex-row items-center justify-between px-4 pb-4 w-full pt-8"
+                className="flex-row items-center justify-between px-4 pb-4 w-full"
+                style={{ paddingTop: insets.top + 8 }}
                 lightColor={Colors.light.background}
                 darkColor={Colors.dark.background}
             >
@@ -612,7 +634,7 @@ export default function RouteDetail() {
             >
                 {route && (
                     <ThemedView
-                        className="flex-row items-center justify-between px-4 pb-4 w-full pt-8"
+                        className="flex-row items-center justify-between px-4 pb-4 w-full pt-4"
                         lightColor={Colors.light.background}
                         darkColor={Colors.dark.background}
                     >
@@ -825,60 +847,53 @@ export default function RouteDetail() {
                         )}
                     </View>
 
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-                        {sessionUsers.filter(u => {
-                            const sessionInfo = passengers.find(p => p.passenger_id === u.id);
-                            return sessionInfo && !['left', 'cancelled', 'rejected'].includes(sessionInfo.status);
-                        }).map((passenger) => {
-                            const sessionInfo = passengers.find(p => p.passenger_id === passenger.id);
-                            const isApproved = ['pending', 'joined', 'completed'].includes(sessionInfo?.status || '');
-                            const isDeleted = passenger.status === 'deleted' || passenger.last_name === 'Eliminado';
+                    <View className="gap-3">
+                        {passengers.length > 0 ? passengers.map((passengerSession) => {
+                            const passengerUser = sessionUsers.find(u => u.id === passengerSession.passenger_id);
+                            const isDeleted = passengerUser?.status === 'deleted' || passengerUser?.last_name === 'Eliminado';
                             const displayName = isDeleted
                                 ? "Usuario Eliminado"
-                                : `${passenger.name || "Usuario"} ${passenger.last_name || ''}`.trim();
+                                : `${passengerUser?.name || "Usuario"} ${passengerUser?.last_name || ''}`.trim();
+                            const statusConfig = passengerStatusConfig[passengerSession.status] || {
+                                label: passengerSession.status,
+                                bg: '#475569',
+                                text: '#E2E8F0',
+                                icon: 'help-circle-outline' as keyof typeof Ionicons.glyphMap,
+                            };
 
                             return (
-                                <View key={passenger.id} className="items-center mr-4">
-                                    <View className="relative">
-                                        {passenger.avatar_profile ? (
-                                            <Image
-                                                source={{ uri: passenger.avatar_profile }}
-                                                className="w-12 h-12 rounded-full border-2"
-                                                style={{ borderColor: isApproved ? Colors.dark.secondary : Colors.dark.borderSecondary }}
-                                            />
-                                        ) : (
-                                            <Ionicons name="person" size={45} color={isApproved ? Colors.dark.secondary : Colors.dark.borderSecondary} />
-                                        )}
-                                        <View
-                                            className="absolute -bottom-1 -right-1 bg-white rounded-full px-1.5 flex-row items-center shadow-sm"
-                                            style={{ elevation: 2 }}
-                                        >
-                                            <ThemedText className="text-[10px] font-bold text-black">
-                                                {Number(passenger.rating || 0).toFixed(1)}
-                                            </ThemedText>
-                                            <Ionicons name="star" size={8} color={Colors.dark.danger} />
+                                <View key={`${passengerSession.id}-${passengerSession.passenger_id}`} className="flex-row items-center justify-between rounded-2xl px-3 py-2" style={{ backgroundColor: Colors.dark.primary, borderWidth: 1, borderColor: Colors.dark.borderSecondary }}>
+                                    <View className="flex-row items-center flex-1">
+                                        <View className="relative mr-3">
+                                            {passengerUser?.avatar_profile ? (
+                                                <Image source={{ uri: passengerUser.avatar_profile }} className="w-11 h-11 rounded-full border-2" style={{ borderColor: Colors.dark.borderSecondary }} />
+                                            ) : (
+                                                <View className="w-11 h-11 rounded-full items-center justify-center" style={{ backgroundColor: Colors.dark.glassSoft }}>
+                                                    <Ionicons name="person" size={20} color={Colors.dark.textSecondary} />
+                                                </View>
+                                            )}
                                         </View>
-                                        {!isApproved && (
-                                            <View className="absolute inset-0 bg-black/40 rounded-full items-center justify-center">
-                                                <Ionicons name="time" size={20} color="white" />
-                                            </View>
-                                        )}
+                                        <View className="flex-1">
+                                            <ThemedText className="text-sm font-semibold" numberOfLines={1}>{displayName}</ThemedText>
+                                            <ThemedText className="text-[11px] text-textSecondary" numberOfLines={1}>
+                                                {passengerSession.status === 'joined' ? 'Se unió al viaje' : passengerSession.status === 'pending' ? 'Pendiente de recogida' : passengerSession.status === 'completed' ? 'Finalizó el viaje' : passengerSession.status === 'cancelled' ? 'Canceló su participación' : passengerSession.status === 'left' ? 'Abandonó el viaje' : passengerSession.status === 'rejected' ? 'Solicitud rechazada' : passengerSession.status}
+                                            </ThemedText>
+                                        </View>
                                     </View>
-                                    <ThemedText className="text-xs mt-2 font-medium" numberOfLines={2} style={{ width: 72, textAlign: 'center' }}>
-                                        {displayName}
-                                    </ThemedText>
+                                    <View className="flex-row items-center gap-2">
+                                        <View className="flex-row items-center px-2 py-1 rounded-full" style={{ backgroundColor: statusConfig.bg, opacity: 0.18 }}>
+                                            <Ionicons name={statusConfig.icon} size={12} color={statusConfig.text} />
+                                            <ThemedText className="text-[10px] font-bold ml-1" style={{ color: statusConfig.text }}>{statusConfig.label}</ThemedText>
+                                        </View>
+                                    </View>
                                 </View>
                             );
-                        })}
-                        {sessionUsers.filter(u => {
-                            const sessionInfo = passengers.find(p => p.passenger_id === u.id);
-                            return sessionInfo && !['left', 'cancelled', 'rejected'].includes(sessionInfo.status);
-                        }).length === 0 && (
-                                <ThemedText className="text-sm text-textSecondary italic">
-                                    No hay pasajeros unidos todavía
-                                </ThemedText>
-                            )}
-                    </ScrollView>
+                        }) : (
+                            <ThemedText className="text-sm text-textSecondary italic">
+                                No hay pasajeros registrados en esta sesión
+                            </ThemedText>
+                        )}
+                    </View>
                 </View>
             </ScrollView>
             {
@@ -924,6 +939,7 @@ export default function RouteDetail() {
                     onCancel={() => setConfirmModalConfig(null)}
                 />
             )}
+
         </ThemedView>
     );
 }

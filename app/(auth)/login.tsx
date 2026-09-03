@@ -3,6 +3,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
+import { useAppInsets } from "@/hooks/useAppInsets";
 import { ActiveLegalVersions } from "@/interfaces/legal";
 import { AuthSessionResponse, authService } from "@/services/auth.service";
 import { legalService } from "@/services/legal.service";
@@ -16,6 +17,7 @@ import { useAuth } from "../context/AuthContext";
 
 export default function LoginScreen() {
     const { login } = useAuth()
+    const insets = useAppInsets();
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -117,7 +119,7 @@ export default function LoginScreen() {
 
     if (pendingLogin) {
         return (
-            <View className="flex-1 bg-background px-6 justify-center items-center">
+            <View className="flex-1 bg-background px-6 justify-center items-center" style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}>
                 <LegalConsent
                     title="Actualización legal"
                     description="Debes aceptar los Términos y la Política de Privacidad para iniciar sesión en RideMate."
@@ -130,11 +132,11 @@ export default function LoginScreen() {
     }
 
     return (
-        <KeyboardAwareScrollView className="bg-background">
+        <KeyboardAwareScrollView className="bg-background" contentContainerStyle={{ paddingBottom: 24 + insets.bottom }}>
             <AnimatedThemedView
-                style={{ height: headerHeight }}
+                style={{ height: headerHeight, paddingTop: insets.top }}
                 lightColor={Colors.light.glassStrong}
-                className="w-full px-4 pt-6 rounded-bl-[40px]"
+                className="w-full px-4 rounded-bl-[40px]"
             >
                 <View className="items-center justify-center flex-1">
                     <Image

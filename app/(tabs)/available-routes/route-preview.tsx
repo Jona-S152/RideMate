@@ -2,6 +2,7 @@ import { useAuth } from "@/app/context/AuthContext";
 import { useSession } from "@/app/context/SessionContext";
 import { ThemedText } from "@/components/ui/ThemedText";
 import { Colors } from "@/constants/Colors";
+import { useAppInsets } from "@/hooks/useAppInsets";
 import { Coords } from "@/interfaces/available-routes";
 import { Vehicle } from "@/interfaces/driver";
 import { VehicleSelectorDropdown } from "@/components/driver/VehicleSelectorDropdown";
@@ -21,6 +22,7 @@ export default function RoutePreviewScreen() {
     const { id, type } = useLocalSearchParams<{ id: string; type: 'route' | 'session' | 'driver_route' }>();
     const { user } = useAuth();
     const { setSessionChanged } = useSession();
+    const insets = useAppInsets();
 
     const [loading, setLoading] = useState(true);
     const [routeData, setRouteData] = useState<any>(null);
@@ -358,7 +360,7 @@ export default function RoutePreviewScreen() {
                             router.replace("/(tabs)/available-routes");
                         }
                     }}
-                    style={styles.backButton as ViewStyle}
+                    style={[styles.backButton, { top: insets.top + 8 }] as ViewStyle}
                 >
                     <Ionicons name="chevron-back" size={24} color={Colors.light.text} />
                 </Pressable>
@@ -367,6 +369,7 @@ export default function RoutePreviewScreen() {
                     ref={bottomSheetRef}
                     index={0}
                     snapPoints={snapPoints}
+                    bottomInset={insets.bottom}
                     backgroundStyle={{
                         backgroundColor: Colors.dark.background,
                         borderTopLeftRadius: 55,
@@ -375,7 +378,7 @@ export default function RoutePreviewScreen() {
                 >
                     <BottomSheetScrollView
                         style={{ backgroundColor: Colors.dark.background }}
-                        contentContainerStyle={styles.scrollContent}
+                        contentContainerStyle={[styles.scrollContent, { paddingBottom: 24 + insets.bottom }]}
                     >
                         {/* Visual Route Timeline */}
                         <View style={styles.timelineContainer}>
@@ -495,7 +498,6 @@ const styles = StyleSheet.create({
     map: { flex: 1 },
     backButton: {
         position: 'absolute',
-        top: 50,
         left: 20,
         width: 44,
         height: 44,
@@ -522,7 +524,7 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingHorizontal: 24,
         paddingTop: 10,
-        paddingBottom: 60,
+        paddingBottom: 24,
     },
     timelineContainer: {
         marginVertical: 10,

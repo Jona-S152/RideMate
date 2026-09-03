@@ -1,6 +1,7 @@
 import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
+import { useAppInsets } from "@/hooks/useAppInsets";
 import { useCollapsingHeader } from "@/hooks/useCollapsingHeader";
 import { authService } from "@/services/auth.service";
 import { legalService } from "@/services/legal.service";
@@ -15,6 +16,7 @@ import { useAuth } from "../context/AuthContext";
 export default function RegisterScreen() {
   const router = useRouter();
   const { login } = useAuth();
+  const insets = useAppInsets();
 
   const { height: SCREEN_HEIGHT } = Dimensions.get("window");
   const HEADER_EXPANDED = SCREEN_HEIGHT * 0.50; // 45%
@@ -163,8 +165,8 @@ export default function RegisterScreen() {
     <View className="flex-1 bg-background">
       <AnimatedThemedView
         lightColor={Colors.light.glassStrong}
-        style={{ height: headerHeight }}
-        className="w-full px-4 pt-6 rounded-bl-[40px]"
+        style={{ height: headerHeight, paddingTop: insets.top }}
+        className="w-full px-4 rounded-bl-[40px]"
       >
         <View className="items-center justify-center flex-1">
           <Image className="h-36" style={{ resizeMode: "contain" }} source={require('../../assets/brand-assets/SplashScreen_DarkMode.png')} />
@@ -175,7 +177,7 @@ export default function RegisterScreen() {
         className="flex-1"
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
-          paddingBottom: keyboardHeight + 40,
+          paddingBottom: keyboardHeight + 24 + insets.bottom,
         }}
       >
         <View className="mx-5 mt-4 mb-2">

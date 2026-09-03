@@ -18,10 +18,12 @@ import {
 } from "@/interfaces/driver";
 import { driverService } from "@/services/driver.service";
 import { formatDateInput, isValidDate } from "@/utils/formatDate";
+import { useAppInsets } from "@/hooks/useAppInsets";
 import { useSafeBackHandler } from "@/hooks/useSafeBackHandler";
 
 export default function EditDriverScreen() {
   useSafeBackHandler("/(tabs)/profile");
+  const insets = useAppInsets();
   const { user, updateUser } = useAuth();
   const router = useRouter();
 
@@ -174,12 +176,13 @@ export default function EditDriverScreen() {
       <ThemedView
         lightColor={Colors.dark.glass}
         darkColor={Colors.dark.glass}
-        style={styles.header}
+        style={[styles.header, { paddingTop: insets.top + 16 }]}
       >
         <Pressable
           onPress={handleGoBack}
           style={({ pressed }) => [
             styles.backButton,
+            { top: insets.top + 10 },
             pressed && { backgroundColor: "rgba(255,255,255,0.15)" },
           ]}
         >
@@ -199,7 +202,7 @@ export default function EditDriverScreen() {
         </View>
       </ThemedView>
 
-      <View style={styles.content}>
+      <View style={[styles.content, { paddingBottom: 24 + insets.bottom }]}>
         {/* ── WARNING CARD ──────────────────────────────────── */}
         <View style={styles.warningCard}>
           <View style={styles.warningHeader}>
@@ -401,7 +404,6 @@ const styles = StyleSheet.create({
     color: Colors.dark.textSecondary,
   },
   header: {
-    paddingTop: 56,
     paddingBottom: 24,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 32,
@@ -410,7 +412,6 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: "absolute",
-    top: 50,
     left: 20,
     zIndex: 20,
     padding: 10,

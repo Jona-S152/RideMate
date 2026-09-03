@@ -1,4 +1,5 @@
 import { Colors } from "@/constants/Colors";
+import { useAppInsets } from "@/hooks/useAppInsets";
 import { UserData } from "@/interfaces/available-routes";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
@@ -33,6 +34,7 @@ export default function DriverRatingListModal({
     onSubmit,
     passengers,
 }: DriverRatingListModalProps) {
+    const insets = useAppInsets();
     const [items, setItems] = useState<PassengerToRate[]>([]);
     const [loading, setLoading] = useState(false);
 
@@ -148,7 +150,7 @@ export default function DriverRatingListModal({
             onRequestClose={onClose}
         >
             <View style={styles.overlay}>
-                <View style={[styles.container, { backgroundColor: Colors.dark.primary }]}>
+                <View style={[styles.container, { backgroundColor: Colors.dark.primary, paddingBottom: 24 + insets.bottom }]}>
                     <Pressable
                         onPress={onClose}
                         style={styles.closeButton}

@@ -14,6 +14,7 @@ import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { useSafeBackHandler } from "@/hooks/useSafeBackHandler";
+import { useAppInsets } from "@/hooks/useAppInsets";
 import {
   BecomeDriverFormData,
   DriverProfile,
@@ -25,6 +26,7 @@ import { formatDateInput, isValidDate } from "@/utils/formatDate";
 
 export default function BecomeDriverScreen() {
   useSafeBackHandler("/(tabs)/profile");
+  const insets = useAppInsets();
   const { user } = useAuth();
   const router = useRouter();
 
@@ -330,12 +332,12 @@ export default function BecomeDriverScreen() {
   // ----------------------------------------------------
   if (existingProfile && existingProfile.status === "approved" && isEditingApproved) {
     return (
-      <KeyboardAwareScrollView className="flex-1 bg-background" bounces={false}>
-        <ThemedView lightColor={Colors.dark.glassStrong} className="w-full px-6 pt-12 pb-6 rounded-bl-[40px] relative">
+      <KeyboardAwareScrollView className="flex-1 bg-background" bounces={false} contentContainerStyle={{ paddingBottom: insets.bottom }}>
+        <ThemedView lightColor={Colors.dark.glassStrong} className="w-full px-6 pb-6 rounded-bl-[40px] relative" style={{ paddingTop: insets.top + 16 }}>
           <Pressable
             onPress={() => setIsEditingApproved(false)}
-            className="absolute top-12 left-6 p-2 rounded-full z-20"
-            style={{ backgroundColor: "rgba(255, 255, 255, 0.08)", borderWidth: 1, borderColor: Colors.dark.border }}
+            className="absolute left-6 p-2 rounded-full z-20"
+            style={{ top: insets.top + 16, backgroundColor: "rgba(255, 255, 255, 0.08)", borderWidth: 1, borderColor: Colors.dark.border }}
           >
             <Ionicons name="arrow-back" size={24} color="white" />
           </Pressable>
@@ -511,13 +513,13 @@ export default function BecomeDriverScreen() {
     const isApproved = existingProfile.status === "approved";
 
     return (
-      <ScrollView className="flex-1 bg-background" contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView className="flex-1 bg-background" contentContainerStyle={{ paddingBottom: 24 + insets.bottom }}>
         {/* Header */}
-        <ThemedView lightColor={Colors.dark.glassStrong} className="w-full px-6 pt-12 pb-8 rounded-bl-[40px] relative">
+        <ThemedView lightColor={Colors.dark.glassStrong} className="w-full px-6 pb-8 rounded-bl-[40px] relative" style={{ paddingTop: insets.top + 16 }}>
           <Pressable
             onPress={handleGoBack}
-            className="absolute top-12 left-6 p-2 rounded-full z-20"
-            style={{ backgroundColor: "rgba(255, 255, 255, 0.08)", borderWidth: 1, borderColor: Colors.dark.border }}
+            className="absolute left-6 p-2 rounded-full z-20"
+            style={{ top: insets.top + 16, backgroundColor: "rgba(255, 255, 255, 0.08)", borderWidth: 1, borderColor: Colors.dark.border }}
           >
             <Ionicons name="arrow-back" size={24} color="white" />
           </Pressable>
@@ -717,12 +719,12 @@ export default function BecomeDriverScreen() {
   // MULTI-STEP FORM WIZARD VIEW (Initial Application)
   // ----------------------------------------------------
   return (
-    <KeyboardAwareScrollView className="flex-1 bg-background" bounces={false}>
-      <ThemedView lightColor={Colors.dark.glassStrong} className="w-full px-6 pt-12 pb-4 rounded-bl-[40px] relative">
+    <KeyboardAwareScrollView className="flex-1 bg-background" bounces={false} contentContainerStyle={{ paddingBottom: insets.bottom }}>
+      <ThemedView lightColor={Colors.dark.glassStrong} className="w-full px-6 pb-4 rounded-bl-[40px] relative" style={{ paddingTop: insets.top + 16 }}>
         <Pressable
           onPress={handlePrevStep}
-          className="absolute top-12 left-6 p-2 rounded-full z-20"
-          style={{ backgroundColor: "rgba(255, 255, 255, 0.08)", borderWidth: 1, borderColor: Colors.dark.border }}
+          className="absolute left-6 p-2 rounded-full z-20"
+          style={{ top: insets.top + 16, backgroundColor: "rgba(255, 255, 255, 0.08)", borderWidth: 1, borderColor: Colors.dark.border }}
         >
           <Ionicons name="arrow-back" size={24} color="white" />
         </Pressable>

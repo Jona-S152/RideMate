@@ -5,6 +5,8 @@ import React from "react";
 import { HapticTab } from "@/components/HapticTab";
 import TabBarBackground from "@/components/ui/TabBarBackground";
 import { Colors } from "@/constants/Colors";
+import { TAB_BAR_BOTTOM_OFFSET, TAB_BAR_HEIGHT } from "@/constants/layout";
+import { useAppInsets } from "@/hooks/useAppInsets";
 import { useColorScheme } from "@/hooks/useColorScheme";
 
 import Entypo from "@expo/vector-icons/Entypo";
@@ -15,6 +17,7 @@ import { useAuth } from "../context/AuthContext";
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const pathName = usePathname();
+  const insets = useAppInsets();
   const hideTabBar = [
     "route-detail",
     "route-preview",
@@ -54,10 +57,10 @@ export default function TabLayout() {
           ? { display: "none" }
           : {
             position: "absolute",
-            bottom: 20, // separación del borde inferior
+            bottom: TAB_BAR_BOTTOM_OFFSET + insets.bottom,
             left: 20,
             right: 20,
-            height: 70, // alto del tab bar
+            height: TAB_BAR_HEIGHT,
             backgroundColor: Colors[colorScheme ?? "light"].glassStrong,
             borderWidth: 1,
             borderColor: Colors[colorScheme ?? "light"].border,

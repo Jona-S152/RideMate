@@ -1,4 +1,5 @@
 import { Colors } from "@/constants/Colors";
+import { useAppInsets } from "@/hooks/useAppInsets";
 import { UserData } from "@/interfaces/available-routes";
 import { configService } from "@/services/config.service";
 import { tripService } from "@/services/trip.service";
@@ -46,6 +47,7 @@ export default function WaypointCheckInModal({
     onPassengerBoarded,
     onClose,
 }: WaypointCheckInModalProps) {
+    const insets = useAppInsets();
     const [loading, setLoading] = useState(false);
     const [step, setStep] = useState<1 | 2>(1);
     const [fareAmount, setFareAmount] = useState<number>(1.25);
@@ -214,7 +216,7 @@ export default function WaypointCheckInModal({
                 onPress={onClose}
             >
                 <Pressable onPress={(e) => e.stopPropagation()}>
-                    <View className="rounded-t-3xl p-6 pb-8 border-t border-slate-700" style={{ backgroundColor: Colors.dark.primary }}>
+                    <View className="rounded-t-3xl p-6 border-t border-slate-700" style={{ backgroundColor: Colors.dark.primary, paddingBottom: 24 + insets.bottom }}>
                         {/* Waypoint / Step Icon */}
                         <View className="items-center mb-4">
                             <View className={`w-20 h-20 ${getTypeColor()} rounded-full items-center justify-center shadow-lg`}>

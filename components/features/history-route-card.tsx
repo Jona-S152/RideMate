@@ -9,6 +9,16 @@ import { useState } from "react";
 import { Image, Pressable, Text, View } from "react-native";
 import { ThemedText } from "../ui/ThemedText";
 
+interface PassengerStatusSummary {
+  total: number;
+  joined: number;
+  pending: number;
+  completed: number;
+  cancelled: number;
+  left: number;
+  rejected: number;
+}
+
 interface HistoryRouteProps {
   title: string;
   startLocation: string;
@@ -27,6 +37,7 @@ interface HistoryRouteProps {
     id: string;
     avatar: string;
   }[];
+  passengerStatusSummary?: PassengerStatusSummary;
   pendingRequestsCount?: number;
   imageUrl?: string;
   vehicle?: Vehicle;
@@ -68,6 +79,7 @@ export default function RouteCard({
   passengerCount = 0,
   driver,
   passengersData = [],
+  passengerStatusSummary,
   pendingRequestsCount = 0,
   imageUrl,
   vehicle,
@@ -268,6 +280,36 @@ export default function RouteCard({
               >
                 {`${joinedCount}/${totalSeats} Asientos`}
               </ThemedText>
+            </View>
+          )}
+
+          {passengerStatusSummary && (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 6, marginTop: 8 }}>
+              {passengerStatusSummary.completed > 0 && (
+                <View style={{ backgroundColor: "rgba(16,185,129,0.12)", borderColor: "rgba(16,185,129,0.35)", borderWidth: 1, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 3 }}>
+                  <Text style={{ color: "#86EFAC", fontSize: 10, fontWeight: "700" }}>{passengerStatusSummary.completed} ok</Text>
+                </View>
+              )}
+              {passengerStatusSummary.joined > 0 && (
+                <View style={{ backgroundColor: "rgba(59,130,246,0.12)", borderColor: "rgba(59,130,246,0.35)", borderWidth: 1, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 3 }}>
+                  <Text style={{ color: "#93C5FD", fontSize: 10, fontWeight: "700" }}>{passengerStatusSummary.joined} unidos</Text>
+                </View>
+              )}
+              {passengerStatusSummary.cancelled > 0 && (
+                <View style={{ backgroundColor: "rgba(239,68,68,0.12)", borderColor: "rgba(239,68,68,0.35)", borderWidth: 1, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 3 }}>
+                  <Text style={{ color: "#FCA5A5", fontSize: 10, fontWeight: "700" }}>{passengerStatusSummary.cancelled} cancel</Text>
+                </View>
+              )}
+              {passengerStatusSummary.left > 0 && (
+                <View style={{ backgroundColor: "rgba(245,158,11,0.12)", borderColor: "rgba(245,158,11,0.35)", borderWidth: 1, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 3 }}>
+                  <Text style={{ color: "#FCD34D", fontSize: 10, fontWeight: "700" }}>{passengerStatusSummary.left} left</Text>
+                </View>
+              )}
+              {passengerStatusSummary.rejected > 0 && (
+                <View style={{ backgroundColor: "rgba(148,163,184,0.12)", borderColor: "rgba(148,163,184,0.35)", borderWidth: 1, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 3 }}>
+                  <Text style={{ color: "#E2E8F0", fontSize: 10, fontWeight: "700" }}>{passengerStatusSummary.rejected} rechaz</Text>
+                </View>
+              )}
             </View>
           )}
         </View>

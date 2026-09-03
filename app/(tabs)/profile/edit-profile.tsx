@@ -5,6 +5,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedTextInput } from "@/components/ThemedTextInput";
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
+import { useAppInsets } from "@/hooks/useAppInsets";
 import { useSafeBackHandler } from "@/hooks/useSafeBackHandler";
 import { userService } from "@/services/user.service";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,6 +18,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view
 
 export default function EditProfileScreen() {
     useSafeBackHandler("/(tabs)/profile");
+    const insets = useAppInsets();
     const { user, updateUser, refreshUser } = useAuth();
     const router = useRouter();
     const [changePassVisibleModal, setChangePassVisibleModal] = useState<boolean>(false);
@@ -162,10 +164,10 @@ export default function EditProfileScreen() {
     return (
         <KeyboardAwareScrollView className="flex-1 bg-background" bounces={false}>
             <AnimatedThemedView
-                style={{ height: headerHeight }}
                 lightColor={Colors.dark.glass}
                 darkColor={Colors.dark.glass}
-                className="w-full px-4 pt-6 rounded-bl-[40px] justify-center relative"
+                className="w-full px-4 rounded-bl-[40px] justify-center relative"
+                style={{ height: headerHeight, paddingTop: insets.top + 8 }}
             >
                 <Pressable
                     onPress={() => {
@@ -175,8 +177,9 @@ export default function EditProfileScreen() {
                             router.replace("/(tabs)/profile");
                         }
                     }}
-                    className="absolute top-10 left-6 p-2 rounded-full z-20"
+                    className="absolute left-6 p-2 rounded-full z-20"
                     style={({ pressed }) => [{
+                        top: insets.top + 16,
                         backgroundColor: pressed ? "rgba(255, 255, 255, 0.15)" : "rgba(255, 255, 255, 0.05)",
                         borderWidth: 1,
                         borderColor: Colors.dark.border
@@ -208,7 +211,7 @@ export default function EditProfileScreen() {
                 </View>
             </AnimatedThemedView>
 
-            <View className="px-6 py-8">
+            <View className="px-6 py-8" style={{ paddingBottom: 32 + insets.bottom }}>
                 <View className="mb-6">
                     <ThemedText className="text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Nombres</ThemedText>
                     <ThemedTextInput

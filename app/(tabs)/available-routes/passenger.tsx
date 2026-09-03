@@ -7,13 +7,15 @@ import MasonryGrid from "@/components/common/MasonryGrid";
 import AvailableRouteCard from "@/components/features/available-route-card";
 import { Colors } from "@/constants/Colors";
 import { useAvailableRoutesSubscription } from "@/hooks/useRealTime";
+import { useAppInsets } from "@/hooks/useAppInsets";
+import { useBottomTabOverflow } from "@/components/ui/TabBarBackground";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { SessionData } from "@/interfaces/available-routes";
 import { tripService } from "@/services/trip.service";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useIsFocused } from "@react-navigation/native";
 import { router } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Easing,
@@ -26,39 +28,53 @@ import Toast from "react-native-toast-message";
 
 export default function PassengerRoutesScreen() {
   const { user } = useAuth();
+  const insets = useAppInsets();
+  const tabOverflow = useBottomTabOverflow();
   const [text, setText] = useState<string>("");
   const [visibleFilters, setVisibleFilters] = useState<boolean>(false);
   const [selectedFilter, setSelectedFilter] = useState<string>("puntoPartida");
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [routes, setRoutes] = useState<SessionData[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const requestIdRef = useRef(0);
   const slideAnim = useRef(new Animated.Value(0)).current;
 
   const secondaryColor = useThemeColor({}, "secondary");
   const tirdColor = useThemeColor({}, "tird");
   const isFocused = useIsFocused();
 
-  useAvailableRoutesSubscription(() => {
+  const fetchRoutes = useCallback(async () => {
+    if (!user?.id) return;
+    const requestId = ++requestIdRef.current;
+    try {
+      const availableRoutes = await tripService.getPassengerRoutes(user.id);
+      if (requestId !== requestIdRef.current) return;
+      console.log("Fetch Passenger routes:", JSON.stringify(availableRoutes, null, 2));
+      setRoutes(availableRoutes);
+    } catch (error) {
+      if (requestId === requestIdRef.current) {
+        console.error("Error fetching passenger routes:", error);
+      }
+    } finally {
+      if (requestId === requestIdRef.current) {
+        setInitialLoading(false);
+      }
+    }
+  }, [user?.id]);
+
+  const handleRoutesUpdate = useCallback(() => {
     fetchRoutes();
-  });
+  }, [fetchRoutes]);
+
+  useAvailableRoutesSubscription(handleRoutesUpdate);
 
   useEffect(() => {
     if (isFocused && user?.driver_mode) {
       router.replace("/(tabs)/available-routes/driver");
       return;
     }
-    fetchRoutes();
-  }, [user?.driver_mode, isFocused]);
-
-  const fetchRoutes = async () => {
-    if (!user?.id) return;
-    try {
-      const availableRoutes = await tripService.getPassengerRoutes(user.id);
-      console.log("Fetch Passenger routes:", JSON.stringify(availableRoutes, null, 2));
-      setRoutes(availableRoutes);
-    } catch (error) {
-      console.error("Error fetching passenger routes:", error);
-    }
-  };
+    if (isFocused) fetchRoutes();
+  }, [user?.driver_mode, isFocused, fetchRoutes]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -173,6 +189,7 @@ export default function PassengerRoutesScreen() {
         lightColor={Colors.light.glass}
         darkColor={Colors.dark.glass}
         className="w-full px-4 py-6 rounded-bl-[40px]"
+        style={{ paddingTop: insets.top + 16 }}
       >
         <ThemedText className="font-semibold text-4xl py-3">
           Hola, {user?.name}
@@ -231,9 +248,10 @@ export default function PassengerRoutesScreen() {
         )}
       </ThemedView>
 
-      <View className="flex-1 mx-4 mt-4 mb-24">
+      <View className="flex-1 mx-4 mt-4">
         <ScrollView
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: tabOverflow }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -242,7 +260,13 @@ export default function PassengerRoutesScreen() {
             />
           }
         >
-          {filteredRoutes.length === 0 ? (
+          {initialLoading ? (
+            <View className="flex-1 items-center justify-center mt-20">
+              <ThemedText className="text-sm text-textSecondary">
+                Cargando rutas...
+              </ThemedText>
+            </View>
+          ) : filteredRoutes.length === 0 ? (
             <View className="flex-1 items-center justify-center mt-20">
               <Ionicons name="car-outline" size={80} color={tirdColor} />
               <ThemedText className="text-xl font-semibold mt-4 text-slate-500">

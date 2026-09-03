@@ -137,7 +137,7 @@ export default function RatingModal({
                                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                                             <Ionicons name="star" size={14} color={Colors.dark.danger} />
                                             <Text style={{ fontSize: 14, color: '#94a3b8', marginLeft: 4, fontWeight: 'bold' }}>
-                                                {userRating || "0.0"}
+                                                {(userRating ?? 0).toFixed(1)}
                                             </Text>
                                         </View>
                                     </View>
@@ -188,7 +188,7 @@ export default function RatingModal({
                                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                                             <Ionicons name="star" size={14} color={Colors.dark.danger} />
                                             <Text style={{ fontSize: 14, color: '#94a3b8', marginLeft: 4, fontWeight: 'bold' }}>
-                                                {userRating || "0.0"}
+                                                {(userRating ?? 0).toFixed(1)}
                                             </Text>
                                         </View>
                                     </View>
