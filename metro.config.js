@@ -2,7 +2,9 @@ const { getDefaultConfig } = require('expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
 
-// Asegura que Metro resuelva correctamente los módulos de Mapbox
-config.resolver.sourceExts = [...config.resolver.sourceExts, 'mjs', 'cjs'];
+// Evita que Metro bundlee los plugins nativos de Node
+config.resolver.blockList = [
+    /@rnmapbox\/maps\/plugin\/.*/,
+];
 
 module.exports = config;
