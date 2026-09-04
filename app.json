@@ -94,7 +94,12 @@
           "isAndroidLevelAndAboveForegroundServiceEnabled": true
         }
       ],
-      "@rnmapbox/maps",
+      [
+        "@rnmapbox/maps",
+        {
+          "RNMapboxMapsImpl": "mapbox"
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",
@@ -106,10 +111,7 @@
         }
       ],
       "expo-maps",
-      "expo-asset",
-      {
-        "RNMapboxMapsImpl": "mapbox"
-      }
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true
